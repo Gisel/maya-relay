@@ -63,6 +63,7 @@ class InMemorySupabaseClient:
 
         if table_name == "conversations":
             row.setdefault("status", "open")
+            row.setdefault("conversation_code", f"C{self._next_index(table_name):04d}")
             row.setdefault("updated_at", now)
 
         if table_name == "messages":
@@ -75,12 +76,11 @@ class InMemorySupabaseClient:
         return row
 
     def _enforce_uniques(self, table: "InMemoryTable", row: dict[str, Any]) -> None:
-        if table.name != "contacts":
-            return
-
         for existing in table.rows:
-            if existing.get("phone_number") == row.get("phone_number"):
+            if table.name == "contacts" and existing.get("phone_number") == row.get("phone_number"):
                 raise AssertionError(f"duplicate contacts.phone_number: {row.get('phone_number')}")
+            if table.name == "conversations" and existing.get("conversation_code") == row.get("conversation_code"):
+                raise AssertionError(f"duplicate conversations.conversation_code: {row.get('conversation_code')}")
 
     def _timestamp(self) -> str:
         self._clock += 1

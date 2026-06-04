@@ -11,6 +11,7 @@ class Conversation:
     customer_phone: str
     assigned_employee: str
     status: str
+    conversation_code: str
 
 
 @dataclass(frozen=True)

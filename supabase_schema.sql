@@ -13,6 +13,7 @@ create table if not exists public.conversations (
   id uuid primary key default gen_random_uuid(),
   customer_phone text not null,
   assigned_employee text not null,
+  conversation_code text unique,
   status text not null default 'open' check (status in ('open', 'closed')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -72,6 +73,17 @@ alter table public.contacts
   add column if not exists display_name text,
   add column if not exists lookup_name text,
   add column if not exists lookup_checked_at timestamptz;
+
+alter table public.conversations
+  add column if not exists conversation_code text;
+
+update public.conversations
+set conversation_code = upper(substr(replace(id::text, '-', ''), 1, 8))
+where conversation_code is null;
+
+create unique index if not exists conversations_code_idx
+  on public.conversations (conversation_code)
+  where conversation_code is not null;
 
 alter table public.message_attachments enable row level security;
 

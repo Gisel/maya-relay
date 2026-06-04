@@ -50,6 +50,7 @@ class FakeRepository:
             customer_phone=customer_phone,
             assigned_employee=assigned_employee,
             status="open",
+            conversation_code=f"C{len(self.conversations) + 1:04d}",
         )
         self.conversations.append(conversation)
         return conversation
@@ -57,6 +58,16 @@ class FakeRepository:
     def get_latest_employee_conversation(self, employee_phone: str) -> Conversation | None:
         for conversation in reversed(self.conversations):
             if conversation.assigned_employee == employee_phone and conversation.status == "open":
+                return conversation
+        return None
+
+    def get_open_conversation_by_code(self, employee_phone: str, conversation_code: str) -> Conversation | None:
+        for conversation in self.conversations:
+            if (
+                conversation.assigned_employee == employee_phone
+                and conversation.conversation_code == conversation_code.upper()
+                and conversation.status == "open"
+            ):
                 return conversation
         return None
 

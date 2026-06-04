@@ -1,9 +1,14 @@
+import re
+
 from app.attachments import AttachmentStore, NoopAttachmentStore
 from app.config import Settings
 from app.db import RelayRepository
 from app.lookup import ContactNameLookup, NoopContactNameLookup
 from app.models import IncomingMessage
 from app.twilio_client import MessageSender
+
+
+CONVERSATION_CODE_PATTERN = re.compile(r"(?:^|\s)#([A-Z0-9]{4,12})\b", re.IGNORECASE)
 
 
 class RelayService:
@@ -55,6 +60,7 @@ class RelayService:
             body=message.body,
             media_urls=media_urls,
             media_content_types=message.media_content_types,
+            conversation_code=conversation.conversation_code,
         )
         outbound_sid = self.sender.send_sms(to_phone=conversation.assigned_employee, body=forwarded_body)
         self.repository.create_message(
@@ -72,8 +78,28 @@ class RelayService:
         return {"status": "forwarded_to_employee", "conversation_id": conversation.id}
 
     def _handle_employee_reply(self, message: IncomingMessage) -> dict[str, str | None]:
-        conversation = self.repository.get_latest_employee_conversation(message.from_phone)
+        conversation_code = self._extract_conversation_code(message.body)
+        if conversation_code is None:
+            self.sender.send_sms(
+                to_phone=message.from_phone,
+                body="Please include the customer code, like #A1B2C3D4 your reply.",
+            )
+            return {"status": "missing_conversation_code", "conversation_id": None}
+
+        reply_body = self._remove_conversation_code(message.body).strip()
+        if not reply_body:
+            self.sender.send_sms(
+                to_phone=message.from_phone,
+                body=f"Please include a message after #{conversation_code}.",
+            )
+            return {"status": "missing_reply_body", "conversation_id": None}
+
+        conversation = self.repository.get_open_conversation_by_code(message.from_phone, conversation_code)
         if conversation is None:
+            self.sender.send_sms(
+                to_phone=message.from_phone,
+                body=f"I could not find an open conversation for #{conversation_code}. Check the code and try again.",
+            )
             return {"status": "no_open_conversation", "conversation_id": None}
 
         inbound_message = self.repository.create_message(
@@ -81,7 +107,7 @@ class RelayService:
             direction="employee_to_customer",
             from_phone=message.from_phone,
             to_phone=conversation.customer_phone,
-            body=message.body,
+            body=reply_body,
             twilio_message_sid=message.message_sid,
             num_media=message.num_media,
             media_urls=message.media_urls,
@@ -94,7 +120,7 @@ class RelayService:
         )
         forwarded_body = self._format_forwarded_body(
             from_label=self._contact_label(message.from_phone, default_prefix="Francisco"),
-            body=message.body,
+            body=reply_body,
             media_urls=media_urls,
             media_content_types=message.media_content_types,
         )
@@ -123,8 +149,10 @@ class RelayService:
         body: str,
         media_urls: tuple[str, ...],
         media_content_types: tuple[str, ...],
+        conversation_code: str | None = None,
     ) -> str:
-        lines = [f"From {from_label}:"]
+        suffix = f" [#{conversation_code}]" if conversation_code else ""
+        lines = [f"From {from_label}{suffix}:"]
         if body:
             lines.append(body)
         for index, media_url in enumerate(media_urls):
@@ -132,7 +160,18 @@ class RelayService:
             lines.append(f"Attachment {index + 1} ({content_type}): {media_url}")
         if len(lines) == 1:
             lines.append("[No message body]")
+        if conversation_code:
+            lines.append(f"Reply with #{conversation_code} your message")
         return "\n".join(lines)
+
+    def _extract_conversation_code(self, body: str) -> str | None:
+        match = CONVERSATION_CODE_PATTERN.search(body)
+        if match is None:
+            return None
+        return match.group(1).upper()
+
+    def _remove_conversation_code(self, body: str) -> str:
+        return CONVERSATION_CODE_PATTERN.sub(" ", body, count=1)
 
     def _contact_label(self, phone_number: str, *, default_prefix: str) -> str:
         contact = self.repository.get_or_create_contact(phone_number)

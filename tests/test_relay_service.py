@@ -38,7 +38,11 @@ def test_customer_message_creates_conversation_and_forwards_to_employee():
         {
             "sid": "SMfake1",
             "to_phone": "+15551234567",
-            "body": "From customer +15550000001:\nI need a sign quote.",
+            "body": (
+                "From customer +15550000001 [#C0001]:\n"
+                "I need a sign quote.\n"
+                "Reply with #C0001 your message"
+            ),
         }
     ]
     assert repository.messages[0]["direction"] == "customer_to_employee"
@@ -63,9 +67,10 @@ def test_customer_media_is_stored_and_forwarded_as_attachment_link():
     assert repository.messages[0]["num_media"] == 1
     assert repository.messages[0]["media_urls"] == ("https://api.twilio.com/media/image.jpg",)
     assert sender.sent_messages[0]["body"] == (
-        "From customer +15550000001:\n"
+        "From customer +15550000001 [#C0001]:\n"
         "Here is the design\n"
-        "Attachment 1 (image/jpeg): https://api.twilio.com/media/image.jpg"
+        "Attachment 1 (image/jpeg): https://api.twilio.com/media/image.jpg\n"
+        "Reply with #C0001 your message"
     )
 
 
@@ -84,7 +89,11 @@ def test_customer_lookup_name_is_cached_and_used_in_forwarded_label():
 
     assert lookup.looked_up == ["+15550000001"]
     assert repository.get_contact("+15550000001").lookup_name == "Maria Lopez"
-    assert sender.sent_messages[0]["body"] == "From Maria Lopez (+15550000001):\nHola"
+    assert sender.sent_messages[0]["body"] == (
+        "From Maria Lopez (+15550000001) [#C0001]:\n"
+        "Hola\n"
+        "Reply with #C0001 your message"
+    )
 
 
 def test_existing_contact_name_is_used_without_lookup():
@@ -104,7 +113,11 @@ def test_existing_contact_name_is_used_without_lookup():
     )
 
     assert lookup.looked_up == []
-    assert sender.sent_messages[0]["body"] == "From Saved Name (+15550000001):\nHola"
+    assert sender.sent_messages[0]["body"] == (
+        "From Saved Name (+15550000001) [#C0001]:\n"
+        "Hola\n"
+        "Reply with #C0001 your message"
+    )
 
 
 def test_employee_reply_does_not_use_lookup_for_default_label():
@@ -124,7 +137,7 @@ def test_employee_reply_does_not_use_lookup_for_default_label():
             message_sid="SMemployee",
             from_phone="+15551234567",
             to_phone="+13852208404",
-            body="Thanks.",
+            body="#C0001 Thanks.",
         )
     )
 
@@ -132,8 +145,36 @@ def test_employee_reply_does_not_use_lookup_for_default_label():
     assert sender.sent_messages[-1]["body"] == "From Francisco:\nThanks."
 
 
-def test_employee_reply_routes_to_latest_open_customer_conversation():
+def test_employee_reply_routes_by_conversation_code():
     service, _, sender = build_service()
+    service.handle_inbound_sms(
+        IncomingMessage(
+            message_sid="SMcustomer",
+            from_phone="+15550000001",
+            to_phone="+13852208404",
+            body="Hello",
+        )
+    )
+
+    result = service.handle_inbound_sms(
+        IncomingMessage(
+            message_sid="SMemployee",
+            from_phone="+15551234567",
+            to_phone="+13852208404",
+            body="#C0001 Thanks, send us the dimensions.",
+        )
+    )
+
+    assert result == {"status": "forwarded_to_customer", "conversation_id": "conversation-1"}
+    assert sender.sent_messages[-1] == {
+        "sid": "SMfake2",
+        "to_phone": "+15550000001",
+        "body": "From Francisco:\nThanks, send us the dimensions.",
+    }
+
+
+def test_employee_reply_missing_conversation_code_fails_safely():
+    service, repository, sender = build_service()
     service.handle_inbound_sms(
         IncomingMessage(
             message_sid="SMcustomer",
@@ -152,12 +193,35 @@ def test_employee_reply_routes_to_latest_open_customer_conversation():
         )
     )
 
-    assert result == {"status": "forwarded_to_customer", "conversation_id": "conversation-1"}
+    assert result == {"status": "missing_conversation_code", "conversation_id": None}
+    assert repository.messages[-1]["direction"] == "system"
     assert sender.sent_messages[-1] == {
         "sid": "SMfake2",
-        "to_phone": "+15550000001",
-        "body": "From Francisco:\nThanks, send us the dimensions.",
+        "to_phone": "+15551234567",
+        "body": "Please include the customer code, like #A1B2C3D4 your reply.",
     }
+
+
+def test_employee_reply_invalid_conversation_code_fails_safely():
+    service, _, sender = build_service()
+
+    result = service.handle_inbound_sms(
+        IncomingMessage(
+            message_sid="SMemployee",
+            from_phone="+15551234567",
+            to_phone="+13852208404",
+            body="#BAD12345 Thanks.",
+        )
+    )
+
+    assert result == {"status": "no_open_conversation", "conversation_id": None}
+    assert sender.sent_messages == [
+        {
+            "sid": "SMfake1",
+            "to_phone": "+15551234567",
+            "body": "I could not find an open conversation for #BAD12345. Check the code and try again.",
+        }
+    ]
 
 
 def test_employee_reply_without_open_conversation_fails_safely():
@@ -168,10 +232,16 @@ def test_employee_reply_without_open_conversation_fails_safely():
             message_sid="SMemployee",
             from_phone="+15551234567",
             to_phone="+13852208404",
-            body="Hello?",
+            body="#C9999 Hello?",
         )
     )
 
     assert result == {"status": "no_open_conversation", "conversation_id": None}
     assert repository.messages == []
-    assert sender.sent_messages == []
+    assert sender.sent_messages == [
+        {
+            "sid": "SMfake1",
+            "to_phone": "+15551234567",
+            "body": "I could not find an open conversation for #C9999. Check the code and try again.",
+        }
+    ]

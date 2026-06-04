@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from secrets import token_hex
 from typing import Any, Protocol
 
 from supabase import Client, create_client
@@ -8,11 +9,13 @@ from app.models import Contact, Conversation
 
 
 def _conversation_from_row(row: dict[str, Any]) -> Conversation:
+    conversation_code = row.get("conversation_code") or str(row["id"]).replace("-", "")[:8].upper()
     return Conversation(
         id=row["id"],
         customer_phone=row["customer_phone"],
         assigned_employee=row["assigned_employee"],
         status=row["status"],
+        conversation_code=conversation_code,
     )
 
 
@@ -23,6 +26,10 @@ def _contact_from_row(row: dict[str, Any]) -> Contact:
         display_name=row.get("display_name"),
         lookup_name=row.get("lookup_name"),
     )
+
+
+def _new_conversation_code() -> str:
+    return token_hex(4).upper()
 
 
 class RelayRepository(Protocol):
@@ -39,6 +46,9 @@ class RelayRepository(Protocol):
         ...
 
     def get_latest_employee_conversation(self, employee_phone: str) -> Conversation | None:
+        ...
+
+    def get_open_conversation_by_code(self, employee_phone: str, conversation_code: str) -> Conversation | None:
         ...
 
     def create_message(
@@ -95,7 +105,7 @@ class SupabaseRelayRepository:
 
         existing = (
             self.client.table("conversations")
-            .select("id, customer_phone, assigned_employee, status")
+            .select("id, customer_phone, assigned_employee, status, conversation_code")
             .eq("customer_phone", customer_phone)
             .eq("assigned_employee", assigned_employee)
             .eq("status", "open")
@@ -114,6 +124,7 @@ class SupabaseRelayRepository:
                     "customer_phone": customer_phone,
                     "assigned_employee": assigned_employee,
                     "status": "open",
+                    "conversation_code": _new_conversation_code(),
                 }
             )
             .execute()
@@ -158,10 +169,24 @@ class SupabaseRelayRepository:
     def get_latest_employee_conversation(self, employee_phone: str) -> Conversation | None:
         result = (
             self.client.table("conversations")
-            .select("id, customer_phone, assigned_employee, status")
+            .select("id, customer_phone, assigned_employee, status, conversation_code")
             .eq("assigned_employee", employee_phone)
             .eq("status", "open")
             .order("updated_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if not result.data:
+            return None
+        return _conversation_from_row(result.data[0])
+
+    def get_open_conversation_by_code(self, employee_phone: str, conversation_code: str) -> Conversation | None:
+        result = (
+            self.client.table("conversations")
+            .select("id, customer_phone, assigned_employee, status, conversation_code")
+            .eq("assigned_employee", employee_phone)
+            .eq("conversation_code", conversation_code.upper())
+            .eq("status", "open")
             .limit(1)
             .execute()
         )

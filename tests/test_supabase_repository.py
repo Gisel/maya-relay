@@ -77,6 +77,9 @@ def test_get_or_create_customer_conversation_creates_contact_and_open_conversati
 
     assert first == second
     assert first.status == "open"
+    assert len(first.conversation_code) == 8
+    assert first.conversation_code.isalnum()
+    assert first.conversation_code == first.conversation_code.upper()
     assert len(client.rows("contacts")) == 1
     assert len(client.rows("conversations")) == 1
 
@@ -111,6 +114,33 @@ def test_get_latest_employee_conversation_uses_open_status_and_latest_updated_at
 
     assert conversation is not None
     assert conversation.customer_phone == "+15550000003"
+
+
+def test_get_open_conversation_by_code_routes_employee_reply():
+    repository, client = build_repository()
+    client.seed(
+        "conversations",
+        [
+            {
+                "customer_phone": "+15550000001",
+                "assigned_employee": "+15551234567",
+                "conversation_code": "C0001",
+                "status": "open",
+            },
+            {
+                "customer_phone": "+15550000002",
+                "assigned_employee": "+15551234567",
+                "conversation_code": "C0002",
+                "status": "open",
+            },
+        ],
+    )
+
+    conversation = repository.get_open_conversation_by_code("+15551234567", "c0002")
+
+    assert conversation is not None
+    assert conversation.customer_phone == "+15550000002"
+    assert conversation.conversation_code == "C0002"
 
 
 def test_create_message_stores_real_row_shape():

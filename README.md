@@ -90,9 +90,10 @@ Set the same environment variables from `.env.example` in Railway's Variables ta
 
 - Customer texts Maya number.
 - App creates or reuses an open conversation.
-- App forwards the message to Francisco.
-- Francisco replies to Maya number.
-- App routes the reply to the latest open customer conversation assigned to Francisco.
+- App forwards the message to Francisco with a conversation code, such as `#A1B2C3D4`.
+- Francisco replies to Maya number with the code, such as `#A1B2C3D4 Yes, send measurements`.
+- App strips the code and routes the reply to that specific customer conversation.
+- If the code is missing or invalid, app texts Francisco back with a correction instead of guessing.
 
 ## MMS Attachments
 
