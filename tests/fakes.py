@@ -42,6 +42,9 @@ class FakeRepository:
         to_phone: str,
         body: str,
         twilio_message_sid: str | None = None,
+        num_media: int = 0,
+        media_urls: tuple[str, ...] = (),
+        media_content_types: tuple[str, ...] = (),
     ) -> dict[str, Any]:
         message = {
             "conversation_id": conversation_id,
@@ -50,6 +53,9 @@ class FakeRepository:
             "to_phone": to_phone,
             "body": body,
             "twilio_message_sid": twilio_message_sid,
+            "num_media": num_media,
+            "media_urls": media_urls,
+            "media_content_types": media_content_types,
         }
         self.messages.append(message)
         return message
@@ -80,4 +86,3 @@ class FakeSender:
         sid = f"SMfake{len(self.sent_messages) + 1}"
         self.sent_messages.append({"sid": sid, "to_phone": to_phone, "body": body})
         return sid
-

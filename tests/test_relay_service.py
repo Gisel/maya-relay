@@ -40,6 +40,30 @@ def test_customer_message_creates_conversation_and_forwards_to_employee():
     assert repository.messages[1]["direction"] == "system"
 
 
+def test_customer_media_is_stored_and_forwarded_as_attachment_link():
+    service, repository, sender = build_service()
+
+    service.handle_inbound_sms(
+        IncomingMessage(
+            message_sid="SMcustomer",
+            from_phone="+15550000001",
+            to_phone="+13852208404",
+            body="Here is the design",
+            num_media=1,
+            media_urls=("https://api.twilio.com/media/image.jpg",),
+            media_content_types=("image/jpeg",),
+        )
+    )
+
+    assert repository.messages[0]["num_media"] == 1
+    assert repository.messages[0]["media_urls"] == ("https://api.twilio.com/media/image.jpg",)
+    assert sender.sent_messages[0]["body"] == (
+        "From customer +15550000001:\n"
+        "Here is the design\n"
+        "Attachment 1 (image/jpeg): https://api.twilio.com/media/image.jpg"
+    )
+
+
 def test_employee_reply_routes_to_latest_open_customer_conversation():
     service, _, sender = build_service()
     service.handle_inbound_sms(
@@ -64,7 +88,7 @@ def test_employee_reply_routes_to_latest_open_customer_conversation():
     assert sender.sent_messages[-1] == {
         "sid": "SMfake2",
         "to_phone": "+15550000001",
-        "body": "Thanks, send us the dimensions.",
+        "body": "From Francisco:\nThanks, send us the dimensions.",
     }
 
 
@@ -83,4 +107,3 @@ def test_employee_reply_without_open_conversation_fails_safely():
     assert result == {"status": "no_open_conversation", "conversation_id": None}
     assert repository.messages == []
     assert sender.sent_messages == []
-

@@ -95,6 +95,29 @@ def test_twilio_sms_webhook_acknowledges_with_empty_twiml():
     assert sender.sent_messages[0]["to_phone"] == "+15551234567"
 
 
+def test_twilio_sms_webhook_parses_media_fields():
+    client, repository, sender = make_client()
+
+    response = client.post(
+        "/webhooks/twilio/sms",
+        data={
+            "MessageSid": "SMinbound",
+            "From": "+15550000001",
+            "To": "+13852208404",
+            "Body": "See attached",
+            "NumMedia": "1",
+            "MediaUrl0": "https://api.twilio.com/media/image.jpg",
+            "MediaContentType0": "image/jpeg",
+        },
+    )
+
+    assert response.status_code == 200
+    assert repository.messages[0]["num_media"] == 1
+    assert repository.messages[0]["media_urls"] == ("https://api.twilio.com/media/image.jpg",)
+    assert repository.messages[0]["media_content_types"] == ("image/jpeg",)
+    assert "Attachment 1 (image/jpeg)" in sender.sent_messages[0]["body"]
+
+
 def test_status_callback_updates_message_status():
     client, repository, _ = make_client()
 

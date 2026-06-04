@@ -23,6 +23,9 @@ create table if not exists public.messages (
   to_phone text not null,
   body text not null,
   twilio_message_sid text,
+  num_media integer not null default 0,
+  media_urls jsonb not null default '[]'::jsonb,
+  media_content_types jsonb not null default '[]'::jsonb,
   delivery_status text,
   delivery_error_code text,
   delivery_error_message text,
@@ -41,6 +44,11 @@ create index if not exists messages_conversation_created_idx
 create index if not exists messages_twilio_sid_idx
   on public.messages (twilio_message_sid)
   where twilio_message_sid is not null;
+
+alter table public.messages
+  add column if not exists num_media integer not null default 0,
+  add column if not exists media_urls jsonb not null default '[]'::jsonb,
+  add column if not exists media_content_types jsonb not null default '[]'::jsonb;
 
 create or replace function public.set_updated_at()
 returns trigger

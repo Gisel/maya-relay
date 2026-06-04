@@ -40,6 +40,36 @@ def _public_request_url(request: Request) -> str:
     return str(request.url)
 
 
+async def _incoming_message_from_request(
+    request: Request,
+    *,
+    message_sid: str,
+    from_phone: str,
+    to_phone: str,
+    body: str,
+    num_media: int,
+) -> IncomingMessage:
+    form = await request.form()
+    media_urls: list[str] = []
+    media_content_types: list[str] = []
+    for index in range(num_media):
+        media_url = form.get(f"MediaUrl{index}")
+        media_content_type = form.get(f"MediaContentType{index}")
+        if isinstance(media_url, str) and media_url:
+            media_urls.append(media_url)
+        if isinstance(media_content_type, str) and media_content_type:
+            media_content_types.append(media_content_type)
+    return IncomingMessage(
+        message_sid=message_sid,
+        from_phone=from_phone,
+        to_phone=to_phone,
+        body=body,
+        num_media=num_media,
+        media_urls=tuple(media_urls),
+        media_content_types=tuple(media_content_types),
+    )
+
+
 @router.post("/sms")
 async def inbound_sms(
     request: Request,
@@ -55,7 +85,8 @@ async def inbound_sms(
         return PlainTextResponse("Forbidden", status_code=403)
 
     relay_service.handle_inbound_sms(
-        IncomingMessage(
+        await _incoming_message_from_request(
+            request,
             message_sid=MessageSid,
             from_phone=From,
             to_phone=To,

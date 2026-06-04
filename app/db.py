@@ -31,6 +31,9 @@ class RelayRepository(Protocol):
         to_phone: str,
         body: str,
         twilio_message_sid: str | None = None,
+        num_media: int = 0,
+        media_urls: tuple[str, ...] = (),
+        media_content_types: tuple[str, ...] = (),
     ) -> dict[str, Any]:
         ...
 
@@ -106,6 +109,9 @@ class SupabaseRelayRepository:
         to_phone: str,
         body: str,
         twilio_message_sid: str | None = None,
+        num_media: int = 0,
+        media_urls: tuple[str, ...] = (),
+        media_content_types: tuple[str, ...] = (),
     ) -> dict[str, Any]:
         result = (
             self.client.table("messages")
@@ -117,6 +123,9 @@ class SupabaseRelayRepository:
                     "to_phone": to_phone,
                     "body": body,
                     "twilio_message_sid": twilio_message_sid,
+                    "num_media": num_media,
+                    "media_urls": list(media_urls),
+                    "media_content_types": list(media_content_types),
                 }
             )
             .execute()

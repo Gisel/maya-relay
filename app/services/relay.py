@@ -27,9 +27,17 @@ class RelayService:
             to_phone=message.to_phone,
             body=message.body,
             twilio_message_sid=message.message_sid,
+            num_media=message.num_media,
+            media_urls=message.media_urls,
+            media_content_types=message.media_content_types,
         )
 
-        forwarded_body = f"From customer {message.from_phone}:\n{message.body}"
+        forwarded_body = self._format_forwarded_body(
+            from_label=f"customer {message.from_phone}",
+            body=message.body,
+            media_urls=message.media_urls,
+            media_content_types=message.media_content_types,
+        )
         outbound_sid = self.sender.send_sms(to_phone=conversation.assigned_employee, body=forwarded_body)
         self.repository.create_message(
             conversation_id=conversation.id,
@@ -38,6 +46,9 @@ class RelayService:
             to_phone=conversation.assigned_employee,
             body=forwarded_body,
             twilio_message_sid=outbound_sid,
+            num_media=message.num_media,
+            media_urls=message.media_urls,
+            media_content_types=message.media_content_types,
         )
 
         return {"status": "forwarded_to_employee", "conversation_id": conversation.id}
@@ -54,15 +65,27 @@ class RelayService:
             to_phone=conversation.customer_phone,
             body=message.body,
             twilio_message_sid=message.message_sid,
+            num_media=message.num_media,
+            media_urls=message.media_urls,
+            media_content_types=message.media_content_types,
         )
-        outbound_sid = self.sender.send_sms(to_phone=conversation.customer_phone, body=message.body)
+        forwarded_body = self._format_forwarded_body(
+            from_label="Francisco",
+            body=message.body,
+            media_urls=message.media_urls,
+            media_content_types=message.media_content_types,
+        )
+        outbound_sid = self.sender.send_sms(to_phone=conversation.customer_phone, body=forwarded_body)
         self.repository.create_message(
             conversation_id=conversation.id,
             direction="system",
             from_phone=self.settings.maya_business_number,
             to_phone=conversation.customer_phone,
-            body=message.body,
+            body=forwarded_body,
             twilio_message_sid=outbound_sid,
+            num_media=message.num_media,
+            media_urls=message.media_urls,
+            media_content_types=message.media_content_types,
         )
 
         return {"status": "forwarded_to_customer", "conversation_id": conversation.id}
@@ -70,3 +93,20 @@ class RelayService:
     def _is_employee(self, phone_number: str) -> bool:
         return phone_number == self.settings.francisco_phone
 
+    def _format_forwarded_body(
+        self,
+        *,
+        from_label: str,
+        body: str,
+        media_urls: tuple[str, ...],
+        media_content_types: tuple[str, ...],
+    ) -> str:
+        lines = [f"From {from_label}:"]
+        if body:
+            lines.append(body)
+        for index, media_url in enumerate(media_urls):
+            content_type = media_content_types[index] if index < len(media_content_types) else "attachment"
+            lines.append(f"Attachment {index + 1} ({content_type}): {media_url}")
+        if len(lines) == 1:
+            lines.append("[No message body]")
+        return "\n".join(lines)

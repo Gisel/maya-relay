@@ -20,4 +20,5 @@ class IncomingMessage:
     to_phone: str
     body: str
     num_media: int = 0
-
+    media_urls: tuple[str, ...] = ()
+    media_content_types: tuple[str, ...] = ()
