@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+from twilio.request_validator import RequestValidator
 
 from app.config import Settings, get_settings
 from app.dependencies import get_relay_service, get_repository
@@ -7,13 +8,15 @@ from app.services.relay import RelayService
 from tests.fakes import FakeRepository, FakeSender
 
 
-def make_client(*, verify_twilio_signature: bool = False) -> tuple[TestClient, FakeRepository, FakeSender]:
+def make_client(
+    *, verify_twilio_signature: bool = False, twilio_auth_token: str = ""
+) -> tuple[TestClient, FakeRepository, FakeSender]:
     settings = Settings(
         FRANCISCO_PHONE="+15551234567",
         MAYA_BUSINESS_NUMBER="+13852208404",
         VERIFY_TWILIO_SIGNATURE=verify_twilio_signature,
         TWILIO_ACCOUNT_SID="",
-        TWILIO_AUTH_TOKEN="",
+        TWILIO_AUTH_TOKEN=twilio_auth_token,
         TWILIO_MESSAGING_SERVICE_SID="",
         SUPABASE_URL="",
         SUPABASE_SERVICE_ROLE_KEY="",
@@ -131,6 +134,33 @@ def test_unsigned_sms_webhook_is_rejected_when_signature_validation_is_enabled()
     assert response.text == "Forbidden"
     assert repository.messages == []
     assert sender.sent_messages == []
+
+
+def test_signed_sms_webhook_uses_forwarded_public_url_for_validation():
+    client, repository, sender = make_client(verify_twilio_signature=True, twilio_auth_token="token")
+    url = "https://maya-relay-production.up.railway.app/webhooks/twilio/sms"
+    data = {
+        "MessageSid": "SMinbound",
+        "From": "+15550000001",
+        "To": "+13852208404",
+        "Body": "Need a quote",
+        "NumMedia": "0",
+    }
+    signature = RequestValidator("token").compute_signature(url, data)
+
+    response = client.post(
+        "/webhooks/twilio/sms",
+        data=data,
+        headers={
+            "X-Twilio-Signature": signature,
+            "x-forwarded-proto": "https",
+            "x-forwarded-host": "maya-relay-production.up.railway.app",
+        },
+    )
+
+    assert response.status_code == 200
+    assert len(repository.messages) == 2
+    assert sender.sent_messages[0]["to_phone"] == "+15551234567"
 
 
 def test_unsigned_status_callback_is_rejected_when_signature_validation_is_enabled():

@@ -24,7 +24,20 @@ async def _validate_twilio_request(request: Request, settings: Settings) -> bool
     signature = request.headers.get("X-Twilio-Signature", "")
     form = dict(await request.form())
     validator = RequestValidator(settings.twilio_auth_token)
-    return validator.validate(str(request.url), form, signature)
+    return validator.validate(_public_request_url(request), form, signature)
+
+
+def _public_request_url(request: Request) -> str:
+    forwarded_proto = request.headers.get("x-forwarded-proto")
+    forwarded_host = request.headers.get("x-forwarded-host") or request.headers.get("host")
+
+    if forwarded_proto and forwarded_host:
+        url = f"{forwarded_proto}://{forwarded_host}{request.url.path}"
+        if request.url.query:
+            url = f"{url}?{request.url.query}"
+        return url
+
+    return str(request.url)
 
 
 @router.post("/sms")
