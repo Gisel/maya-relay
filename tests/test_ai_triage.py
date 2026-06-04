@@ -21,10 +21,25 @@ def test_extract_response_text_supports_raw_responses_output_shape():
     assert _extract_response_text(payload) == "Intent: quote request\nMissing: dimensions"
 
 
-def test_compact_summary_limits_to_three_lines_and_320_characters():
+def test_compact_summary_limits_to_three_content_lines_and_360_characters():
     summary = _compact_summary("\n".join([f"Line {index}" for index in range(1, 8)]))
 
     assert summary == "Line 1\nLine 2\nLine 3"
+
+
+def test_compact_summary_adds_separator_before_suggested_reply():
+    summary = _compact_summary(
+        "Intent: quote request\n"
+        "Missing: size and deadline\n"
+        "#C0001 Please send size and deadline."
+    )
+
+    assert summary == (
+        "Intent: quote request\n"
+        "Missing: size and deadline\n"
+        "---\n"
+        "#C0001 Please send size and deadline."
+    )
 
 
 def test_openai_triage_uses_low_reasoning_and_enough_output_tokens(monkeypatch):

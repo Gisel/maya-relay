@@ -101,4 +101,9 @@ def _extract_response_text(payload: dict) -> str | None:
 
 def _compact_summary(text: str) -> str:
     lines = [line.strip() for line in text.splitlines() if line.strip()]
-    return "\n".join(lines[:3])[:320]
+    compact_lines = lines[:3]
+    for index, line in enumerate(compact_lines):
+        if index > 0 and line.startswith("#"):
+            compact_lines.insert(index, "---")
+            break
+    return "\n".join(compact_lines)[:360]
