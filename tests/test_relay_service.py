@@ -16,6 +16,7 @@ def build_service(
         EMPLOYEE_PHONE_NUMBERS=employee_phone_numbers,
         MAYA_BUSINESS_NUMBER="+13852208404",
         VERIFY_TWILIO_SIGNATURE=False,
+        ENABLE_AI_TRIAGE=False,
     )
     repository = FakeRepository()
     sender = FakeSender()

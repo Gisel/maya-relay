@@ -56,12 +56,39 @@ class OpenAIMessageTriage:
         except requests.RequestException:
             return None
 
-        output_text = response.json().get("output_text")
-        if not isinstance(output_text, str):
+        output_text = _extract_response_text(response.json())
+        if output_text is None:
             return None
 
         summary = _compact_summary(output_text)
         return summary or None
+
+
+def _extract_response_text(payload: dict) -> str | None:
+    output_text = payload.get("output_text")
+    if isinstance(output_text, str):
+        return output_text
+
+    parts: list[str] = []
+    output = payload.get("output")
+    if not isinstance(output, list):
+        return None
+
+    for item in output:
+        if not isinstance(item, dict):
+            continue
+        content = item.get("content")
+        if not isinstance(content, list):
+            continue
+        for content_item in content:
+            if not isinstance(content_item, dict):
+                continue
+            text = content_item.get("text")
+            if isinstance(text, str):
+                parts.append(text)
+
+    text = "\n".join(parts).strip()
+    return text or None
 
 
 def _compact_summary(text: str) -> str:
