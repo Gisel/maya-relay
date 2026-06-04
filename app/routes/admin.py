@@ -48,10 +48,12 @@ def admin_index(
     if not _is_authenticated(request, settings):
         return HTMLResponse(_layout("Maya Admin", _login_form()))
 
+    query = (request.query_params.get("q") or "").strip()
     conversations = repository.list_conversations()
     metrics = _conversation_metrics(conversations)
+    visible_conversations = _filter_conversations(conversations, query)
     rows = []
-    for conversation in conversations:
+    for conversation in visible_conversations:
         last_message = conversation.get("last_message") or {}
         customer = conversation.get("customer_name") or conversation["customer_phone"]
         body = str(last_message.get("body") or "")
@@ -74,10 +76,11 @@ def admin_index(
         "<a class='button' href='/admin/logout'>Logout</a>"
         "</section>"
         f"{_metrics_bar(metrics)}"
+        f"{_search_bar(query, len(visible_conversations), len(conversations))}"
         "<table>"
         "<thead><tr><th>Code</th><th>Customer</th><th>Status</th><th>Last direction</th>"
         "<th>Last message</th><th>Delivery</th><th>Updated</th></tr></thead>"
-        f"<tbody>{''.join(rows) or '<tr><td colspan=\"7\">No conversations yet.</td></tr>'}</tbody>"
+        f"<tbody>{''.join(rows) or '<tr><td colspan=\"7\">No matching conversations.</td></tr>'}</tbody>"
         "</table>"
     )
     return HTMLResponse(_layout("Maya Admin", content))
@@ -194,6 +197,41 @@ def _metrics_bar(metrics: dict[str, int]) -> str:
     return f"<section class='metrics'>{cards}</section>"
 
 
+def _search_bar(query: str, visible_count: int, total_count: int) -> str:
+    result_text = f"{visible_count} of {total_count} conversations"
+    clear_link = "<a class='clear' href='/admin'>Clear</a>" if query else ""
+    return (
+        "<form class='search' method='get' action='/admin'>"
+        f"<input type='search' name='q' value='{_e(query)}' "
+        "placeholder='Search name, phone, code, delivery, or message text'>"
+        "<button type='submit'>Search</button>"
+        f"<span>{_e(result_text)}</span>{clear_link}"
+        "</form>"
+    )
+
+
+def _filter_conversations(conversations: list[dict], query: str) -> list[dict]:
+    if not query:
+        return conversations
+    needle = query.casefold()
+    return [conversation for conversation in conversations if needle in _conversation_search_text(conversation)]
+
+
+def _conversation_search_text(conversation: dict) -> str:
+    last_message = conversation.get("last_message") or {}
+    parts = [
+        conversation.get("conversation_code"),
+        conversation.get("customer_phone"),
+        conversation.get("customer_name"),
+        conversation.get("status"),
+        last_message.get("body"),
+        last_message.get("direction"),
+        last_message.get("delivery_status"),
+        last_message.get("delivery_error_code"),
+    ]
+    return " ".join(str(part) for part in parts if part).casefold()
+
+
 def _format_time(value: object) -> str:
     if not value:
         return ""
@@ -222,6 +260,9 @@ h1{font-size:22px;margin:0}
 .metric{background:white;border:1px solid #dde1e7;border-radius:8px;padding:16px}
 .metric strong{display:block;font-size:28px;line-height:1}
 .metric span{display:block;color:#667085;font-size:12px;text-transform:uppercase;margin-top:8px;font-weight:700}
+.search{display:grid;grid-template-columns:minmax(220px,1fr) auto auto auto;gap:10px;align-items:center;margin:16px;background:white;border:1px solid #dde1e7;border-radius:8px;padding:12px}
+.search input{width:100%}
+.search span,.search .clear{font-size:13px;color:#667085}
 table{width:calc(100% - 32px);margin:16px;border-collapse:collapse;background:white;border:1px solid #dde1e7}
 th,td{padding:12px;border-bottom:1px solid #edf0f4;text-align:left;vertical-align:top;font-size:14px}
 th{font-size:12px;text-transform:uppercase;color:#667085;background:#fbfcfd}
@@ -239,5 +280,5 @@ pre{white-space:pre-wrap;font:14px/1.45 ui-monospace,SFMono-Regular,Menlo,monosp
 .login{min-height:100vh;display:grid;place-content:center;gap:16px}
 .login form{display:flex;gap:8px}
 input{padding:10px 12px;border:1px solid #cbd2dc;border-radius:6px;font-size:14px}
-@media(max-width:900px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}table{display:block;overflow-x:auto}}
+@media(max-width:900px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.search{grid-template-columns:1fr}table{display:block;overflow-x:auto}}
 """
