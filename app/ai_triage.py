@@ -1,0 +1,69 @@
+from typing import Protocol
+
+import requests
+
+from app.config import Settings
+
+
+class MessageTriage(Protocol):
+    def summarize(self, *, body: str, has_attachments: bool) -> str | None:
+        ...
+
+
+class NoopMessageTriage:
+    def summarize(self, *, body: str, has_attachments: bool) -> str | None:
+        return None
+
+
+class OpenAIMessageTriage:
+    def __init__(self, settings: Settings):
+        if not settings.openai_api_key:
+            raise RuntimeError("OPENAI_API_KEY is required when ENABLE_AI_TRIAGE=true.")
+        self.api_key = settings.openai_api_key
+        self.model = settings.openai_model
+
+    def summarize(self, *, body: str, has_attachments: bool) -> str | None:
+        if not body.strip() and not has_attachments:
+            return None
+
+        prompt = (
+            "Customer message:\n"
+            f"{body.strip() or '[No text body]'}\n\n"
+            f"Has attachments: {'yes' if has_attachments else 'no'}"
+        )
+        try:
+            response = requests.post(
+                "https://api.openai.com/v1/responses",
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": self.model,
+                    "instructions": (
+                        "You triage inbound messages for Maya Graphics and Signs. "
+                        "Write a concise internal SMS note for Francisco, not for the customer. "
+                        "Use at most 4 short lines. Include intent, key details, missing info, "
+                        "and a suggested reply only when useful. Be bilingual if the customer writes Spanish. "
+                        "Do not invent prices, commitments, timelines, or policies."
+                    ),
+                    "input": prompt,
+                    "max_output_tokens": 120,
+                },
+                timeout=12,
+            )
+            response.raise_for_status()
+        except requests.RequestException:
+            return None
+
+        output_text = response.json().get("output_text")
+        if not isinstance(output_text, str):
+            return None
+
+        summary = _compact_summary(output_text)
+        return summary or None
+
+
+def _compact_summary(text: str) -> str:
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    return "\n".join(lines[:4])[:500]

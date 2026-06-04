@@ -2,46 +2,65 @@
 
 ## Objective
 
-Build a communication relay platform for Maya Graphics and Signs that allows customers to communicate through the Maya business number while employees continue using their native cellphone messaging applications.
+Build a communication relay platform for Maya Graphics and Signs that lets customers communicate through the Maya business number while employees continue using native cellphone messaging.
 
-No dashboards.
+For the current MVP, there is no employee dashboard and no CRM requirement. The backend acts as a routing layer between customers, Twilio, Supabase, and Francisco.
 
-No CRM requirement for MVP.
+## Current Production State
 
-No additional apps required for employees.
+### SMS / MMS
 
-The system acts as a routing layer between customers and employees.
+- Maya business number: `+1 (385) 220-8404`
+- SMS enabled and tested.
+- MMS enabled and tested.
+- A2P campaign approved as Low Volume Mixed.
+- Twilio Messaging Service and sender pool configured.
+- Railway deployment is live.
+- Supabase stores contacts, conversations, messages, delivery status, and attachments.
+- Incoming media is copied from Twilio to the Supabase `attachments` bucket.
 
-## Current State
+### Routing
 
-### Twilio
+Customer SMS flow:
 
-Business number:
+```text
+Customer
+  -> Maya Twilio number
+  -> FastAPI webhook
+  -> Supabase conversation/message records
+  -> Francisco native SMS app
+```
 
-`+1 (385) 220-8404`
+Francisco reply flow:
 
-Status:
+```text
+Francisco replies with #conversation_code
+  -> Maya Twilio number
+  -> FastAPI webhook
+  -> Supabase conversation lookup
+  -> Original customer
+```
 
-- SMS enabled
-- MMS enabled
-- A2P campaign approved
-- Messaging Service configured
-- Sender pool configured
+The conversation code is required while Francisco stays in a native SMS app, because multiple customers arrive in the same Maya SMS thread. The app validates the code and refuses to guess when the code is missing or invalid.
 
-Campaign:
+### Contact Names
 
-- Low Volume Mixed
-- Status: Verified
+- `FRANCISCO_PHONE` is the primary employee phone and comes from Railway/.env.
+- `EMPLOYEE_PHONE_NUMBERS` optionally allows additional reply phones.
+- Twilio Lookup can be enabled with `ENABLE_TWILIO_LOOKUP=true`.
+- Lookup results are cached in `contacts.lookup_name`.
+- Manual `contacts.display_name` takes precedence over Lookup.
 
-SMS testing:
+### AI Triage
 
-- Incoming SMS: working
-- Outgoing SMS: working
-- Delivery confirmed
+- Optional AI triage is available behind `ENABLE_AI_TRIAGE=true`.
+- It adds a short internal note to Francisco's forwarded SMS.
+- AI does not auto-reply to customers.
+- The relay fails open if the AI call fails.
 
 ### Voice System
 
-Production IVR completed.
+Production IVR is already completed and remains separate from this SMS relay.
 
 Features:
 
@@ -53,65 +72,14 @@ Features:
 - English voicemail
 - Spanish voicemail
 
-Voice routing remains functional.
+## Current Technology Stack
 
-### WhatsApp
-
-Current status:
-
-- Existing WhatsApp Business Account exists
-- Incorrect test sender registered previously
-- Need Meta admin access to remove old sender
-- Need to register `+1 (385) 220-8404` as production WhatsApp sender
-
-Do not work on WhatsApp until Meta access is available.
-
-## Maya Relay MVP
-
-```text
-Customer SMS
-  -> Twilio
-  -> FastAPI
-  -> Supabase
-  -> Forward SMS to Francisco
-
-Francisco replies via native SMS app
-  -> Twilio
-  -> FastAPI
-  -> Route response to original customer
-```
-
-Customer always sees Maya Graphics business number.
-
-Employee always uses native phone messaging application.
-
-## Technology Stack
-
-Backend:
-
-- Python 3.12
-- FastAPI
-
-Database:
-
-- Supabase
-
-Hosting:
-
-- Railway
-
-Messaging:
-
-- Twilio SMS
-- Twilio WhatsApp future phase
-
-Repository:
-
-- GitHub
-
-AI:
-
-- OpenAI future phase
+- Backend: Python 3.12, FastAPI
+- Database: Supabase
+- Hosting: Railway
+- Messaging: Twilio SMS/MMS now, WhatsApp future phase
+- AI: OpenAI Responses API for optional internal triage
+- Repository: GitHub
 
 ## Database Tables
 
@@ -119,6 +87,9 @@ AI:
 
 - `id`
 - `phone_number`
+- `display_name`
+- `lookup_name`
+- `lookup_checked_at`
 - `created_at`
 
 `conversations`
@@ -126,6 +97,7 @@ AI:
 - `id`
 - `customer_phone`
 - `assigned_employee`
+- `conversation_code`
 - `status`
 - `created_at`
 - `updated_at`
@@ -135,52 +107,75 @@ AI:
 - `id`
 - `conversation_id`
 - `direction`
+- `from_phone`
+- `to_phone`
 - `body`
+- `twilio_message_sid`
+- `num_media`
+- `media_urls`
+- `media_content_types`
+- `delivery_status`
+- `delivery_error_code`
+- `delivery_error_message`
 - `created_at`
 
-## Development Order
+`message_attachments`
 
-### Phase 1: Infrastructure
+- `id`
+- `message_id`
+- `bucket`
+- `object_path`
+- `public_url`
+- `source_url`
+- `content_type`
+- `size_bytes`
+- `created_at`
 
-- GitHub repo
-- Railway project
-- Supabase project
-- Environment variables
+## Pending Work
 
-### Phase 2: FastAPI
+### WhatsApp Relay
 
-- `/health`
-- `/webhooks/twilio/sms`
-- `/webhooks/twilio/employee`
+Blocked until Meta/Twilio sender setup is ready:
 
-### Phase 3: SMS Relay
+- Get Meta admin access.
+- Remove or release the incorrect test sender.
+- Register `+1 (385) 220-8404` as the production WhatsApp sender.
+- Wait for sender status to become `ONLINE`.
+- Configure inbound and status webhooks.
 
-- Customer -> Francisco
-- Francisco -> Customer
+Implementation after setup:
 
-### Phase 4: Conversation Tracking
+- Add channel-aware message handling for SMS and WhatsApp.
+- Preserve WhatsApp addresses as `whatsapp:+E.164`.
+- Route WhatsApp customer messages through the same conversation model.
+- Respect WhatsApp's 24-hour free-form service window.
+- Use approved templates for outbound messages outside the service window.
 
-- Conversation IDs
-- Multiple simultaneous customers
+### Contact Upload
 
-### Phase 5: WhatsApp Relay
+CSV upload is deferred. Expected first version:
 
-- Same architecture
-- Channel abstraction
+- CSV columns: `phone_number`, `display_name`
+- Upsert by `phone_number`
+- Uploaded `display_name` overrides Twilio Lookup display
+- Blank CSV names should not erase existing names by default
 
-### Phase 6: AI Assistant
+### Future AI
+
+Potential later additions:
 
 - Lead qualification
-- Auto responses
-- Escalation to employee
+- Missing-information prompts
+- Draft replies for Francisco
+- Escalation detection
+- Auto-response only after explicit approval and guardrails
 
 ## Success Criteria
 
 - Customer texts Maya number.
-- Francisco receives message on cellphone.
-- Francisco replies from cellphone.
-- Customer receives response from Maya number.
-- No dashboard required.
-- No app required.
-- No manual routing required.
-
+- Francisco receives the message on his cellphone.
+- Francisco replies from native SMS using the conversation code.
+- Customer receives the response from Maya's business number.
+- Customer attachments are preserved and forwarded.
+- Francisco can identify the correct customer even when multiple conversations are active.
+- Optional AI helps Francisco triage but never sends customer-facing text automatically.

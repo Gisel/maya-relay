@@ -2,13 +2,14 @@ from app.config import Settings
 from app.models import Contact
 from app.models import IncomingMessage
 from app.services.relay import RelayService
-from tests.fakes import FakeLookup, FakeRepository, FakeSender
+from tests.fakes import FakeLookup, FakeRepository, FakeSender, FakeTriage
 
 
 def build_service(
     lookup: FakeLookup | None = None,
     *,
     employee_phone_numbers: str = "",
+    triage: FakeTriage | None = None,
 ) -> tuple[RelayService, FakeRepository, FakeSender]:
     settings = Settings(
         FRANCISCO_PHONE="+15551234567",
@@ -19,7 +20,13 @@ def build_service(
     repository = FakeRepository()
     sender = FakeSender()
     return (
-        RelayService(settings=settings, repository=repository, sender=sender, contact_name_lookup=lookup),
+        RelayService(
+            settings=settings,
+            repository=repository,
+            sender=sender,
+            contact_name_lookup=lookup,
+            message_triage=triage,
+        ),
         repository,
         sender,
     )
@@ -97,6 +104,49 @@ def test_customer_lookup_name_is_cached_and_used_in_forwarded_label():
     assert sender.sent_messages[0]["body"] == (
         "From Maria Lopez (+15550000001) [#C0001]:\n"
         "Hola\n"
+        "Reply with #C0001 your message"
+    )
+
+
+def test_customer_message_includes_ai_triage_note_when_available():
+    triage = FakeTriage("Intent: quote request\nMissing: size and deadline")
+    service, _, sender = build_service(triage=triage)
+
+    service.handle_inbound_sms(
+        IncomingMessage(
+            message_sid="SMcustomer",
+            from_phone="+15550000001",
+            to_phone="+13852208404",
+            body="I need a banner quote.",
+        )
+    )
+
+    assert triage.calls == [{"body": "I need a banner quote.", "has_attachments": False}]
+    assert sender.sent_messages[0]["body"] == (
+        "From customer +15550000001 [#C0001]:\n"
+        "AI note:\n"
+        "Intent: quote request\n"
+        "Missing: size and deadline\n"
+        "I need a banner quote.\n"
+        "Reply with #C0001 your message"
+    )
+
+
+def test_customer_message_still_forwards_when_ai_triage_fails():
+    service, _, sender = build_service(triage=FakeTriage(should_raise=True))
+
+    service.handle_inbound_sms(
+        IncomingMessage(
+            message_sid="SMcustomer",
+            from_phone="+15550000001",
+            to_phone="+13852208404",
+            body="I need a quote.",
+        )
+    )
+
+    assert sender.sent_messages[0]["body"] == (
+        "From customer +15550000001 [#C0001]:\n"
+        "I need a quote.\n"
         "Reply with #C0001 your message"
     )
 

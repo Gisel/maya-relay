@@ -54,6 +54,9 @@ def test_readiness_reports_required_config_presence():
         "checks": {
             "verify_twilio_signature": False,
             "enable_twilio_lookup": False,
+            "enable_ai_triage": False,
+            "openai_api_key": True,
+            "openai_model": True,
             "twilio_account_sid": False,
             "twilio_auth_token": False,
             "twilio_messaging_service_sid": False,

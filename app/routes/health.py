@@ -21,6 +21,9 @@ def readiness(settings: Settings = Depends(get_settings)) -> dict[str, object]:
     checks = {
         "verify_twilio_signature": settings.verify_twilio_signature,
         "enable_twilio_lookup": settings.enable_twilio_lookup,
+        "enable_ai_triage": settings.enable_ai_triage,
+        "openai_api_key": bool(settings.openai_api_key) if settings.enable_ai_triage else True,
+        "openai_model": bool(settings.openai_model) if settings.enable_ai_triage else True,
         "twilio_account_sid": bool(settings.twilio_account_sid),
         "twilio_auth_token": bool(settings.twilio_auth_token),
         "twilio_messaging_service_sid": bool(settings.twilio_messaging_service_sid),

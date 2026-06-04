@@ -1,6 +1,7 @@
 import re
 
 from app.attachments import AttachmentStore, NoopAttachmentStore
+from app.ai_triage import MessageTriage, NoopMessageTriage
 from app.config import Settings, normalize_phone_number
 from app.db import RelayRepository
 from app.lookup import ContactNameLookup, NoopContactNameLookup
@@ -20,12 +21,14 @@ class RelayService:
         sender: MessageSender,
         attachment_store: AttachmentStore | None = None,
         contact_name_lookup: ContactNameLookup | None = None,
+        message_triage: MessageTriage | None = None,
     ):
         self.settings = settings
         self.repository = repository
         self.sender = sender
         self.attachment_store = attachment_store or NoopAttachmentStore()
         self.contact_name_lookup = contact_name_lookup or NoopContactNameLookup()
+        self.message_triage = message_triage or NoopMessageTriage()
 
     def handle_inbound_sms(self, message: IncomingMessage) -> dict[str, str | None]:
         if self._is_employee(message.from_phone):
@@ -61,6 +64,7 @@ class RelayService:
             media_urls=media_urls,
             media_content_types=message.media_content_types,
             conversation_code=conversation.conversation_code,
+            triage_note=self._triage_note(message),
         )
         outbound_sid = self.sender.send_sms(to_phone=conversation.assigned_employee, body=forwarded_body)
         self.repository.create_message(
@@ -150,9 +154,12 @@ class RelayService:
         media_urls: tuple[str, ...],
         media_content_types: tuple[str, ...],
         conversation_code: str | None = None,
+        triage_note: str | None = None,
     ) -> str:
         suffix = f" [#{conversation_code}]" if conversation_code else ""
         lines = [f"From {from_label}{suffix}:"]
+        if triage_note:
+            lines.append(f"AI note:\n{triage_note}")
         if body:
             lines.append(body)
         for index, media_url in enumerate(media_urls):
@@ -172,6 +179,15 @@ class RelayService:
 
     def _remove_conversation_code(self, body: str) -> str:
         return CONVERSATION_CODE_PATTERN.sub(" ", body, count=1)
+
+    def _triage_note(self, message: IncomingMessage) -> str | None:
+        try:
+            return self.message_triage.summarize(
+                body=message.body,
+                has_attachments=bool(message.media_urls),
+            )
+        except Exception:
+            return None
 
     def _contact_label(self, phone_number: str, *, default_prefix: str) -> str:
         contact = self.repository.get_or_create_contact(phone_number)

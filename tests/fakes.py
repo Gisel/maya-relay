@@ -158,3 +158,16 @@ class FakeLookup:
     def lookup_name(self, phone_number: str) -> str | None:
         self.looked_up.append(phone_number)
         return self.names.get(phone_number)
+
+
+class FakeTriage:
+    def __init__(self, note: str | None = None, should_raise: bool = False):
+        self.note = note
+        self.should_raise = should_raise
+        self.calls: list[dict[str, object]] = []
+
+    def summarize(self, *, body: str, has_attachments: bool) -> str | None:
+        self.calls.append({"body": body, "has_attachments": has_attachments})
+        if self.should_raise:
+            raise RuntimeError("triage failed")
+        return self.note

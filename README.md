@@ -42,6 +42,9 @@ curl http://127.0.0.1:8000/health
 APP_ENV=development
 VERIFY_TWILIO_SIGNATURE=false
 ENABLE_TWILIO_LOOKUP=false
+ENABLE_AI_TRIAGE=false
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-5-mini
 TWILIO_ACCOUNT_SID=
 TWILIO_AUTH_TOKEN=
 TWILIO_MESSAGING_SERVICE_SID=
@@ -105,3 +108,7 @@ Incoming media is downloaded from Twilio with the configured Twilio credentials,
 ## Contact Names
 
 When `ENABLE_TWILIO_LOOKUP=true`, unknown customer phone numbers are checked once with Twilio Lookup Caller Name, then cached in `contacts.lookup_name`. If `contacts.display_name` exists, it takes precedence over Lookup.
+
+## AI Triage
+
+When `ENABLE_AI_TRIAGE=true`, inbound customer messages are summarized for Francisco with a short internal AI note. The note is included only in the employee-facing forwarded SMS. The app never sends AI-generated text directly to customers.

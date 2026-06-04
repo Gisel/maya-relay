@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     app_env: str = Field(default="development", alias="APP_ENV")
     verify_twilio_signature: bool = Field(default=False, alias="VERIFY_TWILIO_SIGNATURE")
     enable_twilio_lookup: bool = Field(default=False, alias="ENABLE_TWILIO_LOOKUP")
+    enable_ai_triage: bool = Field(default=False, alias="ENABLE_AI_TRIAGE")
+    openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
+    openai_model: str = Field(default="gpt-5-mini", alias="OPENAI_MODEL")
 
     twilio_account_sid: str = Field(default="", alias="TWILIO_ACCOUNT_SID")
     twilio_auth_token: str = Field(default="", alias="TWILIO_AUTH_TOKEN")
