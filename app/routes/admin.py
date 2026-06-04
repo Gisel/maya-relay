@@ -404,10 +404,12 @@ td span,.message p{color:#667085;font-size:12px}
 .composer form{display:grid;gap:10px}
 .composer label{font-weight:700}
 .composer textarea{width:100%;box-sizing:border-box;padding:12px;border:1px solid #cbd2dc;border-radius:6px;font:15px/1.45 inherit;resize:vertical}
+.composer textarea:disabled{background:#f2f4f7;color:#667085;cursor:not-allowed}
 .composer-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .composer-actions span{color:#667085;font-size:13px}
 .dropzone{display:grid;gap:4px;padding:14px;border:1px dashed #98a2b3;border-radius:8px;background:#fbfcfd;color:#344054}
 .dropzone.dragging{border-color:#164ea6;background:#eff6ff}
+.dropzone.disabled{background:#f2f4f7;color:#667085;border-color:#d0d5dd;cursor:not-allowed}
 .dropzone span{color:#667085;font-size:13px}
 .dropzone input{width:100%;padding:0;border:0}
 pre{white-space:pre-wrap;font:14px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}
@@ -424,6 +426,7 @@ const summary=document.getElementById('file-summary');
 const zone=document.querySelector('.dropzone');
 const form=document.querySelector('.composer form');
 const sendButton=document.querySelector('.send-button');
+const replyBody=document.getElementById('reply_body');
 function updateFileSummary(){
   if(!input||!summary){return;}
   const count=input.files.length;
@@ -449,6 +452,10 @@ if(form&&sendButton){
   form.addEventListener('submit', () => {
     sendButton.disabled=true;
     sendButton.textContent='Sending...';
+    if(replyBody){replyBody.disabled=true;}
+    if(input){input.disabled=true;}
+    if(zone){zone.classList.add('disabled');}
+    if(summary){summary.textContent='Sending message...';}
   });
 }
 """
