@@ -7,6 +7,7 @@ class FakeRepository:
     def __init__(self):
         self.conversations: list[Conversation] = []
         self.messages: list[dict[str, Any]] = []
+        self.attachments: list[dict[str, Any]] = []
         self.status_updates: list[dict[str, Any]] = []
 
     def get_or_create_customer_conversation(self, customer_phone: str, assigned_employee: str) -> Conversation:
@@ -47,6 +48,7 @@ class FakeRepository:
         media_content_types: tuple[str, ...] = (),
     ) -> dict[str, Any]:
         message = {
+            "id": f"message-{len(self.messages) + 1}",
             "conversation_id": conversation_id,
             "direction": direction,
             "from_phone": from_phone,
@@ -59,6 +61,30 @@ class FakeRepository:
         }
         self.messages.append(message)
         return message
+
+    def create_message_attachment(
+        self,
+        *,
+        message_id: str,
+        bucket: str,
+        object_path: str,
+        public_url: str,
+        source_url: str,
+        content_type: str,
+        size_bytes: int | None = None,
+    ) -> dict[str, Any]:
+        attachment = {
+            "id": f"attachment-{len(self.attachments) + 1}",
+            "message_id": message_id,
+            "bucket": bucket,
+            "object_path": object_path,
+            "public_url": public_url,
+            "source_url": source_url,
+            "content_type": content_type,
+            "size_bytes": size_bytes,
+        }
+        self.attachments.append(attachment)
+        return attachment
 
     def update_message_status(
         self,

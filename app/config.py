@@ -20,6 +20,7 @@ class Settings(BaseSettings):
 
     supabase_url: str = Field(default="", alias="SUPABASE_URL")
     supabase_service_role_key: str = Field(default="", alias="SUPABASE_SERVICE_ROLE_KEY")
+    supabase_attachments_bucket: str = Field(default="attachments", alias="SUPABASE_ATTACHMENTS_BUCKET")
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -27,4 +28,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-

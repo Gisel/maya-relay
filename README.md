@@ -48,6 +48,7 @@ MAYA_BUSINESS_NUMBER=+13852208404
 FRANCISCO_PHONE=
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
+SUPABASE_ATTACHMENTS_BUCKET=attachments
 ```
 
 Keep `.env` private. It is ignored by git.
@@ -91,3 +92,7 @@ Set the same environment variables from `.env.example` in Railway's Variables ta
 - App forwards the message to Francisco.
 - Francisco replies to Maya number.
 - App routes the reply to the latest open customer conversation assigned to Francisco.
+
+## MMS Attachments
+
+Incoming media is downloaded from Twilio with the configured Twilio credentials, uploaded to the public Supabase Storage bucket named `attachments`, recorded in `message_attachments`, and forwarded as a Supabase public URL.

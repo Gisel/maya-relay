@@ -1,3 +1,4 @@
+from app.attachments import AttachmentStore, NoopAttachmentStore
 from app.config import Settings
 from app.db import RelayRepository
 from app.models import IncomingMessage
@@ -5,10 +6,18 @@ from app.twilio_client import MessageSender
 
 
 class RelayService:
-    def __init__(self, *, settings: Settings, repository: RelayRepository, sender: MessageSender):
+    def __init__(
+        self,
+        *,
+        settings: Settings,
+        repository: RelayRepository,
+        sender: MessageSender,
+        attachment_store: AttachmentStore | None = None,
+    ):
         self.settings = settings
         self.repository = repository
         self.sender = sender
+        self.attachment_store = attachment_store or NoopAttachmentStore()
 
     def handle_inbound_sms(self, message: IncomingMessage) -> dict[str, str | None]:
         if self._is_employee(message.from_phone):
@@ -20,7 +29,7 @@ class RelayService:
             customer_phone=message.from_phone,
             assigned_employee=self.settings.francisco_phone,
         )
-        self.repository.create_message(
+        inbound_message = self.repository.create_message(
             conversation_id=conversation.id,
             direction="customer_to_employee",
             from_phone=message.from_phone,
@@ -31,11 +40,16 @@ class RelayService:
             media_urls=message.media_urls,
             media_content_types=message.media_content_types,
         )
+        media_urls = self._store_attachment_urls(
+            message_id=inbound_message["id"],
+            media_urls=message.media_urls,
+            media_content_types=message.media_content_types,
+        )
 
         forwarded_body = self._format_forwarded_body(
             from_label=f"customer {message.from_phone}",
             body=message.body,
-            media_urls=message.media_urls,
+            media_urls=media_urls,
             media_content_types=message.media_content_types,
         )
         outbound_sid = self.sender.send_sms(to_phone=conversation.assigned_employee, body=forwarded_body)
@@ -46,8 +60,8 @@ class RelayService:
             to_phone=conversation.assigned_employee,
             body=forwarded_body,
             twilio_message_sid=outbound_sid,
-            num_media=message.num_media,
-            media_urls=message.media_urls,
+            num_media=len(media_urls),
+            media_urls=media_urls,
             media_content_types=message.media_content_types,
         )
 
@@ -58,7 +72,7 @@ class RelayService:
         if conversation is None:
             return {"status": "no_open_conversation", "conversation_id": None}
 
-        self.repository.create_message(
+        inbound_message = self.repository.create_message(
             conversation_id=conversation.id,
             direction="employee_to_customer",
             from_phone=message.from_phone,
@@ -69,10 +83,15 @@ class RelayService:
             media_urls=message.media_urls,
             media_content_types=message.media_content_types,
         )
+        media_urls = self._store_attachment_urls(
+            message_id=inbound_message["id"],
+            media_urls=message.media_urls,
+            media_content_types=message.media_content_types,
+        )
         forwarded_body = self._format_forwarded_body(
             from_label="Francisco",
             body=message.body,
-            media_urls=message.media_urls,
+            media_urls=media_urls,
             media_content_types=message.media_content_types,
         )
         outbound_sid = self.sender.send_sms(to_phone=conversation.customer_phone, body=forwarded_body)
@@ -83,8 +102,8 @@ class RelayService:
             to_phone=conversation.customer_phone,
             body=forwarded_body,
             twilio_message_sid=outbound_sid,
-            num_media=message.num_media,
-            media_urls=message.media_urls,
+            num_media=len(media_urls),
+            media_urls=media_urls,
             media_content_types=message.media_content_types,
         )
 
@@ -110,3 +129,22 @@ class RelayService:
         if len(lines) == 1:
             lines.append("[No message body]")
         return "\n".join(lines)
+
+    def _store_attachment_urls(
+        self,
+        *,
+        message_id: str,
+        media_urls: tuple[str, ...],
+        media_content_types: tuple[str, ...],
+    ) -> tuple[str, ...]:
+        if not media_urls:
+            return ()
+        try:
+            stored = self.attachment_store.store_message_attachments(
+                message_id=message_id,
+                source_urls=media_urls,
+                content_types=media_content_types,
+            )
+        except Exception:
+            return media_urls
+        return tuple(attachment.public_url for attachment in stored)

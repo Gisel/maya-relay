@@ -32,6 +32,18 @@ create table if not exists public.messages (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.message_attachments (
+  id uuid primary key default gen_random_uuid(),
+  message_id uuid not null references public.messages(id) on delete cascade,
+  bucket text not null default 'attachments',
+  object_path text not null,
+  public_url text not null,
+  source_url text not null,
+  content_type text not null,
+  size_bytes integer,
+  created_at timestamptz not null default now()
+);
+
 create index if not exists conversations_customer_open_idx
   on public.conversations (customer_phone, assigned_employee, status, updated_at desc);
 
@@ -45,10 +57,15 @@ create index if not exists messages_twilio_sid_idx
   on public.messages (twilio_message_sid)
   where twilio_message_sid is not null;
 
+create index if not exists message_attachments_message_idx
+  on public.message_attachments (message_id, created_at);
+
 alter table public.messages
   add column if not exists num_media integer not null default 0,
   add column if not exists media_urls jsonb not null default '[]'::jsonb,
   add column if not exists media_content_types jsonb not null default '[]'::jsonb;
+
+alter table public.message_attachments enable row level security;
 
 create or replace function public.set_updated_at()
 returns trigger
@@ -75,6 +92,7 @@ alter table public.messages enable row level security;
 grant all on public.contacts to service_role;
 grant all on public.conversations to service_role;
 grant all on public.messages to service_role;
+grant all on public.message_attachments to service_role;
 grant usage on schema public to service_role;
 grant all on all tables in schema public to service_role;
 grant usage, select on all sequences in schema public to service_role;

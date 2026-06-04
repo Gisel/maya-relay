@@ -37,6 +37,19 @@ class RelayRepository(Protocol):
     ) -> dict[str, Any]:
         ...
 
+    def create_message_attachment(
+        self,
+        *,
+        message_id: str,
+        bucket: str,
+        object_path: str,
+        public_url: str,
+        source_url: str,
+        content_type: str,
+        size_bytes: int | None = None,
+    ) -> dict[str, Any]:
+        ...
+
     def update_message_status(
         self,
         *,
@@ -126,6 +139,34 @@ class SupabaseRelayRepository:
                     "num_media": num_media,
                     "media_urls": list(media_urls),
                     "media_content_types": list(media_content_types),
+                }
+            )
+            .execute()
+        )
+        return result.data[0]
+
+    def create_message_attachment(
+        self,
+        *,
+        message_id: str,
+        bucket: str,
+        object_path: str,
+        public_url: str,
+        source_url: str,
+        content_type: str,
+        size_bytes: int | None = None,
+    ) -> dict[str, Any]:
+        result = (
+            self.client.table("message_attachments")
+            .insert(
+                {
+                    "message_id": message_id,
+                    "bucket": bucket,
+                    "object_path": object_path,
+                    "public_url": public_url,
+                    "source_url": source_url,
+                    "content_type": content_type,
+                    "size_bytes": size_bytes,
                 }
             )
             .execute()
