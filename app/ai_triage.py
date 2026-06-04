@@ -51,6 +51,8 @@ class OpenAIMessageTriage:
                         "Line 3: a short suggested reply only when useful. "
                         "If you include a suggested reply, start it with the exact conversation reply code. "
                         "Match the customer's language. Keep the whole note under 320 characters. "
+                        "Business context: Maya has one location. Office hours are Monday-Friday 9:00 AM-6:00 PM. "
+                        "Saturday is by appointment only. "
                         "Do not invent prices, commitments, timelines, or policies."
                     ),
                     "input": prompt,
