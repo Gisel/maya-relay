@@ -2,12 +2,13 @@ import html
 import hmac
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 
+from app.attachments import AttachmentStore, StoredAttachment, UploadedAttachment
 from app.config import Settings, get_settings
 from app.db import RelayRepository
-from app.dependencies import get_repository, get_sender
+from app.dependencies import get_attachment_store, get_repository, get_sender
 from app.twilio_client import MessageSender
 
 
@@ -154,10 +155,12 @@ def conversation_detail(
 def send_conversation_reply(
     conversation_id: str,
     request: Request,
-    reply_body: str = Form(...),
+    reply_body: str = Form(""),
+    reply_files: list[UploadFile] = File(default=[]),
     settings: Settings = Depends(get_settings),
     repository: RelayRepository = Depends(get_repository),
     sender: MessageSender = Depends(get_sender),
+    attachment_store: AttachmentStore = Depends(get_attachment_store),
 ) -> RedirectResponse:
     _require_admin(request, settings)
     conversation = repository.get_conversation(conversation_id)
@@ -165,18 +168,39 @@ def send_conversation_reply(
         raise HTTPException(status_code=404)
 
     body = reply_body.strip()
-    if not body:
-        raise HTTPException(status_code=400, detail="Reply body is required.")
+    uploads = _read_uploads(reply_files)
+    if not body and not uploads:
+        raise HTTPException(status_code=400, detail="Reply body or file is required.")
 
-    outbound_sid = sender.send_sms(to_phone=conversation.customer_phone, body=body)
-    repository.create_message(
+    stored_attachments = ()
+    if uploads:
+        stored_attachments = attachment_store.store_uploaded_attachments(
+            object_prefix=f"admin-replies/{conversation.id}",
+            files=uploads,
+        )
+    outbound_body = _reply_body_with_attachments(body, stored_attachments)
+    outbound_sid = sender.send_sms(to_phone=conversation.customer_phone, body=outbound_body)
+    created_message = repository.create_message(
         conversation_id=conversation.id,
         direction="employee_to_customer",
         from_phone=settings.maya_business_number,
         to_phone=conversation.customer_phone,
-        body=body,
+        body=outbound_body,
         twilio_message_sid=outbound_sid,
+        num_media=len(stored_attachments),
+        media_urls=tuple(attachment.public_url for attachment in stored_attachments),
+        media_content_types=tuple(attachment.content_type for attachment in stored_attachments),
     )
+    for attachment in stored_attachments:
+        repository.create_message_attachment(
+            message_id=created_message["id"],
+            bucket=attachment.bucket,
+            object_path=attachment.object_path,
+            public_url=attachment.public_url,
+            source_url=attachment.source_url,
+            content_type=attachment.content_type,
+            size_bytes=None,
+        )
     return RedirectResponse(f"/admin/conversations/{conversation_id}", status_code=303)
 
 
@@ -196,11 +220,17 @@ def _reply_form(conversation_id: str, suggested_reply: str) -> str:
     return (
         "<section class='composer'>"
         "<form method='post' "
+        "enctype='multipart/form-data' "
         f"action='/admin/conversations/{_e(conversation_id)}/reply'>"
         "<label for='reply_body'>Reply to customer</label>"
-        f"<textarea id='reply_body' name='reply_body' rows='4' required>{_e(suggested_reply)}</textarea>"
+        f"<textarea id='reply_body' name='reply_body' rows='4'>{_e(suggested_reply)}</textarea>"
+        "<label class='dropzone' for='reply_files'>"
+        "<strong>Attach files</strong>"
+        "<span id='file-summary'>Drop files here or click to choose</span>"
+        "<input id='reply_files' name='reply_files' type='file' multiple>"
+        "</label>"
         "<div class='composer-actions'>"
-        "<button type='submit'>Send to customer</button>"
+        "<button class='send-button' type='submit'>Send to customer</button>"
         "<span>This sends a real message from Maya Relay.</span>"
         "</div>"
         "</form>"
@@ -220,6 +250,31 @@ def _suggested_reply(messages: list[dict], conversation_code: str) -> str:
     return ""
 
 
+def _read_uploads(files: list[UploadFile]) -> tuple[UploadedAttachment, ...]:
+    uploads: list[UploadedAttachment] = []
+    for file in files:
+        if not file.filename:
+            continue
+        content = file.file.read()
+        if not content:
+            continue
+        uploads.append(
+            UploadedAttachment(
+                filename=file.filename,
+                content=content,
+                content_type=file.content_type or "application/octet-stream",
+            )
+        )
+    return tuple(uploads)
+
+
+def _reply_body_with_attachments(body: str, attachments: tuple[StoredAttachment, ...]) -> str:
+    lines = [body] if body else []
+    for index, attachment in enumerate(attachments, start=1):
+        lines.append(f"Attachment {index} ({attachment.content_type}): {attachment.public_url}")
+    return "\n".join(lines)
+
+
 def _layout(title: str, content: str) -> str:
     return (
         "<!doctype html><html><head>"
@@ -228,6 +283,7 @@ def _layout(title: str, content: str) -> str:
         f"<style>{_CSS}</style>"
         "</head><body>"
         f"{content}"
+        f"<script>{_JS}</script>"
         "</body></html>"
     )
 
@@ -322,6 +378,8 @@ a{color:#164ea6;text-decoration:none}
 .toolbar{display:flex;align-items:center;justify-content:space-between;padding:24px 28px;background:white;border-bottom:1px solid #dde1e7}
 h1{font-size:22px;margin:0}
 .button,button{background:#16181d;color:white;border:0;border-radius:6px;padding:10px 14px;font-weight:650}
+.button:active,button:active{transform:scale(1.03)}
+button:disabled{background:#98a2b3;color:white;cursor:not-allowed;transform:none}
 .button.secondary{background:white;color:#16181d;border:1px solid #cfd5df}
 .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:16px}
 .metric{background:white;border:1px solid #dde1e7;border-radius:8px;padding:16px}
@@ -348,10 +406,49 @@ td span,.message p{color:#667085;font-size:12px}
 .composer textarea{width:100%;box-sizing:border-box;padding:12px;border:1px solid #cbd2dc;border-radius:6px;font:15px/1.45 inherit;resize:vertical}
 .composer-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .composer-actions span{color:#667085;font-size:13px}
+.dropzone{display:grid;gap:4px;padding:14px;border:1px dashed #98a2b3;border-radius:8px;background:#fbfcfd;color:#344054}
+.dropzone.dragging{border-color:#164ea6;background:#eff6ff}
+.dropzone span{color:#667085;font-size:13px}
+.dropzone input{width:100%;padding:0;border:0}
 pre{white-space:pre-wrap;font:14px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}
 .media{display:inline-block;margin-right:8px}
 .login{min-height:100vh;display:grid;place-content:center;gap:16px}
 .login form{display:flex;gap:8px}
 input{padding:10px 12px;border:1px solid #cbd2dc;border-radius:6px;font-size:14px}
 @media(max-width:900px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.search{grid-template-columns:1fr}table{display:block;overflow-x:auto}}
+"""
+
+_JS = """
+const input=document.getElementById('reply_files');
+const summary=document.getElementById('file-summary');
+const zone=document.querySelector('.dropzone');
+const form=document.querySelector('.composer form');
+const sendButton=document.querySelector('.send-button');
+function updateFileSummary(){
+  if(!input||!summary){return;}
+  const count=input.files.length;
+  summary.textContent=count ? `${count} file${count===1?'':'s'} selected` : 'Drop files here or click to choose';
+}
+if(input&&zone){
+  input.addEventListener('change', updateFileSummary);
+  zone.addEventListener('dragover', event => {
+    event.preventDefault();
+    zone.classList.add('dragging');
+  });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragging'));
+  zone.addEventListener('drop', event => {
+    event.preventDefault();
+    zone.classList.remove('dragging');
+    if(event.dataTransfer.files.length){
+      input.files=event.dataTransfer.files;
+      updateFileSummary();
+    }
+  });
+}
+if(form&&sendButton){
+  form.addEventListener('submit', () => {
+    sendButton.disabled=true;
+    sendButton.textContent='Sending...';
+  });
+}
 """

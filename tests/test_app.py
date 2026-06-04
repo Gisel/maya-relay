@@ -2,10 +2,10 @@ from fastapi.testclient import TestClient
 from twilio.request_validator import RequestValidator
 
 from app.config import Settings, get_settings
-from app.dependencies import get_relay_service, get_repository, get_sender
+from app.dependencies import get_attachment_store, get_relay_service, get_repository, get_sender
 from app.main import create_app
 from app.services.relay import RelayService
-from tests.fakes import FakeRepository, FakeSender
+from tests.fakes import FakeAttachmentStore, FakeRepository, FakeSender
 
 
 def make_client(
@@ -27,6 +27,7 @@ def make_client(
     )
     repository = FakeRepository()
     sender = FakeSender()
+    attachment_store = FakeAttachmentStore()
     app = create_app()
 
     def relay_override() -> RelayService:
@@ -35,6 +36,7 @@ def make_client(
     app.dependency_overrides[get_relay_service] = relay_override
     app.dependency_overrides[get_repository] = lambda: repository
     app.dependency_overrides[get_sender] = lambda: sender
+    app.dependency_overrides[get_attachment_store] = lambda: attachment_store
     app.dependency_overrides[get_settings] = lambda: settings
     return TestClient(app), repository, sender
 
@@ -190,6 +192,31 @@ def test_admin_login_and_conversations_page():
     }
     assert repository.messages[-1]["direction"] == "employee_to_customer"
     assert repository.messages[-1]["twilio_message_sid"] == "SMfake1"
+
+    send_file_reply = client.post(
+        "/admin/conversations/conversation-1/reply",
+        data={"reply_body": "Please review this proof."},
+        files=[("reply_files", ("proof.pdf", b"fake pdf", "application/pdf"))],
+        headers={"cookie": cookie},
+        follow_redirects=False,
+    )
+    assert send_file_reply.status_code == 303
+    assert sender.sent_messages[-1] == {
+        "sid": "SMfake2",
+        "to_phone": "+15550000001",
+        "body": (
+            "Please review this proof.\n"
+            "Attachment 1 (application/pdf): "
+            "https://files.example/admin-replies/conversation-1/proof.pdf"
+        ),
+    }
+    assert repository.messages[-1]["num_media"] == 1
+    assert repository.messages[-1]["media_urls"] == (
+        "https://files.example/admin-replies/conversation-1/proof.pdf",
+    )
+    assert repository.attachments[-1]["public_url"] == (
+        "https://files.example/admin-replies/conversation-1/proof.pdf"
+    )
 
     logout = client.get("/admin/logout", follow_redirects=False)
     assert logout.status_code == 303

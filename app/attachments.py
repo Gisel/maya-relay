@@ -1,4 +1,5 @@
 import mimetypes
+import re
 import uuid
 from dataclasses import dataclass
 from typing import Protocol
@@ -19,6 +20,13 @@ class StoredAttachment:
     object_path: str
 
 
+@dataclass(frozen=True)
+class UploadedAttachment:
+    filename: str
+    content: bytes
+    content_type: str
+
+
 class AttachmentStore(Protocol):
     def store_message_attachments(
         self,
@@ -26,6 +34,14 @@ class AttachmentStore(Protocol):
         message_id: str,
         source_urls: tuple[str, ...],
         content_types: tuple[str, ...],
+    ) -> tuple[StoredAttachment, ...]:
+        ...
+
+    def store_uploaded_attachments(
+        self,
+        *,
+        object_prefix: str,
+        files: tuple[UploadedAttachment, ...],
     ) -> tuple[StoredAttachment, ...]:
         ...
 
@@ -47,6 +63,23 @@ class NoopAttachmentStore:
                 object_path="",
             )
             for index, url in enumerate(source_urls)
+        )
+
+    def store_uploaded_attachments(
+        self,
+        *,
+        object_prefix: str,
+        files: tuple[UploadedAttachment, ...],
+    ) -> tuple[StoredAttachment, ...]:
+        return tuple(
+            StoredAttachment(
+                source_url=f"upload:{file.filename}",
+                public_url=f"upload:{file.filename}",
+                content_type=file.content_type,
+                bucket="",
+                object_path=f"{object_prefix}/{file.filename}",
+            )
+            for file in files
         )
 
 
@@ -104,9 +137,41 @@ class SupabaseAttachmentStore:
             object_path=object_path,
         )
 
+    def store_uploaded_attachments(
+        self,
+        *,
+        object_prefix: str,
+        files: tuple[UploadedAttachment, ...],
+    ) -> tuple[StoredAttachment, ...]:
+        stored: list[StoredAttachment] = []
+        for file in files:
+            object_path = f"{object_prefix}/{uuid.uuid4()}-{_safe_filename(file.filename)}"
+            self.client.storage.from_(self.bucket).upload(
+                object_path,
+                file.content,
+                {"content-type": file.content_type, "upsert": "false"},
+            )
+            public_url = self.client.storage.from_(self.bucket).get_public_url(object_path)
+            stored.append(
+                StoredAttachment(
+                    source_url=f"upload:{file.filename}",
+                    public_url=public_url,
+                    content_type=file.content_type,
+                    bucket=self.bucket,
+                    object_path=object_path,
+                )
+            )
+        return tuple(stored)
+
 
 def _extension_for_content_type(content_type: str) -> str:
     clean_type = content_type.split(";")[0].strip().lower()
     if clean_type == "image/jpeg":
         return ".jpg"
     return mimetypes.guess_extension(clean_type) or ""
+
+
+def _safe_filename(filename: str) -> str:
+    clean = filename.strip().replace("\\", "/").split("/")[-1]
+    clean = re.sub(r"[^A-Za-z0-9._-]+", "-", clean).strip(".-")
+    return clean or "attachment"

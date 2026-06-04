@@ -1,5 +1,6 @@
 from typing import Any
 
+from app.attachments import StoredAttachment
 from app.models import Contact, Conversation
 
 
@@ -185,6 +186,29 @@ class FakeSender:
         sid = f"SMfake{len(self.sent_messages) + 1}"
         self.sent_messages.append({"sid": sid, "to_phone": to_phone, "body": body})
         return sid
+
+
+class FakeAttachmentStore:
+    def __init__(self):
+        self.uploads: list[dict[str, object]] = []
+
+    def store_uploaded_attachments(
+        self,
+        *,
+        object_prefix: str,
+        files: tuple[object, ...],
+    ) -> tuple[StoredAttachment, ...]:
+        self.uploads.append({"object_prefix": object_prefix, "files": files})
+        return tuple(
+            StoredAttachment(
+                source_url=f"upload:{file.filename}",
+                public_url=f"https://files.example/{object_prefix}/{file.filename}",
+                content_type=file.content_type,
+                bucket="attachments",
+                object_path=f"{object_prefix}/{file.filename}",
+            )
+            for file in files
+        )
 
 
 class FakeLookup:
