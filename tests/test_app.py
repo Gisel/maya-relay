@@ -60,6 +60,7 @@ def test_readiness_reports_required_config_presence():
             "francisco_phone": True,
             "supabase_url": False,
             "supabase_service_role_key": False,
+            "supabase_key_role": None,
         },
     }
 
