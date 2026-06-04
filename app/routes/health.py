@@ -24,8 +24,12 @@ def readiness(settings: Settings = Depends(get_settings)) -> dict[str, object]:
         "twilio_account_sid": bool(settings.twilio_account_sid),
         "twilio_auth_token": bool(settings.twilio_auth_token),
         "twilio_messaging_service_sid": bool(settings.twilio_messaging_service_sid),
-        "maya_business_number": bool(settings.maya_business_number),
-        "francisco_phone": bool(settings.francisco_phone),
+        "maya_business_number": bool(settings.maya_business_number_e164),
+        "francisco_phone": bool(settings.francisco_phone_e164),
+        "francisco_phone_is_not_maya_number": (
+            bool(settings.francisco_phone_e164)
+            and settings.francisco_phone_e164 != settings.maya_business_number_e164
+        ),
         "employee_phones": bool(settings.employee_phones),
         "supabase_url": bool(settings.supabase_url),
         "supabase_service_role_key": bool(settings.supabase_service_role_key),

@@ -59,12 +59,29 @@ def test_readiness_reports_required_config_presence():
             "twilio_messaging_service_sid": False,
             "maya_business_number": True,
             "francisco_phone": True,
+            "francisco_phone_is_not_maya_number": True,
             "employee_phones": True,
             "supabase_url": False,
             "supabase_service_role_key": False,
             "supabase_key_role": None,
         },
     }
+
+
+def test_readiness_rejects_francisco_phone_matching_maya_number():
+    client, _, _ = make_client()
+    settings = Settings(
+        FRANCISCO_PHONE="+13852208404",
+        MAYA_BUSINESS_NUMBER="+13852208404",
+        VERIFY_TWILIO_SIGNATURE=False,
+    )
+    client.app.dependency_overrides[get_settings] = lambda: settings
+
+    response = client.get("/readiness")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "missing_config"
+    assert response.json()["checks"]["francisco_phone_is_not_maya_number"] is False
 
 
 def test_supabase_readiness_reports_ok_when_repository_is_accessible():

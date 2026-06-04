@@ -96,7 +96,7 @@ Set the same environment variables from `.env.example` in Railway's Variables ta
 - App strips the code and routes the reply to that specific customer conversation.
 - If the code is missing or invalid, app texts Francisco back with a correction instead of guessing.
 
-`FRANCISCO_PHONE` is the primary phone that receives forwarded customer texts. `EMPLOYEE_PHONE_NUMBERS` is an optional comma-separated allowlist of additional phones that may reply with conversation codes.
+`FRANCISCO_PHONE` is the primary phone that receives forwarded customer texts. It must be an employee phone, not the Maya business number. `EMPLOYEE_PHONE_NUMBERS` is an optional comma-separated allowlist of additional phones that may reply with conversation codes. Phone values are normalized, so `8018334544` and `+18018334544` are treated as the same US number.
 
 ## MMS Attachments
 

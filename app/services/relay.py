@@ -1,7 +1,7 @@
 import re
 
 from app.attachments import AttachmentStore, NoopAttachmentStore
-from app.config import Settings
+from app.config import Settings, normalize_phone_number
 from app.db import RelayRepository
 from app.lookup import ContactNameLookup, NoopContactNameLookup
 from app.models import IncomingMessage
@@ -35,7 +35,7 @@ class RelayService:
     def _handle_customer_message(self, message: IncomingMessage) -> dict[str, str | None]:
         conversation = self.repository.get_or_create_customer_conversation(
             customer_phone=message.from_phone,
-            assigned_employee=self.settings.francisco_phone,
+            assigned_employee=self.settings.francisco_phone_e164,
         )
         inbound_message = self.repository.create_message(
             conversation_id=conversation.id,
@@ -140,7 +140,7 @@ class RelayService:
         return {"status": "forwarded_to_customer", "conversation_id": conversation.id}
 
     def _is_employee(self, phone_number: str) -> bool:
-        return phone_number in self.settings.employee_phones
+        return normalize_phone_number(phone_number) in self.settings.employee_phones
 
     def _format_forwarded_body(
         self,

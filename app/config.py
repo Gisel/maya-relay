@@ -27,11 +27,38 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @property
+    def francisco_phone_e164(self) -> str:
+        return normalize_phone_number(self.francisco_phone)
+
+    @property
+    def maya_business_number_e164(self) -> str:
+        return normalize_phone_number(self.maya_business_number)
+
+    @property
     def employee_phones(self) -> frozenset[str]:
-        phones = {phone.strip() for phone in self.employee_phone_numbers.split(",") if phone.strip()}
-        if self.francisco_phone:
-            phones.add(self.francisco_phone)
+        phones = {
+            normalize_phone_number(phone)
+            for phone in self.employee_phone_numbers.split(",")
+            if normalize_phone_number(phone)
+        }
+        if self.francisco_phone_e164:
+            phones.add(self.francisco_phone_e164)
         return frozenset(phones)
+
+
+def normalize_phone_number(phone_number: str) -> str:
+    stripped = phone_number.strip()
+    if not stripped:
+        return ""
+
+    digits = "".join(character for character in stripped if character.isdigit())
+    if stripped.startswith("+") and digits:
+        return f"+{digits}"
+    if len(digits) == 10:
+        return f"+1{digits}"
+    if len(digits) == 11 and digits.startswith("1"):
+        return f"+{digits}"
+    return stripped
 
 
 @lru_cache

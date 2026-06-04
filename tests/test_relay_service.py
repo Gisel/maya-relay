@@ -206,6 +206,30 @@ def test_allowed_alternate_employee_phone_routes_by_conversation_code():
     }
 
 
+def test_employee_phone_matching_normalizes_configured_phone_number():
+    service, _, sender = build_service(employee_phone_numbers="(555) 765-4321")
+    service.handle_inbound_sms(
+        IncomingMessage(
+            message_sid="SMcustomer",
+            from_phone="+15550000001",
+            to_phone="+13852208404",
+            body="Hello",
+        )
+    )
+
+    result = service.handle_inbound_sms(
+        IncomingMessage(
+            message_sid="SMemployee",
+            from_phone="+15557654321",
+            to_phone="+13852208404",
+            body="#C0001 This is Francisco from a formatted config phone.",
+        )
+    )
+
+    assert result == {"status": "forwarded_to_customer", "conversation_id": "conversation-1"}
+    assert sender.sent_messages[-1]["to_phone"] == "+15550000001"
+
+
 def test_employee_reply_missing_conversation_code_fails_safely():
     service, repository, sender = build_service()
     service.handle_inbound_sms(
