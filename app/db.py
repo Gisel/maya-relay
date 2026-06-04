@@ -295,7 +295,7 @@ class SupabaseRelayRepository:
                 .select("body, direction, delivery_status, delivery_error_code, created_at, num_media")
                 .eq("conversation_id", conversation["id"])
                 .order("created_at", desc=True)
-                .limit(1)
+                .limit(50)
                 .execute()
             )
             contacts = (
@@ -311,6 +311,7 @@ class SupabaseRelayRepository:
                     **conversation,
                     "customer_name": contact.get("display_name") or contact.get("lookup_name"),
                     "last_message": messages.data[0] if messages.data else None,
+                    "message_search_text": _message_search_text(messages.data),
                 }
             )
         return conversations
@@ -329,3 +330,19 @@ class SupabaseRelayRepository:
             .execute()
         )
         return result.data
+
+
+def _message_search_text(messages: list[dict[str, Any]]) -> str:
+    parts: list[str] = []
+    for message in messages:
+        parts.extend(
+            str(value)
+            for value in (
+                message.get("body"),
+                message.get("direction"),
+                message.get("delivery_status"),
+                message.get("delivery_error_code"),
+            )
+            if value
+        )
+    return " ".join(parts)

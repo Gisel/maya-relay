@@ -119,7 +119,14 @@ def test_admin_login_and_conversations_page():
         direction="customer_to_employee",
         from_phone="+15550000001",
         to_phone="+13852208404",
-        body="Need a quote",
+        body="Necesito cotización",
+    )
+    repository.create_message(
+        conversation_id="conversation-1",
+        direction="system",
+        from_phone="+13852208404",
+        to_phone="+15551234567",
+        body="Reply with #C0001 your message",
     )
     repository.get_or_create_customer_conversation(
         customer_phone="+15550000002",
@@ -146,13 +153,14 @@ def test_admin_login_and_conversations_page():
     assert "Logout" in dashboard.text
     assert "Open conversations" in dashboard.text
     assert "#C0001" in dashboard.text
-    assert "Need a quote" in dashboard.text
+    assert "Reply with #C0001 your message" in dashboard.text
 
-    search = client.get("/admin?q=quote", headers={"cookie": cookie})
+    search = client.get("/admin?q=cotización", headers={"cookie": cookie})
     assert search.status_code == 200
     assert "1 of 2 conversations" in search.text
-    assert "Need a quote" in search.text
+    assert "#C0001" in search.text
     assert "Are you open today?" not in search.text
+    assert "href='/admin'>Clear</a>" in search.text
 
     logout = client.get("/admin/logout", follow_redirects=False)
     assert logout.status_code == 303

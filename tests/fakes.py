@@ -142,12 +142,13 @@ class FakeRepository:
     def list_conversations(self, limit: int = 50) -> list[dict[str, Any]]:
         rows = []
         for conversation in self.conversations[:limit]:
+            messages = [
+                message
+                for message in self.messages
+                if message["conversation_id"] == conversation.id
+            ]
             last_message = next(
-                (
-                    message
-                    for message in reversed(self.messages)
-                    if message["conversation_id"] == conversation.id
-                ),
+                (message for message in reversed(messages)),
                 None,
             )
             rows.append(
@@ -161,6 +162,7 @@ class FakeRepository:
                     "updated_at": "",
                     "customer_name": None,
                     "last_message": last_message,
+                    "message_search_text": _message_search_text(messages),
                 }
             )
         return rows
@@ -202,3 +204,19 @@ class FakeTriage:
         if self.should_raise:
             raise RuntimeError("triage failed")
         return self.note
+
+
+def _message_search_text(messages: list[dict[str, Any]]) -> str:
+    parts: list[str] = []
+    for message in messages:
+        parts.extend(
+            str(value)
+            for value in (
+                message.get("body"),
+                message.get("direction"),
+                message.get("delivery_status"),
+                message.get("delivery_error_code"),
+            )
+            if value
+        )
+    return " ".join(parts)

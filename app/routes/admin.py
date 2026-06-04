@@ -199,7 +199,7 @@ def _metrics_bar(metrics: dict[str, int]) -> str:
 
 def _search_bar(query: str, visible_count: int, total_count: int) -> str:
     result_text = f"{visible_count} of {total_count} conversations"
-    clear_link = "<a class='clear' href='/admin'>Clear</a>" if query else ""
+    clear_link = "<a class='button secondary' href='/admin'>Clear</a>" if query else ""
     return (
         "<form class='search' method='get' action='/admin'>"
         f"<input type='search' name='q' value='{_e(query)}' "
@@ -224,6 +224,7 @@ def _conversation_search_text(conversation: dict) -> str:
         conversation.get("customer_phone"),
         conversation.get("customer_name"),
         conversation.get("status"),
+        conversation.get("message_search_text"),
         last_message.get("body"),
         last_message.get("direction"),
         last_message.get("delivery_status"),
@@ -256,6 +257,7 @@ a{color:#164ea6;text-decoration:none}
 .toolbar{display:flex;align-items:center;justify-content:space-between;padding:24px 28px;background:white;border-bottom:1px solid #dde1e7}
 h1{font-size:22px;margin:0}
 .button,button{background:#16181d;color:white;border:0;border-radius:6px;padding:10px 14px;font-weight:650}
+.button.secondary{background:white;color:#16181d;border:1px solid #cfd5df}
 .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:16px}
 .metric{background:white;border:1px solid #dde1e7;border-radius:8px;padding:16px}
 .metric strong{display:block;font-size:28px;line-height:1}
