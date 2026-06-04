@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.config import Settings
+from app.config import Settings, get_settings
 from app.dependencies import get_relay_service, get_repository
 from app.main import create_app
 from app.services.relay import RelayService
@@ -12,6 +12,11 @@ def make_client() -> tuple[TestClient, FakeRepository, FakeSender]:
         FRANCISCO_PHONE="+15551234567",
         MAYA_BUSINESS_NUMBER="+13852208404",
         VERIFY_TWILIO_SIGNATURE=False,
+        TWILIO_ACCOUNT_SID="",
+        TWILIO_AUTH_TOKEN="",
+        TWILIO_MESSAGING_SERVICE_SID="",
+        SUPABASE_URL="",
+        SUPABASE_SERVICE_ROLE_KEY="",
     )
     repository = FakeRepository()
     sender = FakeSender()
@@ -22,6 +27,7 @@ def make_client() -> tuple[TestClient, FakeRepository, FakeSender]:
 
     app.dependency_overrides[get_relay_service] = relay_override
     app.dependency_overrides[get_repository] = lambda: repository
+    app.dependency_overrides[get_settings] = lambda: settings
     return TestClient(app), repository, sender
 
 
@@ -32,6 +38,26 @@ def test_health():
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_readiness_reports_required_config_presence():
+    client, _, _ = make_client()
+
+    response = client.get("/readiness")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "missing_config",
+        "checks": {
+            "twilio_account_sid": False,
+            "twilio_auth_token": False,
+            "twilio_messaging_service_sid": False,
+            "maya_business_number": True,
+            "francisco_phone": True,
+            "supabase_url": False,
+            "supabase_service_role_key": False,
+        },
+    }
 
 
 def test_twilio_sms_webhook_acknowledges_with_empty_twiml():
@@ -75,4 +101,3 @@ def test_status_callback_updates_message_status():
             "error_message": None,
         }
     ]
-
