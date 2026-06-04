@@ -1,9 +1,10 @@
+from datetime import UTC, datetime
 from typing import Any, Protocol
 
 from supabase import Client, create_client
 
 from app.config import Settings
-from app.models import Conversation
+from app.models import Contact, Conversation
 
 
 def _conversation_from_row(row: dict[str, Any]) -> Conversation:
@@ -15,7 +16,25 @@ def _conversation_from_row(row: dict[str, Any]) -> Conversation:
     )
 
 
+def _contact_from_row(row: dict[str, Any]) -> Contact:
+    return Contact(
+        id=row["id"],
+        phone_number=row["phone_number"],
+        display_name=row.get("display_name"),
+        lookup_name=row.get("lookup_name"),
+    )
+
+
 class RelayRepository(Protocol):
+    def get_contact(self, phone_number: str) -> Contact | None:
+        ...
+
+    def get_or_create_contact(self, phone_number: str) -> Contact:
+        ...
+
+    def update_contact_lookup_name(self, phone_number: str, lookup_name: str | None) -> Contact:
+        ...
+
     def get_or_create_customer_conversation(self, customer_phone: str, assigned_employee: str) -> Conversation:
         ...
 
@@ -72,6 +91,8 @@ class SupabaseRelayRepository:
         return cls(create_client(settings.supabase_url, settings.supabase_service_role_key))
 
     def get_or_create_customer_conversation(self, customer_phone: str, assigned_employee: str) -> Conversation:
+        self.get_or_create_contact(customer_phone)
+
         existing = (
             self.client.table("conversations")
             .select("id, customer_phone, assigned_employee, status")
@@ -98,6 +119,41 @@ class SupabaseRelayRepository:
             .execute()
         )
         return _conversation_from_row(created.data[0])
+
+    def get_contact(self, phone_number: str) -> Contact | None:
+        result = (
+            self.client.table("contacts")
+            .select("id, phone_number, display_name, lookup_name")
+            .eq("phone_number", phone_number)
+            .limit(1)
+            .execute()
+        )
+        if not result.data:
+            return None
+        return _contact_from_row(result.data[0])
+
+    def get_or_create_contact(self, phone_number: str) -> Contact:
+        existing = self.get_contact(phone_number)
+        if existing is not None:
+            return existing
+
+        created = self.client.table("contacts").insert({"phone_number": phone_number}).execute()
+        return _contact_from_row(created.data[0])
+
+    def update_contact_lookup_name(self, phone_number: str, lookup_name: str | None) -> Contact:
+        result = (
+            self.client.table("contacts")
+            .upsert(
+                {
+                    "phone_number": phone_number,
+                    "lookup_name": lookup_name,
+                    "lookup_checked_at": datetime.now(UTC).isoformat(),
+                },
+                on_conflict="phone_number",
+            )
+            .execute()
+        )
+        return _contact_from_row(result.data[0])
 
     def get_latest_employee_conversation(self, employee_phone: str) -> Conversation | None:
         result = (

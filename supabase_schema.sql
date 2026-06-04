@@ -3,6 +3,9 @@ create extension if not exists pgcrypto;
 create table if not exists public.contacts (
   id uuid primary key default gen_random_uuid(),
   phone_number text not null unique,
+  display_name text,
+  lookup_name text,
+  lookup_checked_at timestamptz,
   created_at timestamptz not null default now()
 );
 
@@ -64,6 +67,11 @@ alter table public.messages
   add column if not exists num_media integer not null default 0,
   add column if not exists media_urls jsonb not null default '[]'::jsonb,
   add column if not exists media_content_types jsonb not null default '[]'::jsonb;
+
+alter table public.contacts
+  add column if not exists display_name text,
+  add column if not exists lookup_name text,
+  add column if not exists lookup_checked_at timestamptz;
 
 alter table public.message_attachments enable row level security;
 

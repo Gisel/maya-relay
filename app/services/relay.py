@@ -1,6 +1,7 @@
 from app.attachments import AttachmentStore, NoopAttachmentStore
 from app.config import Settings
 from app.db import RelayRepository
+from app.lookup import ContactNameLookup, NoopContactNameLookup
 from app.models import IncomingMessage
 from app.twilio_client import MessageSender
 
@@ -13,11 +14,13 @@ class RelayService:
         repository: RelayRepository,
         sender: MessageSender,
         attachment_store: AttachmentStore | None = None,
+        contact_name_lookup: ContactNameLookup | None = None,
     ):
         self.settings = settings
         self.repository = repository
         self.sender = sender
         self.attachment_store = attachment_store or NoopAttachmentStore()
+        self.contact_name_lookup = contact_name_lookup or NoopContactNameLookup()
 
     def handle_inbound_sms(self, message: IncomingMessage) -> dict[str, str | None]:
         if self._is_employee(message.from_phone):
@@ -46,8 +49,9 @@ class RelayService:
             media_content_types=message.media_content_types,
         )
 
+        from_label = self._contact_label(message.from_phone, default_prefix="customer")
         forwarded_body = self._format_forwarded_body(
-            from_label=f"customer {message.from_phone}",
+            from_label=from_label,
             body=message.body,
             media_urls=media_urls,
             media_content_types=message.media_content_types,
@@ -89,7 +93,7 @@ class RelayService:
             media_content_types=message.media_content_types,
         )
         forwarded_body = self._format_forwarded_body(
-            from_label="Francisco",
+            from_label=self._contact_label(message.from_phone, default_prefix="Francisco"),
             body=message.body,
             media_urls=media_urls,
             media_content_types=message.media_content_types,
@@ -129,6 +133,21 @@ class RelayService:
         if len(lines) == 1:
             lines.append("[No message body]")
         return "\n".join(lines)
+
+    def _contact_label(self, phone_number: str, *, default_prefix: str) -> str:
+        contact = self.repository.get_or_create_contact(phone_number)
+        name = contact.best_name
+        if name is None and default_prefix == "customer":
+            lookup_name = self.contact_name_lookup.lookup_name(phone_number)
+            if lookup_name:
+                contact = self.repository.update_contact_lookup_name(phone_number, lookup_name)
+                name = contact.best_name
+
+        if name:
+            return f"{name} ({phone_number})"
+        if default_prefix == "customer":
+            return f"customer {phone_number}"
+        return default_prefix
 
     def _store_attachment_urls(
         self,

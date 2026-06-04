@@ -11,6 +11,7 @@ load_dotenv()
 class Settings(BaseSettings):
     app_env: str = Field(default="development", alias="APP_ENV")
     verify_twilio_signature: bool = Field(default=False, alias="VERIFY_TWILIO_SIGNATURE")
+    enable_twilio_lookup: bool = Field(default=False, alias="ENABLE_TWILIO_LOOKUP")
 
     twilio_account_sid: str = Field(default="", alias="TWILIO_ACCOUNT_SID")
     twilio_auth_token: str = Field(default="", alias="TWILIO_AUTH_TOKEN")

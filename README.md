@@ -41,6 +41,7 @@ curl http://127.0.0.1:8000/health
 ```env
 APP_ENV=development
 VERIFY_TWILIO_SIGNATURE=false
+ENABLE_TWILIO_LOOKUP=false
 TWILIO_ACCOUNT_SID=
 TWILIO_AUTH_TOKEN=
 TWILIO_MESSAGING_SERVICE_SID=
@@ -96,3 +97,7 @@ Set the same environment variables from `.env.example` in Railway's Variables ta
 ## MMS Attachments
 
 Incoming media is downloaded from Twilio with the configured Twilio credentials, uploaded to the public Supabase Storage bucket named `attachments`, recorded in `message_attachments`, and forwarded as a Supabase public URL.
+
+## Contact Names
+
+When `ENABLE_TWILIO_LOOKUP=true`, unknown customer phone numbers are checked once with Twilio Lookup Caller Name, then cached in `contacts.lookup_name`. If `contacts.display_name` exists, it takes precedence over Lookup.

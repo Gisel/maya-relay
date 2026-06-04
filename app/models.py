@@ -14,6 +14,18 @@ class Conversation:
 
 
 @dataclass(frozen=True)
+class Contact:
+    id: str
+    phone_number: str
+    display_name: str | None = None
+    lookup_name: str | None = None
+
+    @property
+    def best_name(self) -> str | None:
+        return self.display_name or self.lookup_name
+
+
+@dataclass(frozen=True)
 class IncomingMessage:
     message_sid: str
     from_phone: str

@@ -7,8 +7,9 @@ class Response:
 
 
 class Query:
-    def __init__(self, table):
+    def __init__(self, table, name):
         self.table = table
+        self.name = name
 
     def select(self, *_args):
         return self
@@ -28,26 +29,35 @@ class Query:
 
     def execute(self):
         if self.table.inserted_payload is not None:
-            payload = {
-                "id": "conversation-1",
-                "created_at": "2026-06-04T00:00:00Z",
-                **self.table.inserted_payload,
-            }
+            if self.name == "contacts":
+                payload = {
+                    "id": "contact-1",
+                    "display_name": None,
+                    "lookup_name": None,
+                    **self.table.inserted_payload,
+                }
+            else:
+                payload = {
+                    "id": "conversation-1",
+                    "created_at": "2026-06-04T00:00:00Z",
+                    **self.table.inserted_payload,
+                }
             return Response([payload])
         return Response([])
 
 
 class Table:
-    def __init__(self):
+    def __init__(self, name):
+        self.name = name
         self.inserted_payload = None
 
     def query(self):
-        return Query(self)
+        return Query(self, self.name)
 
 
 class Client:
     def __init__(self):
-        self.tables = {"conversations": Table()}
+        self.tables = {"conversations": Table("conversations"), "contacts": Table("contacts")}
 
     def table(self, name):
         return self.tables[name].query()

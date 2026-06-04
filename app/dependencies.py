@@ -3,6 +3,7 @@ from functools import lru_cache
 from app.attachments import AttachmentStore, SupabaseAttachmentStore
 from app.config import Settings, get_settings
 from app.db import RelayRepository, SupabaseRelayRepository
+from app.lookup import ContactNameLookup, NoopContactNameLookup, TwilioContactNameLookup
 from app.services.relay import RelayService
 from app.twilio_client import MessageSender, TwilioMessageSender
 
@@ -22,6 +23,14 @@ def get_attachment_store() -> AttachmentStore:
     return SupabaseAttachmentStore(settings=get_settings(), repository=get_repository())
 
 
+@lru_cache
+def get_contact_name_lookup() -> ContactNameLookup:
+    settings = get_settings()
+    if not settings.enable_twilio_lookup:
+        return NoopContactNameLookup()
+    return TwilioContactNameLookup(settings)
+
+
 def get_relay_service() -> RelayService:
     settings: Settings = get_settings()
     return RelayService(
@@ -29,4 +38,5 @@ def get_relay_service() -> RelayService:
         repository=get_repository(),
         sender=get_sender(),
         attachment_store=get_attachment_store(),
+        contact_name_lookup=get_contact_name_lookup(),
     )

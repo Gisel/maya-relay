@@ -53,6 +53,7 @@ def test_readiness_reports_required_config_presence():
         "status": "missing_config",
         "checks": {
             "verify_twilio_signature": False,
+            "enable_twilio_lookup": False,
             "twilio_account_sid": False,
             "twilio_auth_token": False,
             "twilio_messaging_service_sid": False,

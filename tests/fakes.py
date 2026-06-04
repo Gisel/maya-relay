@@ -1,14 +1,40 @@
 from typing import Any
 
-from app.models import Conversation
+from app.models import Contact, Conversation
 
 
 class FakeRepository:
     def __init__(self):
         self.conversations: list[Conversation] = []
+        self.contacts: list[Contact] = []
         self.messages: list[dict[str, Any]] = []
         self.attachments: list[dict[str, Any]] = []
         self.status_updates: list[dict[str, Any]] = []
+
+    def get_contact(self, phone_number: str) -> Contact | None:
+        for contact in self.contacts:
+            if contact.phone_number == phone_number:
+                return contact
+        return None
+
+    def get_or_create_contact(self, phone_number: str) -> Contact:
+        existing = self.get_contact(phone_number)
+        if existing is not None:
+            return existing
+        contact = Contact(id=f"contact-{len(self.contacts) + 1}", phone_number=phone_number)
+        self.contacts.append(contact)
+        return contact
+
+    def update_contact_lookup_name(self, phone_number: str, lookup_name: str | None) -> Contact:
+        existing = self.get_or_create_contact(phone_number)
+        updated = Contact(
+            id=existing.id,
+            phone_number=existing.phone_number,
+            display_name=existing.display_name,
+            lookup_name=lookup_name,
+        )
+        self.contacts = [updated if contact.phone_number == phone_number else contact for contact in self.contacts]
+        return updated
 
     def get_or_create_customer_conversation(self, customer_phone: str, assigned_employee: str) -> Conversation:
         for conversation in self.conversations:
@@ -112,3 +138,13 @@ class FakeSender:
         sid = f"SMfake{len(self.sent_messages) + 1}"
         self.sent_messages.append({"sid": sid, "to_phone": to_phone, "body": body})
         return sid
+
+
+class FakeLookup:
+    def __init__(self, names: dict[str, str | None] | None = None):
+        self.names = names or {}
+        self.looked_up: list[str] = []
+
+    def lookup_name(self, phone_number: str) -> str | None:
+        self.looked_up.append(phone_number)
+        return self.names.get(phone_number)

@@ -1,10 +1,11 @@
 from app.config import Settings
+from app.models import Contact
 from app.models import IncomingMessage
 from app.services.relay import RelayService
-from tests.fakes import FakeRepository, FakeSender
+from tests.fakes import FakeLookup, FakeRepository, FakeSender
 
 
-def build_service() -> tuple[RelayService, FakeRepository, FakeSender]:
+def build_service(lookup: FakeLookup | None = None) -> tuple[RelayService, FakeRepository, FakeSender]:
     settings = Settings(
         FRANCISCO_PHONE="+15551234567",
         MAYA_BUSINESS_NUMBER="+13852208404",
@@ -12,7 +13,11 @@ def build_service() -> tuple[RelayService, FakeRepository, FakeSender]:
     )
     repository = FakeRepository()
     sender = FakeSender()
-    return RelayService(settings=settings, repository=repository, sender=sender), repository, sender
+    return (
+        RelayService(settings=settings, repository=repository, sender=sender, contact_name_lookup=lookup),
+        repository,
+        sender,
+    )
 
 
 def test_customer_message_creates_conversation_and_forwards_to_employee():
@@ -62,6 +67,69 @@ def test_customer_media_is_stored_and_forwarded_as_attachment_link():
         "Here is the design\n"
         "Attachment 1 (image/jpeg): https://api.twilio.com/media/image.jpg"
     )
+
+
+def test_customer_lookup_name_is_cached_and_used_in_forwarded_label():
+    lookup = FakeLookup({"+15550000001": "Maria Lopez"})
+    service, repository, sender = build_service(lookup)
+
+    service.handle_inbound_sms(
+        IncomingMessage(
+            message_sid="SMcustomer",
+            from_phone="+15550000001",
+            to_phone="+13852208404",
+            body="Hola",
+        )
+    )
+
+    assert lookup.looked_up == ["+15550000001"]
+    assert repository.get_contact("+15550000001").lookup_name == "Maria Lopez"
+    assert sender.sent_messages[0]["body"] == "From Maria Lopez (+15550000001):\nHola"
+
+
+def test_existing_contact_name_is_used_without_lookup():
+    lookup = FakeLookup({"+15550000001": "Lookup Name"})
+    service, repository, sender = build_service(lookup)
+    repository.contacts.append(
+        Contact(id="contact-1", phone_number="+15550000001", display_name="Saved Name")
+    )
+
+    service.handle_inbound_sms(
+        IncomingMessage(
+            message_sid="SMcustomer",
+            from_phone="+15550000001",
+            to_phone="+13852208404",
+            body="Hola",
+        )
+    )
+
+    assert lookup.looked_up == []
+    assert sender.sent_messages[0]["body"] == "From Saved Name (+15550000001):\nHola"
+
+
+def test_employee_reply_does_not_use_lookup_for_default_label():
+    lookup = FakeLookup({"+15550000001": "Customer Name", "+15551234567": "Paid Lookup Employee Name"})
+    service, _, sender = build_service(lookup)
+    service.handle_inbound_sms(
+        IncomingMessage(
+            message_sid="SMcustomer",
+            from_phone="+15550000001",
+            to_phone="+13852208404",
+            body="Hello",
+        )
+    )
+
+    service.handle_inbound_sms(
+        IncomingMessage(
+            message_sid="SMemployee",
+            from_phone="+15551234567",
+            to_phone="+13852208404",
+            body="Thanks.",
+        )
+    )
+
+    assert lookup.looked_up == ["+15550000001"]
+    assert sender.sent_messages[-1]["body"] == "From Francisco:\nThanks."
 
 
 def test_employee_reply_routes_to_latest_open_customer_conversation():
