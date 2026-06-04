@@ -1,5 +1,6 @@
 import html
 import hmac
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -48,11 +49,13 @@ def admin_index(
         return HTMLResponse(_layout("Maya Admin", _login_form()))
 
     conversations = repository.list_conversations()
+    metrics = _conversation_metrics(conversations)
     rows = []
     for conversation in conversations:
         last_message = conversation.get("last_message") or {}
         customer = conversation.get("customer_name") or conversation["customer_phone"]
         body = str(last_message.get("body") or "")
+        delivery_status = str(last_message.get("delivery_status") or "pending")
         rows.append(
             "<tr>"
             f"<td><a href='/admin/conversations/{_e(conversation['id'])}'>#{_e(conversation['conversation_code'])}</a></td>"
@@ -60,8 +63,8 @@ def admin_index(
             f"<td>{_badge(conversation['status'])}</td>"
             f"<td>{_e(last_message.get('direction') or '')}</td>"
             f"<td>{_e(body[:140])}</td>"
-            f"<td>{_e(last_message.get('delivery_status') or '')}</td>"
-            f"<td>{_e(conversation.get('updated_at') or '')}</td>"
+            f"<td>{_badge(delivery_status)}</td>"
+            f"<td>{_format_time(conversation.get('updated_at'))}</td>"
             "</tr>"
         )
 
@@ -70,6 +73,7 @@ def admin_index(
         "<h1>Maya Relay</h1>"
         "<a class='button' href='/readiness'>Readiness</a>"
         "</section>"
+        f"{_metrics_bar(metrics)}"
         "<table>"
         "<thead><tr><th>Code</th><th>Customer</th><th>Status</th><th>Last direction</th>"
         "<th>Last message</th><th>Delivery</th><th>Updated</th></tr></thead>"
@@ -110,7 +114,7 @@ def conversation_detail(
         )
         items.append(
             "<article class='message'>"
-            f"<div>{_badge(message['direction'])} <span>{_e(message.get('created_at') or '')}</span></div>"
+            f"<div>{_badge(message['direction'])} <span>{_format_time(message.get('created_at'))}</span></div>"
             f"<pre>{_e(message.get('body') or '')}</pre>"
             f"<p>From {_e(message.get('from_phone') or '')} to {_e(message.get('to_phone') or '')}</p>"
             f"<p>Delivery: {_e(message.get('delivery_status') or 'pending')}"
@@ -153,7 +157,46 @@ def _layout(title: str, content: str) -> str:
 
 
 def _badge(value: str) -> str:
-    return f"<span class='badge'>{_e(value)}</span>"
+    clean = str(value or "unknown").lower().replace("_", "-")
+    return f"<span class='badge badge-{_e(clean)}'>{_e(value)}</span>"
+
+
+def _conversation_metrics(conversations: list[dict]) -> dict[str, int]:
+    total = len(conversations)
+    open_count = sum(1 for conversation in conversations if conversation.get("status") == "open")
+    failed_count = sum(
+        1
+        for conversation in conversations
+        if (conversation.get("last_message") or {}).get("delivery_status") in {"failed", "undelivered"}
+    )
+    attachments = sum(
+        1 for conversation in conversations if ((conversation.get("last_message") or {}).get("num_media") or 0) > 0
+    )
+    return {"total": total, "open": open_count, "failed": failed_count, "attachments": attachments}
+
+
+def _metrics_bar(metrics: dict[str, int]) -> str:
+    labels = [
+        ("Open conversations", metrics["open"]),
+        ("Recent conversations", metrics["total"]),
+        ("Failed deliveries", metrics["failed"]),
+        ("With attachments", metrics["attachments"]),
+    ]
+    cards = "".join(f"<article class='metric'><strong>{value}</strong><span>{_e(label)}</span></article>" for label, value in labels)
+    return f"<section class='metrics'>{cards}</section>"
+
+
+def _format_time(value: object) -> str:
+    if not value:
+        return ""
+    text = str(value)
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return _e(text)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return _e(parsed.astimezone(UTC).strftime("%b %-d, %I:%M %p UTC"))
 
 
 def _e(value: object) -> str:
@@ -167,15 +210,26 @@ a{color:#164ea6;text-decoration:none}
 .toolbar{display:flex;align-items:center;justify-content:space-between;padding:24px 28px;background:white;border-bottom:1px solid #dde1e7}
 h1{font-size:22px;margin:0}
 .button,button{background:#16181d;color:white;border:0;border-radius:6px;padding:10px 14px;font-weight:650}
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:16px}
+.metric{background:white;border:1px solid #dde1e7;border-radius:8px;padding:16px}
+.metric strong{display:block;font-size:28px;line-height:1}
+.metric span{display:block;color:#667085;font-size:12px;text-transform:uppercase;margin-top:8px;font-weight:700}
 table{width:calc(100% - 32px);margin:16px;border-collapse:collapse;background:white;border:1px solid #dde1e7}
 th,td{padding:12px;border-bottom:1px solid #edf0f4;text-align:left;vertical-align:top;font-size:14px}
 th{font-size:12px;text-transform:uppercase;color:#667085;background:#fbfcfd}
 td span,.message p{color:#667085;font-size:12px}
 .badge{display:inline-block;background:#eef2f7;color:#2f3643;border-radius:999px;padding:3px 8px;font-size:12px}
+.badge-open,.badge-delivered{background:#dcfce7;color:#166534}
+.badge-failed,.badge-undelivered{background:#fee2e2;color:#991b1b}
+.badge-queued,.badge-pending{background:#fef3c7;color:#92400e}
+.badge-system{background:#e0e7ff;color:#3730a3}
+.badge-customer-to-employee{background:#dbeafe;color:#1d4ed8}
+.badge-employee-to-customer{background:#f3e8ff;color:#6b21a8}
 .message{margin:16px;padding:16px;background:white;border:1px solid #dde1e7;border-radius:8px}
 pre{white-space:pre-wrap;font:14px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}
 .media{display:inline-block;margin-right:8px}
 .login{min-height:100vh;display:grid;place-content:center;gap:16px}
 .login form{display:flex;gap:8px}
 input{padding:10px 12px;border:1px solid #cbd2dc;border-radius:6px;font-size:14px}
+@media(max-width:900px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}table{display:block;overflow-x:auto}}
 """

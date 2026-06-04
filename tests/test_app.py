@@ -132,6 +132,7 @@ def test_admin_login_and_conversations_page():
 
     dashboard = client.get("/admin", headers={"cookie": cookie})
     assert dashboard.status_code == 200
+    assert "Open conversations" in dashboard.text
     assert "#C0001" in dashboard.text
     assert "Need a quote" in dashboard.text
 
