@@ -7,11 +7,11 @@ from app.services.relay import RelayService
 from tests.fakes import FakeRepository, FakeSender
 
 
-def make_client() -> tuple[TestClient, FakeRepository, FakeSender]:
+def make_client(*, verify_twilio_signature: bool = False) -> tuple[TestClient, FakeRepository, FakeSender]:
     settings = Settings(
         FRANCISCO_PHONE="+15551234567",
         MAYA_BUSINESS_NUMBER="+13852208404",
-        VERIFY_TWILIO_SIGNATURE=False,
+        VERIFY_TWILIO_SIGNATURE=verify_twilio_signature,
         TWILIO_ACCOUNT_SID="",
         TWILIO_AUTH_TOKEN="",
         TWILIO_MESSAGING_SERVICE_SID="",
@@ -102,3 +102,39 @@ def test_status_callback_updates_message_status():
             "error_message": None,
         }
     ]
+
+
+def test_unsigned_sms_webhook_is_rejected_when_signature_validation_is_enabled():
+    client, repository, sender = make_client(verify_twilio_signature=True)
+
+    response = client.post(
+        "/webhooks/twilio/sms",
+        data={
+            "MessageSid": "SMinbound",
+            "From": "+15550000001",
+            "To": "+13852208404",
+            "Body": "Need a quote",
+            "NumMedia": "0",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.text == "Forbidden"
+    assert repository.messages == []
+    assert sender.sent_messages == []
+
+
+def test_unsigned_status_callback_is_rejected_when_signature_validation_is_enabled():
+    client, repository, _ = make_client(verify_twilio_signature=True)
+
+    response = client.post(
+        "/webhooks/twilio/status",
+        data={
+            "MessageSid": "SMoutbound",
+            "MessageStatus": "delivered",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.text == "Forbidden"
+    assert repository.status_updates == []

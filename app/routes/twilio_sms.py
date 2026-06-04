@@ -78,12 +78,17 @@ async def employee_sms(
 
 @router.post("/status")
 async def message_status(
+    request: Request,
     MessageSid: str = Form(...),
     MessageStatus: str = Form(...),
     ErrorCode: str | None = Form(default=None),
     ErrorMessage: str | None = Form(default=None),
+    settings: Settings = Depends(get_settings),
     repository: RelayRepository = Depends(get_repository),
 ) -> Response:
+    if not await _validate_twilio_request(request, settings):
+        return PlainTextResponse("Forbidden", status_code=403)
+
     repository.update_message_status(
         twilio_message_sid=MessageSid,
         status=MessageStatus,
@@ -91,4 +96,3 @@ async def message_status(
         error_message=ErrorMessage,
     )
     return Response(status_code=204)
-
