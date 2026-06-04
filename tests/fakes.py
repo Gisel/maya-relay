@@ -70,6 +70,12 @@ class FakeRepository:
                 return conversation
         return None
 
+    def get_conversation(self, conversation_id: str) -> Conversation | None:
+        for conversation in self.conversations:
+            if conversation.id == conversation_id:
+                return conversation
+        return None
+
     def create_message(
         self,
         *,

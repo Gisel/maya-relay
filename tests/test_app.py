@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 from twilio.request_validator import RequestValidator
 
 from app.config import Settings, get_settings
-from app.dependencies import get_relay_service, get_repository
+from app.dependencies import get_relay_service, get_repository, get_sender
 from app.main import create_app
 from app.services.relay import RelayService
 from tests.fakes import FakeRepository, FakeSender
@@ -34,6 +34,7 @@ def make_client(
 
     app.dependency_overrides[get_relay_service] = relay_override
     app.dependency_overrides[get_repository] = lambda: repository
+    app.dependency_overrides[get_sender] = lambda: sender
     app.dependency_overrides[get_settings] = lambda: settings
     return TestClient(app), repository, sender
 
@@ -109,7 +110,7 @@ def test_admin_is_hidden_when_password_is_not_configured():
 
 
 def test_admin_login_and_conversations_page():
-    client, repository, _ = make_client(admin_password="secret")
+    client, repository, sender = make_client(admin_password="secret")
     repository.get_or_create_customer_conversation(
         customer_phone="+15550000001",
         assigned_employee="+15551234567",
@@ -126,7 +127,14 @@ def test_admin_login_and_conversations_page():
         direction="system",
         from_phone="+13852208404",
         to_phone="+15551234567",
-        body="Reply with #C0001 your message",
+        body=(
+            "Reply with #C0001 your message\n"
+            "---\n"
+            "AI note:\n"
+            "Intent: quote request.\n"
+            "---\n"
+            "#C0001 Hi! What size and material do you need?"
+        ),
     )
     repository.get_or_create_customer_conversation(
         customer_phone="+15550000002",
@@ -161,6 +169,27 @@ def test_admin_login_and_conversations_page():
     assert "#C0001" in search.text
     assert "Are you open today?" not in search.text
     assert "href='/admin'>Clear</a>" in search.text
+
+    detail = client.get("/admin/conversations/conversation-1", headers={"cookie": cookie})
+    assert detail.status_code == 200
+    assert "Reply to customer" in detail.text
+    assert "Hi! What size and material do you need?" in detail.text
+    assert "#C0001 Hi! What size and material do you need?" in detail.text
+
+    send_reply = client.post(
+        "/admin/conversations/conversation-1/reply",
+        data={"reply_body": "We are open today until 6 PM."},
+        headers={"cookie": cookie},
+        follow_redirects=False,
+    )
+    assert send_reply.status_code == 303
+    assert sender.sent_messages[-1] == {
+        "sid": "SMfake1",
+        "to_phone": "+15550000001",
+        "body": "We are open today until 6 PM.",
+    }
+    assert repository.messages[-1]["direction"] == "employee_to_customer"
+    assert repository.messages[-1]["twilio_message_sid"] == "SMfake1"
 
     logout = client.get("/admin/logout", follow_redirects=False)
     assert logout.status_code == 303

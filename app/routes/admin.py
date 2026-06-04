@@ -7,7 +7,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.config import Settings, get_settings
 from app.db import RelayRepository
-from app.dependencies import get_repository
+from app.dependencies import get_repository, get_sender
+from app.twilio_client import MessageSender
 
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -115,7 +116,12 @@ def conversation_detail(
     repository: RelayRepository = Depends(get_repository),
 ) -> HTMLResponse:
     _require_admin(request, settings)
+    conversation = repository.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404)
+
     messages = repository.list_messages_for_conversation(conversation_id)
+    suggested_reply = _suggested_reply(messages, conversation.conversation_code)
     items = []
     for message in messages:
         media_urls = message.get("media_urls") or []
@@ -138,9 +144,40 @@ def conversation_detail(
         "<h1>Conversation</h1>"
         "<a class='button' href='/admin'>Back</a>"
         "</section>"
+        f"{_reply_form(conversation_id, suggested_reply)}"
         f"{''.join(items) or '<p>No messages yet.</p>'}"
     )
     return HTMLResponse(_layout("Conversation", content))
+
+
+@router.post("/conversations/{conversation_id}/reply")
+def send_conversation_reply(
+    conversation_id: str,
+    request: Request,
+    reply_body: str = Form(...),
+    settings: Settings = Depends(get_settings),
+    repository: RelayRepository = Depends(get_repository),
+    sender: MessageSender = Depends(get_sender),
+) -> RedirectResponse:
+    _require_admin(request, settings)
+    conversation = repository.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404)
+
+    body = reply_body.strip()
+    if not body:
+        raise HTTPException(status_code=400, detail="Reply body is required.")
+
+    outbound_sid = sender.send_sms(to_phone=conversation.customer_phone, body=body)
+    repository.create_message(
+        conversation_id=conversation.id,
+        direction="employee_to_customer",
+        from_phone=settings.maya_business_number,
+        to_phone=conversation.customer_phone,
+        body=body,
+        twilio_message_sid=outbound_sid,
+    )
+    return RedirectResponse(f"/admin/conversations/{conversation_id}", status_code=303)
 
 
 def _login_form() -> str:
@@ -153,6 +190,34 @@ def _login_form() -> str:
         "</form>"
         "</main>"
     )
+
+
+def _reply_form(conversation_id: str, suggested_reply: str) -> str:
+    return (
+        "<section class='composer'>"
+        "<form method='post' "
+        f"action='/admin/conversations/{_e(conversation_id)}/reply'>"
+        "<label for='reply_body'>Reply to customer</label>"
+        f"<textarea id='reply_body' name='reply_body' rows='4' required>{_e(suggested_reply)}</textarea>"
+        "<div class='composer-actions'>"
+        "<button type='submit'>Send to customer</button>"
+        "<span>This sends a real message from Maya Relay.</span>"
+        "</div>"
+        "</form>"
+        "</section>"
+    )
+
+
+def _suggested_reply(messages: list[dict], conversation_code: str) -> str:
+    prefix = f"#{conversation_code.upper()} "
+    for message in reversed(messages):
+        if message.get("direction") != "system":
+            continue
+        for line in reversed(str(message.get("body") or "").splitlines()):
+            clean = line.strip()
+            if clean.upper().startswith(prefix):
+                return clean[len(prefix):].strip()
+    return ""
 
 
 def _layout(title: str, content: str) -> str:
@@ -277,6 +342,12 @@ td span,.message p{color:#667085;font-size:12px}
 .badge-customer-to-employee{background:#dbeafe;color:#1d4ed8}
 .badge-employee-to-customer{background:#f3e8ff;color:#6b21a8}
 .message{margin:16px;padding:16px;background:white;border:1px solid #dde1e7;border-radius:8px}
+.composer{margin:16px;padding:16px;background:white;border:1px solid #dde1e7;border-radius:8px}
+.composer form{display:grid;gap:10px}
+.composer label{font-weight:700}
+.composer textarea{width:100%;box-sizing:border-box;padding:12px;border:1px solid #cbd2dc;border-radius:6px;font:15px/1.45 inherit;resize:vertical}
+.composer-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.composer-actions span{color:#667085;font-size:13px}
 pre{white-space:pre-wrap;font:14px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}
 .media{display:inline-block;margin-right:8px}
 .login{min-height:100vh;display:grid;place-content:center;gap:16px}
