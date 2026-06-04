@@ -90,6 +90,17 @@ uvicorn app.main:app --host 0.0.0.0 --port $PORT
 
 Set the same environment variables from `.env.example` in Railway's Variables tab.
 
+## Demo Operations
+
+Before demoing with Francisco's real phone:
+
+1. Set `FRANCISCO_PHONE` in Railway to Francisco's cellphone.
+2. Clear `EMPLOYEE_PHONE_NUMBERS` unless an extra helper/test phone should also be allowed to reply.
+3. Wait for Railway to redeploy/restart.
+4. Open `/readiness` and confirm `"status": "ready"`.
+5. Confirm `"francisco_phone_is_not_maya_number": true`.
+6. Send a fresh customer SMS and reply using the new `#code`.
+
 ## MVP Routing
 
 - Customer texts Maya number.

@@ -57,6 +57,10 @@ The conversation code is required while Francisco stays in a native SMS app, bec
 - It adds a short internal note to Francisco's forwarded SMS.
 - AI does not auto-reply to customers.
 - The relay fails open if the AI call fails.
+- AI knows Maya has one location.
+- Office hours: Monday-Friday 9:00 AM-6:00 PM.
+- Saturday is by appointment only.
+- Suggested replies include the conversation code for easier copy/paste.
 
 ### Voice System
 
@@ -133,6 +137,31 @@ Features:
 
 ## Pending Work
 
+### Demo Day Checklist
+
+- Change Railway `FRANCISCO_PHONE` to Francisco's real cellphone.
+- Clear `EMPLOYEE_PHONE_NUMBERS`, unless an extra testing/helper phone should also be allowed to reply.
+- Wait for Railway to redeploy/restart.
+- Confirm `https://maya-relay-production.up.railway.app/readiness` returns `"status": "ready"`.
+- Confirm `francisco_phone_is_not_maya_number` is `true`.
+- Send a fresh customer SMS to Maya's number.
+- Confirm Francisco receives:
+  - customer name/phone
+  - conversation code
+  - original message
+  - reply instruction
+  - short AI note and suggested reply when AI is enabled
+- Reply from Francisco's phone using the new `#code`.
+- Confirm the customer receives the reply from Maya's number.
+
+### Pricing / Commercial
+
+- One-time setup fee already discussed: `$1,500`.
+- Suggested monthly fee: `$299/month` for AI-assisted SMS relay, hosting, maintenance, monitoring, and improvements.
+- Client pays Twilio usage directly.
+- Current vendor costs paid by us: Railway, Supabase, OpenAI.
+- Future auto-response mode can be a higher tier after Francisco approves the AI behavior.
+
 ### WhatsApp Relay
 
 Blocked until Meta/Twilio sender setup is ready:
@@ -164,11 +193,12 @@ CSV upload is deferred. Expected first version:
 
 Potential later additions:
 
-- Lead qualification
-- Missing-information prompts
-- Draft replies for Francisco
-- Escalation detection
-- Auto-response only after explicit approval and guardrails
+- Refine AI prompt based on Francisco's feedback after demo.
+- Decide whether to keep `Intent` and `Missing` lines, or switch to suggested-reply-only.
+- Add lead qualification and structured extraction.
+- Add escalation detection for urgent/angry/complex messages.
+- Add auto-response mode only for low-risk messages after explicit approval.
+- Keep human approval required for pricing, timelines, complaints, and complex jobs.
 
 ## Success Criteria
 
