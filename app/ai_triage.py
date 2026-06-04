@@ -43,8 +43,9 @@ class OpenAIMessageTriage:
                     "instructions": (
                         "You triage inbound messages for Maya Graphics and Signs. "
                         "Write a concise internal SMS note for Francisco, not for the customer. "
-                        "Use at most 4 short lines. Include intent, key details, missing info, "
-                        "and a suggested reply only when useful. Be bilingual if the customer writes Spanish. "
+                        "Use at most 3 short lines. Line 1: intent. Line 2: missing details. "
+                        "Line 3: a short suggested reply only when useful. "
+                        "Match the customer's language. Keep the whole note under 320 characters. "
                         "Do not invent prices, commitments, timelines, or policies."
                     ),
                     "input": prompt,
@@ -95,4 +96,4 @@ def _extract_response_text(payload: dict) -> str | None:
 
 def _compact_summary(text: str) -> str:
     lines = [line.strip() for line in text.splitlines() if line.strip()]
-    return "\n".join(lines[:4])[:500]
+    return "\n".join(lines[:3])[:320]
