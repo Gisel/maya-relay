@@ -67,10 +67,15 @@ alter table public.messages enable row level security;
 grant all on public.contacts to service_role;
 grant all on public.conversations to service_role;
 grant all on public.messages to service_role;
+grant usage on schema public to service_role;
+grant all on all tables in schema public to service_role;
+grant usage, select on all sequences in schema public to service_role;
 
 revoke execute on function public.rls_auto_enable() from public;
 revoke execute on function public.rls_auto_enable() from anon;
 revoke execute on function public.rls_auto_enable() from authenticated;
+
+notify pgrst, 'reload schema';
 
 -- The backend uses SUPABASE_SERVICE_ROLE_KEY only on the server.
 -- Do not grant anon/authenticated access until there is a real user-facing client.

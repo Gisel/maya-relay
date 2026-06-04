@@ -61,6 +61,15 @@ def test_readiness_reports_required_config_presence():
     }
 
 
+def test_supabase_readiness_reports_ok_when_repository_is_accessible():
+    client, _, _ = make_client()
+
+    response = client.get("/readiness/supabase")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
 def test_twilio_sms_webhook_acknowledges_with_empty_twiml():
     client, repository, sender = make_client()
 

@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends
 
 from app.config import Settings, get_settings
+from app.db import RelayRepository
+from app.dependencies import get_repository
 
 
 router = APIRouter()
@@ -24,3 +26,15 @@ def readiness(settings: Settings = Depends(get_settings)) -> dict[str, object]:
         "supabase_service_role_key": bool(settings.supabase_service_role_key),
     }
     return {"status": "ready" if all(checks.values()) else "missing_config", "checks": checks}
+
+
+@router.get("/readiness/supabase")
+def supabase_readiness(repository: RelayRepository = Depends(get_repository)) -> dict[str, object]:
+    try:
+        repository.get_latest_employee_conversation("__readiness_check__")
+    except Exception as exc:
+        return {
+            "status": "error",
+            "error_type": exc.__class__.__name__,
+        }
+    return {"status": "ok"}
