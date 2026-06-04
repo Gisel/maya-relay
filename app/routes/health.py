@@ -14,6 +14,7 @@ def health() -> dict[str, str]:
 @router.get("/readiness")
 def readiness(settings: Settings = Depends(get_settings)) -> dict[str, object]:
     checks = {
+        "verify_twilio_signature": settings.verify_twilio_signature,
         "twilio_account_sid": bool(settings.twilio_account_sid),
         "twilio_auth_token": bool(settings.twilio_auth_token),
         "twilio_messaging_service_sid": bool(settings.twilio_messaging_service_sid),

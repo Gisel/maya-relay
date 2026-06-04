@@ -49,6 +49,7 @@ def test_readiness_reports_required_config_presence():
     assert response.json() == {
         "status": "missing_config",
         "checks": {
+            "verify_twilio_signature": False,
             "twilio_account_sid": False,
             "twilio_auth_token": False,
             "twilio_messaging_service_sid": False,

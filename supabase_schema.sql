@@ -45,6 +45,7 @@ create index if not exists messages_twilio_sid_idx
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   new.updated_at = now();
@@ -67,6 +68,9 @@ grant all on public.contacts to service_role;
 grant all on public.conversations to service_role;
 grant all on public.messages to service_role;
 
+revoke execute on function public.rls_auto_enable() from public;
+revoke execute on function public.rls_auto_enable() from anon;
+revoke execute on function public.rls_auto_enable() from authenticated;
+
 -- The backend uses SUPABASE_SERVICE_ROLE_KEY only on the server.
 -- Do not grant anon/authenticated access until there is a real user-facing client.
-
