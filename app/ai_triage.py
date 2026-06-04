@@ -48,7 +48,9 @@ class OpenAIMessageTriage:
                         "Do not invent prices, commitments, timelines, or policies."
                     ),
                     "input": prompt,
-                    "max_output_tokens": 120,
+                    "max_output_tokens": 300,
+                    "reasoning": {"effort": "low"},
+                    "text": {"verbosity": "low"},
                 },
                 timeout=12,
             )
