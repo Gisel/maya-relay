@@ -6,6 +6,15 @@ from app.config import Settings
 from app.models import Conversation
 
 
+def _conversation_from_row(row: dict[str, Any]) -> Conversation:
+    return Conversation(
+        id=row["id"],
+        customer_phone=row["customer_phone"],
+        assigned_employee=row["assigned_employee"],
+        status=row["status"],
+    )
+
+
 class RelayRepository(Protocol):
     def get_or_create_customer_conversation(self, customer_phone: str, assigned_employee: str) -> Conversation:
         ...
@@ -59,7 +68,7 @@ class SupabaseRelayRepository:
         )
         if existing.data:
             row = existing.data[0]
-            return Conversation(**row)
+            return _conversation_from_row(row)
 
         created = (
             self.client.table("conversations")
@@ -70,10 +79,9 @@ class SupabaseRelayRepository:
                     "status": "open",
                 }
             )
-            .select("id, customer_phone, assigned_employee, status")
             .execute()
         )
-        return Conversation(**created.data[0])
+        return _conversation_from_row(created.data[0])
 
     def get_latest_employee_conversation(self, employee_phone: str) -> Conversation | None:
         result = (
@@ -87,7 +95,7 @@ class SupabaseRelayRepository:
         )
         if not result.data:
             return None
-        return Conversation(**result.data[0])
+        return _conversation_from_row(result.data[0])
 
     def create_message(
         self,
@@ -111,7 +119,6 @@ class SupabaseRelayRepository:
                     "twilio_message_sid": twilio_message_sid,
                 }
             )
-            .select("*")
             .execute()
         )
         return result.data[0]
@@ -136,4 +143,3 @@ class SupabaseRelayRepository:
             .eq("twilio_message_sid", twilio_message_sid)
             .execute()
         )
-
