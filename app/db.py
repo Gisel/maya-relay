@@ -89,6 +89,12 @@ class RelayRepository(Protocol):
     ) -> None:
         ...
 
+    def list_conversations(self, limit: int = 50) -> list[dict[str, Any]]:
+        ...
+
+    def list_messages_for_conversation(self, conversation_id: str, limit: int = 100) -> list[dict[str, Any]]:
+        ...
+
 
 class SupabaseRelayRepository:
     def __init__(self, client: Client):
@@ -273,3 +279,53 @@ class SupabaseRelayRepository:
             .eq("twilio_message_sid", twilio_message_sid)
             .execute()
         )
+
+    def list_conversations(self, limit: int = 50) -> list[dict[str, Any]]:
+        result = (
+            self.client.table("conversations")
+            .select("id, customer_phone, assigned_employee, conversation_code, status, created_at, updated_at")
+            .order("updated_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        conversations: list[dict[str, Any]] = []
+        for conversation in result.data:
+            messages = (
+                self.client.table("messages")
+                .select("body, direction, delivery_status, delivery_error_code, created_at, num_media")
+                .eq("conversation_id", conversation["id"])
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+            contacts = (
+                self.client.table("contacts")
+                .select("display_name, lookup_name")
+                .eq("phone_number", conversation["customer_phone"])
+                .limit(1)
+                .execute()
+            )
+            contact = contacts.data[0] if contacts.data else {}
+            conversations.append(
+                {
+                    **conversation,
+                    "customer_name": contact.get("display_name") or contact.get("lookup_name"),
+                    "last_message": messages.data[0] if messages.data else None,
+                }
+            )
+        return conversations
+
+    def list_messages_for_conversation(self, conversation_id: str, limit: int = 100) -> list[dict[str, Any]]:
+        result = (
+            self.client.table("messages")
+            .select(
+                "id, conversation_id, direction, from_phone, to_phone, body, twilio_message_sid, "
+                "num_media, media_urls, media_content_types, delivery_status, delivery_error_code, "
+                "delivery_error_message, created_at"
+            )
+            .eq("conversation_id", conversation_id)
+            .order("created_at", desc=False)
+            .limit(limit)
+            .execute()
+        )
+        return result.data

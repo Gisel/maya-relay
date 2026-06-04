@@ -139,6 +139,35 @@ class FakeRepository:
             }
         )
 
+    def list_conversations(self, limit: int = 50) -> list[dict[str, Any]]:
+        rows = []
+        for conversation in self.conversations[:limit]:
+            last_message = next(
+                (
+                    message
+                    for message in reversed(self.messages)
+                    if message["conversation_id"] == conversation.id
+                ),
+                None,
+            )
+            rows.append(
+                {
+                    "id": conversation.id,
+                    "customer_phone": conversation.customer_phone,
+                    "assigned_employee": conversation.assigned_employee,
+                    "conversation_code": conversation.conversation_code,
+                    "status": conversation.status,
+                    "created_at": "",
+                    "updated_at": "",
+                    "customer_name": None,
+                    "last_message": last_message,
+                }
+            )
+        return rows
+
+    def list_messages_for_conversation(self, conversation_id: str, limit: int = 100) -> list[dict[str, Any]]:
+        return [message for message in self.messages if message["conversation_id"] == conversation_id][:limit]
+
 
 class FakeSender:
     def __init__(self):

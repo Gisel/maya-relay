@@ -9,7 +9,7 @@ from tests.fakes import FakeRepository, FakeSender
 
 
 def make_client(
-    *, verify_twilio_signature: bool = False, twilio_auth_token: str = ""
+    *, verify_twilio_signature: bool = False, twilio_auth_token: str = "", admin_password: str = ""
 ) -> tuple[TestClient, FakeRepository, FakeSender]:
     settings = Settings(
         FRANCISCO_PHONE="+15551234567",
@@ -18,6 +18,7 @@ def make_client(
         ENABLE_AI_TRIAGE=False,
         OPENAI_API_KEY="",
         OPENAI_MODEL="gpt-5-mini",
+        ADMIN_PASSWORD=admin_password,
         TWILIO_ACCOUNT_SID="",
         TWILIO_AUTH_TOKEN=twilio_auth_token,
         TWILIO_MESSAGING_SERVICE_SID="",
@@ -97,6 +98,42 @@ def test_supabase_readiness_reports_ok_when_repository_is_accessible():
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_admin_is_hidden_when_password_is_not_configured():
+    client, _, _ = make_client()
+
+    response = client.get("/admin")
+
+    assert response.status_code == 404
+
+
+def test_admin_login_and_conversations_page():
+    client, repository, _ = make_client(admin_password="secret")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    repository.create_message(
+        conversation_id="conversation-1",
+        direction="customer_to_employee",
+        from_phone="+15550000001",
+        to_phone="+13852208404",
+        body="Need a quote",
+    )
+
+    login_page = client.get("/admin")
+    assert login_page.status_code == 200
+    assert "Admin password" in login_page.text
+
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    assert login.status_code == 303
+    cookie = login.headers["set-cookie"]
+
+    dashboard = client.get("/admin", headers={"cookie": cookie})
+    assert dashboard.status_code == 200
+    assert "#C0001" in dashboard.text
+    assert "Need a quote" in dashboard.text
 
 
 def test_twilio_sms_webhook_acknowledges_with_empty_twiml():

@@ -45,6 +45,7 @@ ENABLE_TWILIO_LOOKUP=false
 ENABLE_AI_TRIAGE=false
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-5-mini
+ADMIN_PASSWORD=
 TWILIO_ACCOUNT_SID=
 TWILIO_AUTH_TOKEN=
 TWILIO_MESSAGING_SERVICE_SID=
@@ -100,6 +101,10 @@ Before demoing with Francisco's real phone:
 4. Open `/readiness` and confirm `"status": "ready"`.
 5. Confirm `"francisco_phone_is_not_maya_number": true`.
 6. Send a fresh customer SMS and reply using the new `#code`.
+
+## Admin Dashboard
+
+Set `ADMIN_PASSWORD` to enable the read-only operations dashboard at `/admin`. Leave it blank to hide the dashboard.
 
 ## MVP Routing
 
