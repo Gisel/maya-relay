@@ -2,6 +2,10 @@
 
 FastAPI backend for routing customer SMS messages through the Maya Graphics business number while employees keep using their native SMS app.
 
+## Project Summary
+
+See [docs/project-summary.md](docs/project-summary.md) for the working requirements.
+
 ## Local Setup
 
 1. Create a virtual environment.
@@ -70,6 +74,16 @@ POST https://your-railway-app.up.railway.app/webhooks/twilio/sms
 POST https://your-railway-app.up.railway.app/webhooks/twilio/status
 ```
 
+## Railway
+
+This repo includes `railway.toml`. Railway should run:
+
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port $PORT
+```
+
+Set the same environment variables from `.env.example` in Railway's Variables tab.
+
 ## MVP Routing
 
 - Customer texts Maya number.
@@ -77,4 +91,3 @@ POST https://your-railway-app.up.railway.app/webhooks/twilio/status
 - App forwards the message to Francisco.
 - Francisco replies to Maya number.
 - App routes the reply to the latest open customer conversation assigned to Francisco.
-
