@@ -122,7 +122,9 @@ def test_customer_message_includes_ai_triage_note_when_available():
         )
     )
 
-    assert triage.calls == [{"body": "I need a banner quote.", "has_attachments": False}]
+    assert triage.calls == [
+        {"body": "I need a banner quote.", "has_attachments": False, "conversation_code": "C0001"}
+    ]
     assert sender.sent_messages[0]["body"] == (
         "From customer +15550000001 [#C0001]:\n"
         "AI note:\n"

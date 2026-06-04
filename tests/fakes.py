@@ -166,8 +166,10 @@ class FakeTriage:
         self.should_raise = should_raise
         self.calls: list[dict[str, object]] = []
 
-    def summarize(self, *, body: str, has_attachments: bool) -> str | None:
-        self.calls.append({"body": body, "has_attachments": has_attachments})
+    def summarize(self, *, body: str, has_attachments: bool, conversation_code: str | None = None) -> str | None:
+        self.calls.append(
+            {"body": body, "has_attachments": has_attachments, "conversation_code": conversation_code}
+        )
         if self.should_raise:
             raise RuntimeError("triage failed")
         return self.note

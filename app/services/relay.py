@@ -64,7 +64,7 @@ class RelayService:
             media_urls=media_urls,
             media_content_types=message.media_content_types,
             conversation_code=conversation.conversation_code,
-            triage_note=self._triage_note(message),
+            triage_note=self._triage_note(message, conversation_code=conversation.conversation_code),
         )
         outbound_sid = self.sender.send_sms(to_phone=conversation.assigned_employee, body=forwarded_body)
         self.repository.create_message(
@@ -180,11 +180,12 @@ class RelayService:
     def _remove_conversation_code(self, body: str) -> str:
         return CONVERSATION_CODE_PATTERN.sub(" ", body, count=1)
 
-    def _triage_note(self, message: IncomingMessage) -> str | None:
+    def _triage_note(self, message: IncomingMessage, *, conversation_code: str) -> str | None:
         try:
             return self.message_triage.summarize(
                 body=message.body,
                 has_attachments=bool(message.media_urls),
+                conversation_code=conversation_code,
             )
         except Exception:
             return None

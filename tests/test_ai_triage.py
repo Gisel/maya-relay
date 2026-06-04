@@ -46,7 +46,11 @@ def test_openai_triage_uses_low_reasoning_and_enough_output_tokens(monkeypatch):
         Settings(OPENAI_API_KEY="test-key", OPENAI_MODEL="gpt-5-mini", ENABLE_AI_TRIAGE=True)
     )
 
-    assert triage.summarize(body="Need a banner quote", has_attachments=False) == "Intent: quote request"
+    assert (
+        triage.summarize(body="Need a banner quote", has_attachments=False, conversation_code="C0001")
+        == "Intent: quote request"
+    )
     assert captured["json"]["max_output_tokens"] == 300
     assert captured["json"]["reasoning"] == {"effort": "low"}
     assert captured["json"]["text"] == {"verbosity": "low"}
+    assert "Conversation reply code: #C0001" in captured["json"]["input"]

@@ -6,12 +6,12 @@ from app.config import Settings
 
 
 class MessageTriage(Protocol):
-    def summarize(self, *, body: str, has_attachments: bool) -> str | None:
+    def summarize(self, *, body: str, has_attachments: bool, conversation_code: str | None = None) -> str | None:
         ...
 
 
 class NoopMessageTriage:
-    def summarize(self, *, body: str, has_attachments: bool) -> str | None:
+    def summarize(self, *, body: str, has_attachments: bool, conversation_code: str | None = None) -> str | None:
         return None
 
 
@@ -22,15 +22,19 @@ class OpenAIMessageTriage:
         self.api_key = settings.openai_api_key
         self.model = settings.openai_model
 
-    def summarize(self, *, body: str, has_attachments: bool) -> str | None:
+    def summarize(self, *, body: str, has_attachments: bool, conversation_code: str | None = None) -> str | None:
         if not body.strip() and not has_attachments:
             return None
 
-        prompt = (
-            "Customer message:\n"
-            f"{body.strip() or '[No text body]'}\n\n"
-            f"Has attachments: {'yes' if has_attachments else 'no'}"
-        )
+        prompt_lines = [
+            "Customer message:",
+            body.strip() or "[No text body]",
+            "",
+            f"Has attachments: {'yes' if has_attachments else 'no'}",
+        ]
+        if conversation_code:
+            prompt_lines.append(f"Conversation reply code: #{conversation_code}")
+        prompt = "\n".join(prompt_lines)
         try:
             response = requests.post(
                 "https://api.openai.com/v1/responses",
@@ -45,6 +49,7 @@ class OpenAIMessageTriage:
                         "Write a concise internal SMS note for Francisco, not for the customer. "
                         "Use at most 3 short lines. Line 1: intent. Line 2: missing details. "
                         "Line 3: a short suggested reply only when useful. "
+                        "If you include a suggested reply, start it with the exact conversation reply code. "
                         "Match the customer's language. Keep the whole note under 320 characters. "
                         "Do not invent prices, commitments, timelines, or policies."
                     ),
