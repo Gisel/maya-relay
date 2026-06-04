@@ -158,8 +158,6 @@ class RelayService:
     ) -> str:
         suffix = f" [#{conversation_code}]" if conversation_code else ""
         lines = [f"From {from_label}{suffix}:"]
-        if triage_note:
-            lines.append(f"AI note:\n{triage_note}")
         if body:
             lines.append(body)
         for index, media_url in enumerate(media_urls):
@@ -169,6 +167,9 @@ class RelayService:
             lines.append("[No message body]")
         if conversation_code:
             lines.append(f"Reply with #{conversation_code} your message")
+        if triage_note:
+            lines.append("---")
+            lines.append(f"AI note:\n{triage_note}")
         return "\n".join(lines)
 
     def _extract_conversation_code(self, body: str) -> str | None:

@@ -127,11 +127,12 @@ def test_customer_message_includes_ai_triage_note_when_available():
     ]
     assert sender.sent_messages[0]["body"] == (
         "From customer +15550000001 [#C0001]:\n"
+        "I need a banner quote.\n"
+        "Reply with #C0001 your message\n"
+        "---\n"
         "AI note:\n"
         "Intent: quote request\n"
-        "Missing: size and deadline\n"
-        "I need a banner quote.\n"
-        "Reply with #C0001 your message"
+        "Missing: size and deadline"
     )
 
 
