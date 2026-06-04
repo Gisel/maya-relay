@@ -61,11 +61,10 @@ class FakeRepository:
                 return conversation
         return None
 
-    def get_open_conversation_by_code(self, employee_phone: str, conversation_code: str) -> Conversation | None:
+    def get_open_conversation_by_code(self, conversation_code: str) -> Conversation | None:
         for conversation in self.conversations:
             if (
-                conversation.assigned_employee == employee_phone
-                and conversation.conversation_code == conversation_code.upper()
+                conversation.conversation_code == conversation_code.upper()
                 and conversation.status == "open"
             ):
                 return conversation

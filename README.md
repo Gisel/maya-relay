@@ -47,6 +47,7 @@ TWILIO_AUTH_TOKEN=
 TWILIO_MESSAGING_SERVICE_SID=
 MAYA_BUSINESS_NUMBER=+13852208404
 FRANCISCO_PHONE=
+EMPLOYEE_PHONE_NUMBERS=
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 SUPABASE_ATTACHMENTS_BUCKET=attachments
@@ -94,6 +95,8 @@ Set the same environment variables from `.env.example` in Railway's Variables ta
 - Francisco replies to Maya number with the code, such as `#A1B2C3D4 Yes, send measurements`.
 - App strips the code and routes the reply to that specific customer conversation.
 - If the code is missing or invalid, app texts Francisco back with a correction instead of guessing.
+
+`FRANCISCO_PHONE` is the primary phone that receives forwarded customer texts. `EMPLOYEE_PHONE_NUMBERS` is an optional comma-separated allowlist of additional phones that may reply with conversation codes.
 
 ## MMS Attachments
 

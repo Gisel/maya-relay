@@ -5,9 +5,14 @@ from app.services.relay import RelayService
 from tests.fakes import FakeLookup, FakeRepository, FakeSender
 
 
-def build_service(lookup: FakeLookup | None = None) -> tuple[RelayService, FakeRepository, FakeSender]:
+def build_service(
+    lookup: FakeLookup | None = None,
+    *,
+    employee_phone_numbers: str = "",
+) -> tuple[RelayService, FakeRepository, FakeSender]:
     settings = Settings(
         FRANCISCO_PHONE="+15551234567",
+        EMPLOYEE_PHONE_NUMBERS=employee_phone_numbers,
         MAYA_BUSINESS_NUMBER="+13852208404",
         VERIFY_TWILIO_SIGNATURE=False,
     )
@@ -170,6 +175,34 @@ def test_employee_reply_routes_by_conversation_code():
         "sid": "SMfake2",
         "to_phone": "+15550000001",
         "body": "From Francisco:\nThanks, send us the dimensions.",
+    }
+
+
+def test_allowed_alternate_employee_phone_routes_by_conversation_code():
+    service, _, sender = build_service(employee_phone_numbers="+15557654321")
+    service.handle_inbound_sms(
+        IncomingMessage(
+            message_sid="SMcustomer",
+            from_phone="+15550000001",
+            to_phone="+13852208404",
+            body="Hello",
+        )
+    )
+
+    result = service.handle_inbound_sms(
+        IncomingMessage(
+            message_sid="SMemployee",
+            from_phone="+15557654321",
+            to_phone="+13852208404",
+            body="#C0001 This is Francisco from another phone.",
+        )
+    )
+
+    assert result == {"status": "forwarded_to_customer", "conversation_id": "conversation-1"}
+    assert sender.sent_messages[-1] == {
+        "sid": "SMfake2",
+        "to_phone": "+15550000001",
+        "body": "From Francisco:\nThis is Francisco from another phone.",
     }
 
 

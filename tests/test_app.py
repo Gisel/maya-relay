@@ -59,6 +59,7 @@ def test_readiness_reports_required_config_presence():
             "twilio_messaging_service_sid": False,
             "maya_business_number": True,
             "francisco_phone": True,
+            "employee_phones": True,
             "supabase_url": False,
             "supabase_service_role_key": False,
             "supabase_key_role": None,

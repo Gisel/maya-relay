@@ -136,7 +136,7 @@ def test_get_open_conversation_by_code_routes_employee_reply():
         ],
     )
 
-    conversation = repository.get_open_conversation_by_code("+15551234567", "c0002")
+    conversation = repository.get_open_conversation_by_code("c0002")
 
     assert conversation is not None
     assert conversation.customer_phone == "+15550000002"

@@ -48,7 +48,7 @@ class RelayRepository(Protocol):
     def get_latest_employee_conversation(self, employee_phone: str) -> Conversation | None:
         ...
 
-    def get_open_conversation_by_code(self, employee_phone: str, conversation_code: str) -> Conversation | None:
+    def get_open_conversation_by_code(self, conversation_code: str) -> Conversation | None:
         ...
 
     def create_message(
@@ -180,11 +180,10 @@ class SupabaseRelayRepository:
             return None
         return _conversation_from_row(result.data[0])
 
-    def get_open_conversation_by_code(self, employee_phone: str, conversation_code: str) -> Conversation | None:
+    def get_open_conversation_by_code(self, conversation_code: str) -> Conversation | None:
         result = (
             self.client.table("conversations")
             .select("id, customer_phone, assigned_employee, status, conversation_code")
-            .eq("assigned_employee", employee_phone)
             .eq("conversation_code", conversation_code.upper())
             .eq("status", "open")
             .limit(1)

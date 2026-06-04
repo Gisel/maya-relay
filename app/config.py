@@ -18,12 +18,20 @@ class Settings(BaseSettings):
     twilio_messaging_service_sid: str = Field(default="", alias="TWILIO_MESSAGING_SERVICE_SID")
     maya_business_number: str = Field(default="+13852208404", alias="MAYA_BUSINESS_NUMBER")
     francisco_phone: str = Field(default="", alias="FRANCISCO_PHONE")
+    employee_phone_numbers: str = Field(default="", alias="EMPLOYEE_PHONE_NUMBERS")
 
     supabase_url: str = Field(default="", alias="SUPABASE_URL")
     supabase_service_role_key: str = Field(default="", alias="SUPABASE_SERVICE_ROLE_KEY")
     supabase_attachments_bucket: str = Field(default="attachments", alias="SUPABASE_ATTACHMENTS_BUCKET")
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @property
+    def employee_phones(self) -> frozenset[str]:
+        phones = {phone.strip() for phone in self.employee_phone_numbers.split(",") if phone.strip()}
+        if self.francisco_phone:
+            phones.add(self.francisco_phone)
+        return frozenset(phones)
 
 
 @lru_cache

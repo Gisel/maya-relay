@@ -94,7 +94,7 @@ class RelayService:
             )
             return {"status": "missing_reply_body", "conversation_id": None}
 
-        conversation = self.repository.get_open_conversation_by_code(message.from_phone, conversation_code)
+        conversation = self.repository.get_open_conversation_by_code(conversation_code)
         if conversation is None:
             self.sender.send_sms(
                 to_phone=message.from_phone,
@@ -140,7 +140,7 @@ class RelayService:
         return {"status": "forwarded_to_customer", "conversation_id": conversation.id}
 
     def _is_employee(self, phone_number: str) -> bool:
-        return phone_number == self.settings.francisco_phone
+        return phone_number in self.settings.employee_phones
 
     def _format_forwarded_body(
         self,

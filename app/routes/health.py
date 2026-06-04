@@ -26,6 +26,7 @@ def readiness(settings: Settings = Depends(get_settings)) -> dict[str, object]:
         "twilio_messaging_service_sid": bool(settings.twilio_messaging_service_sid),
         "maya_business_number": bool(settings.maya_business_number),
         "francisco_phone": bool(settings.francisco_phone),
+        "employee_phones": bool(settings.employee_phones),
         "supabase_url": bool(settings.supabase_url),
         "supabase_service_role_key": bool(settings.supabase_service_role_key),
         "supabase_key_role": _jwt_role(settings.supabase_service_role_key),
