@@ -132,9 +132,14 @@ def test_admin_login_and_conversations_page():
 
     dashboard = client.get("/admin", headers={"cookie": cookie})
     assert dashboard.status_code == 200
+    assert "Logout" in dashboard.text
     assert "Open conversations" in dashboard.text
     assert "#C0001" in dashboard.text
     assert "Need a quote" in dashboard.text
+
+    logout = client.get("/admin/logout", follow_redirects=False)
+    assert logout.status_code == 303
+    assert "maya_admin" in logout.headers["set-cookie"]
 
 
 def test_twilio_sms_webhook_acknowledges_with_empty_twiml():

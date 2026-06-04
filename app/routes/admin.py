@@ -71,7 +71,7 @@ def admin_index(
     content = (
         "<section class='toolbar'>"
         "<h1>Maya Relay</h1>"
-        "<a class='button' href='/readiness'>Readiness</a>"
+        "<a class='button' href='/admin/logout'>Logout</a>"
         "</section>"
         f"{_metrics_bar(metrics)}"
         "<table>"
@@ -93,6 +93,14 @@ def admin_login(
         return RedirectResponse("/admin", status_code=303)
     response = RedirectResponse("/admin", status_code=303)
     response.set_cookie(SESSION_COOKIE, _session_value(settings), httponly=True, secure=True, samesite="lax")
+    return response
+
+
+@router.get("/logout")
+def admin_logout(settings: Settings = Depends(get_settings)) -> RedirectResponse:
+    _admin_enabled(settings)
+    response = RedirectResponse("/admin", status_code=303)
+    response.delete_cookie(SESSION_COOKIE)
     return response
 
 
