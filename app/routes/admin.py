@@ -127,10 +127,8 @@ def conversation_detail(
     items = []
     for message in messages:
         media_urls = message.get("media_urls") or []
-        media_links = "".join(
-            f"<a class='media' href='{_e(url)}' target='_blank' rel='noreferrer'>Attachment {index + 1}</a>"
-            for index, url in enumerate(media_urls)
-        )
+        media_content_types = message.get("media_content_types") or []
+        media_links = _media_preview_links(media_urls, media_content_types)
         items.append(
             "<article class='message'>"
             f"<div>{_badge(message['direction'])} <span>{_format_time(message.get('created_at'))}</span></div>"
@@ -284,6 +282,25 @@ def _reply_body_with_attachments(body: str, attachments: tuple[StoredAttachment,
         lines.append(f"Attachment {attachment_number} ({attachment.content_type}): {attachment.public_url}")
         attachment_number += 1
     return "\n".join(lines)
+
+
+def _media_preview_links(media_urls: list[str], media_content_types: list[str]) -> str:
+    previews = []
+    for index, url in enumerate(media_urls):
+        content_type = media_content_types[index] if index < len(media_content_types) else ""
+        label = f"Attachment {index + 1}"
+        if _is_image_content_type(content_type):
+            previews.append(
+                "<a class='media media-preview' "
+                f"href='{_e(url)}' target='_blank' rel='noreferrer'>"
+                f"<img src='{_e(url)}' alt='{_e(label)}'>"
+                "</a>"
+            )
+        else:
+            previews.append(
+                f"<a class='media' href='{_e(url)}' target='_blank' rel='noreferrer'>{_e(label)}</a>"
+            )
+    return "".join(previews)
 
 
 def _image_attachment_urls(attachments: tuple[StoredAttachment, ...]) -> tuple[str, ...]:
@@ -441,6 +458,8 @@ td span,.message p{color:#667085;font-size:12px}
 .dropzone input{width:100%;padding:0;border:0}
 pre{white-space:pre-wrap;font:14px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace}
 .media{display:inline-block;margin-right:8px}
+.media-preview{display:block;margin:10px 0 0}
+.media-preview img{display:block;max-width:min(420px,100%);max-height:320px;border-radius:8px;border:1px solid #dde1e7;object-fit:contain;background:#f8fafc}
 .login{min-height:100vh;display:grid;place-content:center;gap:16px}
 .login form{display:flex;gap:8px}
 input{padding:10px 12px;border:1px solid #cbd2dc;border-radius:6px;font-size:14px}

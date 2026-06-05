@@ -235,6 +235,9 @@ def test_admin_login_and_conversations_page():
     assert repository.messages[-1]["media_urls"] == (
         "https://files.example/admin-replies/conversation-1/proof.jpg",
     )
+    image_detail = client.get("/admin/conversations/conversation-1", headers={"cookie": cookie})
+    assert "class='media media-preview'" in image_detail.text
+    assert "<img src='https://files.example/admin-replies/conversation-1/proof.jpg'" in image_detail.text
 
     logout = client.get("/admin/logout", follow_redirects=False)
     assert logout.status_code == 303
