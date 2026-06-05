@@ -19,6 +19,7 @@ The adjustment I would make is to put an API contract and data model checkpoint 
 ## Product Principles
 
 - The operator inbox is the source of truth for daily work.
+- Configuration source of truth is environment variables and persisted data, never hardcoded production values.
 - Native SMS reply by `#code` remains as a mobile fallback, not the premium workflow.
 - WhatsApp and SMS should feel like channels inside one conversation system.
 - AI should assist the human first; automatic customer replies come later behind explicit guardrails.
@@ -26,6 +27,54 @@ The adjustment I would make is to put an API contract and data model checkpoint 
 - Failed delivery must be obvious and actionable.
 - Every send action must be idempotent enough to prevent accidental double sends.
 - The app must be usable on desktop and phone browsers.
+- Existing production behavior must remain intact while new app surfaces are added.
+- Reusable UI and backend components should be preferred over one-off screens or duplicated logic.
+
+## Engineering Guardrails
+
+### Source Of Truth
+
+No production behavior should depend on hardcoded phone numbers, service IDs, domains, employee names, bucket names, model names, or vendor credentials.
+
+Allowed sources:
+
+- `.env` locally.
+- Railway variables in production.
+- Supabase data for contacts, conversations, messages, attachments, and future operator records.
+- Explicit application defaults only for safe non-secret behavior.
+
+Important variables that must stay authoritative:
+
+- `MAYA_BUSINESS_NUMBER`
+- `FRANCISCO_PHONE`
+- `EMPLOYEE_PHONE_NUMBERS`
+- `TWILIO_MESSAGING_SERVICE_SID`
+- `SUPABASE_ATTACHMENTS_BUCKET`
+- `ENABLE_TWILIO_LOOKUP`
+- `ENABLE_AI_TRIAGE`
+- `OPENAI_MODEL`
+
+The frontend must never receive service role keys, Twilio auth tokens, OpenAI keys, or other server-only secrets.
+
+### Additive Development
+
+Do not delete or weaken existing functionality while building the React app:
+
+- Keep Twilio SMS, MMS, and WhatsApp webhooks working.
+- Keep native SMS `#code` replies as a fallback.
+- Keep `/admin` available as an operations fallback until the React app fully replaces it.
+- Keep readiness endpoints.
+- Keep existing tests and add new tests around new behavior.
+- Keep channel-aware routing through the original customer channel.
+
+### Reuse And Boundaries
+
+- Put shared backend response formatting in serializers instead of duplicating shape logic in multiple routes.
+- Keep Twilio send logic inside `TwilioMessageSender`.
+- Keep attachment storage inside `AttachmentStore`.
+- Keep conversation routing rules inside `RelayService`.
+- Build React UI from reusable components such as buttons, badges, message bubbles, file cards, panels, filters, and empty states.
+- Avoid binding frontend components directly to raw Supabase row shapes; use API types that represent product concepts.
 
 ## Target User Experience
 
@@ -245,6 +294,29 @@ Recommended stack:
 - TanStack Query for server state.
 - Plain CSS modules or a small design system layer first; avoid a large UI framework until interaction patterns settle.
 - No global state library initially unless needed; conversation selection can live in URL state.
+
+### Maya Branding And Design Direction
+
+Use Maya Graphics and Signs branding from the provided logo assets. The UI should feel operational and professional, but it should carry Maya's color personality rather than becoming generic SaaS gray.
+
+Brand cues from the logo:
+
+- Maya red for the primary wordmark/accent: approximately `#F20D0D`.
+- Maya blue for primary actions and links: approximately `#1688C9`.
+- Maya green for success/open states: approximately `#A8CF45`.
+- Maya yellow for warning/attention states: approximately `#FFD22E`.
+- Maya magenta for selective highlights: approximately `#EC1E83`.
+- Neutral background should stay light and clean: white, soft gray, and dark slate text.
+
+Usage guidance:
+
+- Use the real Maya logo in the top bar once the asset is available in the repo.
+- Use blue as the main interactive color for buttons, selected inbox rows, links, and send actions.
+- Use green for open/healthy states.
+- Use yellow/red for warning and failed delivery states.
+- Use magenta sparingly for AI/intent highlights or brand moments.
+- Avoid decorative gradients and oversized marketing layouts; this is an operator tool.
+- Keep cards, panels, and controls compact and scannable.
 
 Why Vite over Next.js for this repo:
 
@@ -490,6 +562,7 @@ Before replacing `/admin` as the primary tool:
 - Mobile layout is usable.
 - No secrets are exposed to frontend.
 - Service role key stays backend-only.
+- No hardcoded production phone numbers, Twilio IDs, Supabase IDs, Railway domains, or employee-specific behavior in frontend or backend code.
 - `/admin` remains as fallback.
 
 ## Risks And Decisions
