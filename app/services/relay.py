@@ -135,8 +135,7 @@ class RelayService:
             media_urls=message.media_urls,
             media_content_types=message.media_content_types,
         )
-        forwarded_body = self._format_forwarded_body(
-            from_label=self._contact_label(message.from_phone, default_prefix="Francisco"),
+        forwarded_body = self._format_customer_reply_body(
             body=reply_body,
             media_urls=media_urls,
             media_content_types=message.media_content_types,
@@ -188,6 +187,19 @@ class RelayService:
             lines.append("---")
             lines.append(f"AI note:\n{triage_note}")
         return "\n".join(lines)
+
+    def _format_customer_reply_body(
+        self,
+        *,
+        body: str,
+        media_urls: tuple[str, ...],
+        media_content_types: tuple[str, ...],
+    ) -> str:
+        lines = [body] if body else []
+        for index, media_url in enumerate(media_urls):
+            content_type = media_content_types[index] if index < len(media_content_types) else "attachment"
+            lines.append(f"Attachment {index + 1} ({content_type}): {media_url}")
+        return "\n".join(lines) or "[No message body]"
 
     def _extract_conversation_code(self, body: str) -> str | None:
         match = CONVERSATION_CODE_PATTERN.search(body)

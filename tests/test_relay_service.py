@@ -216,7 +216,7 @@ def test_employee_reply_does_not_use_lookup_for_default_label():
     )
 
     assert lookup.looked_up == ["+15550000001"]
-    assert sender.sent_messages[-1]["body"] == "From Francisco:\nThanks."
+    assert sender.sent_messages[-1]["body"] == "Thanks."
 
 
 def test_employee_reply_routes_by_conversation_code():
@@ -243,7 +243,7 @@ def test_employee_reply_routes_by_conversation_code():
     assert sender.sent_messages[-1] == {
         "sid": "SMfake2",
         "to_phone": "+15550000001",
-        "body": "From Francisco:\nThanks, send us the dimensions.",
+        "body": "Thanks, send us the dimensions.",
     }
 
 
@@ -273,7 +273,7 @@ def test_employee_reply_to_whatsapp_conversation_uses_whatsapp_channel():
     assert sender.sent_messages[-1] == {
         "sid": "SMfake2",
         "to_phone": "+15550000001",
-        "body": "From Francisco:\nThanks, WhatsApp customer.",
+        "body": "Thanks, WhatsApp customer.",
         "channel": "whatsapp",
     }
 
@@ -302,7 +302,7 @@ def test_allowed_alternate_employee_phone_routes_by_conversation_code():
     assert sender.sent_messages[-1] == {
         "sid": "SMfake2",
         "to_phone": "+15550000001",
-        "body": "From Francisco:\nThis is Francisco from another phone.",
+        "body": "This is Francisco from another phone.",
     }
 
 
