@@ -1,7 +1,7 @@
 from app.config import Settings
 from app.models import Contact
 from app.models import IncomingMessage
-from app.services.relay import RelayService
+from app.services.relay import RelayService, _extract_suggested_reply, _triage_context_note
 from tests.fakes import FakeLookup, FakeRepository, FakeSender, FakeTriage
 
 
@@ -31,6 +31,15 @@ def build_service(
         repository,
         sender,
     )
+
+
+def test_triage_suggestion_helpers_extract_copy_ready_reply():
+    note = "Intent: quote\nMissing: size\n---\n#C0001 Please send the size."
+
+    suggestion = _extract_suggested_reply(note, "C0001")
+
+    assert suggestion == "#C0001 Please send the size."
+    assert _triage_context_note(note, suggestion) == "Intent: quote\nMissing: size"
 
 
 def test_customer_message_creates_conversation_and_forwards_to_employee():
@@ -110,7 +119,12 @@ def test_customer_lookup_name_is_cached_and_used_in_forwarded_label():
 
 
 def test_customer_message_includes_ai_triage_note_when_available():
-    triage = FakeTriage("Intent: quote request\nMissing: size and deadline")
+    triage = FakeTriage(
+        "Intent: quote request\n"
+        "Missing: size and deadline\n"
+        "---\n"
+        "#C0001 Please send size and deadline."
+    )
     service, _, sender = build_service(triage=triage)
 
     service.handle_inbound_sms(
@@ -134,6 +148,7 @@ def test_customer_message_includes_ai_triage_note_when_available():
         "Intent: quote request\n"
         "Missing: size and deadline"
     )
+    assert sender.sent_messages[1]["body"] == "#C0001 Please send size and deadline."
 
 
 def test_customer_message_still_forwards_when_ai_triage_fails():

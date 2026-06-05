@@ -59,13 +59,15 @@ class RelayService:
         )
 
         from_label = self._contact_label(message.from_phone, default_prefix="customer")
+        triage_note = self._triage_note(message, conversation_code=conversation.conversation_code)
+        suggested_reply = _extract_suggested_reply(triage_note, conversation.conversation_code)
         forwarded_body = self._format_forwarded_body(
             from_label=from_label,
             body=message.body,
             media_urls=media_urls,
             media_content_types=message.media_content_types,
             conversation_code=conversation.conversation_code,
-            triage_note=self._triage_note(message, conversation_code=conversation.conversation_code),
+            triage_note=_triage_context_note(triage_note, suggested_reply),
         )
         outbound_sid = self.sender.send_sms(to_phone=conversation.assigned_employee, body=forwarded_body)
         self.repository.create_message(
@@ -79,6 +81,16 @@ class RelayService:
             media_urls=media_urls,
             media_content_types=message.media_content_types,
         )
+        if suggested_reply:
+            suggestion_sid = self.sender.send_sms(to_phone=conversation.assigned_employee, body=suggested_reply)
+            self.repository.create_message(
+                conversation_id=conversation.id,
+                direction="system",
+                from_phone=self.settings.maya_business_number,
+                to_phone=conversation.assigned_employee,
+                body=suggested_reply,
+                twilio_message_sid=suggestion_sid,
+            )
 
         return {"status": "forwarded_to_employee", "conversation_id": conversation.id}
 
@@ -229,3 +241,22 @@ class RelayService:
         except Exception:
             return media_urls
         return tuple(attachment.public_url for attachment in stored)
+
+
+def _extract_suggested_reply(triage_note: str | None, conversation_code: str) -> str | None:
+    if not triage_note:
+        return None
+    prefix = f"#{conversation_code.upper()} "
+    for line in reversed(triage_note.splitlines()):
+        clean = line.strip()
+        if clean.upper().startswith(prefix):
+            return clean
+    return None
+
+
+def _triage_context_note(triage_note: str | None, suggested_reply: str | None) -> str | None:
+    if not triage_note or not suggested_reply:
+        return triage_note
+    lines = [line.strip() for line in triage_note.splitlines()]
+    context_lines = [line for line in lines if line and line != suggested_reply and line != "---"]
+    return "\n".join(context_lines) or None
