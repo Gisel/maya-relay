@@ -1,10 +1,12 @@
+import hmac
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel
+from fastapi.responses import JSONResponse
 
 from app.attachments import AttachmentStore
-from app.auth import require_admin
+from app.auth import SESSION_COOKIE, admin_enabled, require_admin, session_value
 from app.config import Settings, get_settings
 from app.db import RelayRepository
 from app.dependencies import get_attachment_store, get_repository, get_sender
@@ -20,6 +22,31 @@ class ConversationUpdate(BaseModel):
     status: Literal["open", "closed"] | None = None
 
 
+class LoginRequest(BaseModel):
+    password: str
+
+
+@router.post("/auth/login")
+def api_login(
+    payload: LoginRequest,
+    settings: Settings = Depends(get_settings),
+) -> JSONResponse:
+    admin_enabled(settings)
+    if not hmac.compare_digest(payload.password, settings.admin_password):
+        raise HTTPException(status_code=401)
+    response = JSONResponse({"authenticated": True})
+    response.set_cookie(SESSION_COOKIE, session_value(settings), httponly=True, secure=True, samesite="lax")
+    return response
+
+
+@router.post("/auth/logout")
+def api_logout(settings: Settings = Depends(get_settings)) -> JSONResponse:
+    admin_enabled(settings)
+    response = JSONResponse({"authenticated": False})
+    response.delete_cookie(SESSION_COOKIE)
+    return response
+
+
 @router.get("/me")
 def api_me(
     request: Request,
@@ -28,6 +55,9 @@ def api_me(
     require_admin(request, settings)
     return {
         "authenticated": True,
+        "session": {
+            "cookieName": SESSION_COOKIE,
+        },
         "app": {
             "name": "Maya Relay",
             "environment": settings.app_env,

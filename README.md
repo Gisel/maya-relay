@@ -114,6 +114,8 @@ The React operator inbox will use authenticated JSON routes under `/api`. These 
 Current Phase 1 routes:
 
 - `GET /api/me`
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
 - `GET /api/readiness`
 - `GET /api/metrics`
 - `GET /api/quick-responses`

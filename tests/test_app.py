@@ -278,6 +278,27 @@ def test_api_requires_admin_session():
     assert response.status_code == 401
 
 
+def test_api_json_login_and_logout():
+    client, _, _ = make_client(admin_password="secret")
+
+    bad_login = client.post("/api/auth/login", json={"password": "wrong"})
+    assert bad_login.status_code == 401
+
+    login = client.post("/api/auth/login", json={"password": "secret"})
+    assert login.status_code == 200
+    assert login.json() == {"authenticated": True}
+    cookie = login.headers["set-cookie"]
+
+    me = client.get("/api/me", headers={"cookie": cookie})
+    assert me.status_code == 200
+    assert me.json()["session"]["cookieName"] == "maya_admin"
+
+    logout = client.post("/api/auth/logout")
+    assert logout.status_code == 200
+    assert logout.json() == {"authenticated": False}
+    assert "maya_admin" in logout.headers["set-cookie"]
+
+
 def test_api_conversation_contract_and_idempotent_reply():
     client, repository, sender = make_client(admin_password="secret")
     repository.update_contact_lookup_name("+15550000001", "GOMEZ, GISEL")

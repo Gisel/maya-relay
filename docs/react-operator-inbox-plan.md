@@ -192,6 +192,8 @@ Already implemented:
 Add a versioned JSON API under `/api`:
 
 - `GET /api/me`
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
 - `GET /api/readiness`
 - `GET /api/conversations`
 - `GET /api/conversations/{conversation_id}`
