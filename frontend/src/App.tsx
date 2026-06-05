@@ -1,135 +1,82 @@
 import {
   AlertTriangle,
   CheckCircle2,
-  Image,
+  FileText,
   LogOut,
   Paperclip,
+  RefreshCw,
   Search,
   Send,
   Sparkles,
 } from "lucide-react";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ApiError,
+  Channel,
+  ConversationDetail,
+  ConversationListItem,
+  ConversationStatus,
+  DeliveryStatus,
+  Message,
+  Metrics,
+  QuickResponse,
+  getConversationDetail,
+  getConversations,
+  getMe,
+  getQuickResponses,
+  login,
+  logout,
+  sendReply,
+} from "./api";
 import logoMaya from "./assets/logo-maya.jpg";
-
-type Channel = "sms" | "whatsapp";
-type ConversationStatus = "open" | "closed";
-type DeliveryStatus = "delivered" | "failed" | "pending" | "queued";
-type MessageDirection = "customer_to_employee" | "employee_to_customer" | "system";
-
-type Attachment = {
-  id: string;
-  fileName: string;
-  contentType: string;
-  url: string;
-};
-
-type Message = {
-  id: string;
-  direction: MessageDirection;
-  body: string;
-  createdAt: string;
-  deliveryStatus: DeliveryStatus;
-  attachments?: Attachment[];
-};
-
-type Conversation = {
-  id: string;
-  code: string;
-  customerName: string;
-  customerPhone: string;
-  channel: Channel;
-  status: ConversationStatus;
-  lastMessagePreview: string;
-  updatedLabel: string;
-  deliveryStatus: DeliveryStatus;
-  messages: Message[];
-  intent: {
-    label: string;
-    missing: string[];
-  };
-};
-
-const initialConversations: Conversation[] = [
-  {
-    id: "conv-1",
-    code: "#1B976390",
-    customerName: "Gomez, Gisel",
-    customerPhone: "+1 801 200 9467",
-    channel: "whatsapp",
-    status: "open",
-    lastMessagePreview: "Need a quote for some presentation cards",
-    updatedLabel: "5m ago",
-    deliveryStatus: "delivered",
-    intent: {
-      label: "Quote Request",
-      missing: ["Quantity", "Size", "Paper/Finish", "Artwork/Design Ready"],
-    },
-    messages: [
-      {
-        id: "msg-1",
-        direction: "customer_to_employee",
-        body: "Hello Francisco I need a quote for some presentation cards",
-        createdAt: "Jun 5, 04:27 PM UTC",
-        deliveryStatus: "delivered",
-      },
-      {
-        id: "msg-2",
-        direction: "employee_to_customer",
-        body: 'Thanks-can you confirm if "50" is quantity or a size, exact dimensions/material/finish?',
-        createdAt: "Jun 5, 04:28 PM UTC",
-        deliveryStatus: "delivered",
-      },
-    ],
-  },
-  {
-    id: "conv-2",
-    code: "#8447A2CA",
-    customerName: "+52 1844 326 1219",
-    customerPhone: "+52 1844 326 1219",
-    channel: "sms",
-    status: "open",
-    lastMessagePreview: 'Thanks-can you confirm if "50" is quantity or size...',
-    updatedLabel: "1h ago",
-    deliveryStatus: "failed",
-    intent: {
-      label: "Needs Follow-up",
-      missing: ["Delivery address", "Deadline"],
-    },
-    messages: [
-      {
-        id: "msg-3",
-        direction: "customer_to_employee",
-        body: "I need 50 large blue signs. Can you send me the estimate?",
-        createdAt: "Jun 5, 03:41 PM UTC",
-        deliveryStatus: "delivered",
-        attachments: [
-          {
-            id: "att-1",
-            fileName: "reference-photo.jpg",
-            contentType: "image/jpeg",
-            url: "https://images.unsplash.com/photo-1618005198919-d3d4b5a92ead?w=900&auto=format&fit=crop",
-          },
-        ],
-      },
-      {
-        id: "msg-4",
-        direction: "employee_to_customer",
-        body: "Could you send exact dimensions, material preference, and pickup or install location?",
-        createdAt: "Jun 5, 03:43 PM UTC",
-        deliveryStatus: "failed",
-      },
-    ],
-  },
-];
-
-const quickResponses = [
-  "Request missing job dimensions",
-  "Send standard print proof review",
-  "Provide shop hours & pickup info",
-];
 
 function channelLabel(channel: Channel) {
   return channel === "whatsapp" ? "WhatsApp" : "SMS";
+}
+
+function displayCustomerName(conversation: ConversationListItem | ConversationDetail) {
+  return conversation.customer.name || conversation.customer.phone || "Unknown customer";
+}
+
+function previewBody(conversation: ConversationListItem) {
+  if (conversation.lastMessage?.body) return conversation.lastMessage.body;
+  if (conversation.lastMessage?.hasAttachments) return "Attachment received";
+  return "No messages yet";
+}
+
+function deliveryStatus(conversation: ConversationListItem): DeliveryStatus {
+  return conversation.lastMessage?.deliveryStatus || "pending";
+}
+
+function formatDate(value: string | null | undefined) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
+}
+
+function relativeDate(value: string | null | undefined) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const diffMs = Date.now() - date.getTime();
+  const diffMinutes = Math.max(0, Math.round(diffMs / 60000));
+  if (diffMinutes < 1) return "now";
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+  const hours = Math.round(diffMinutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
+
+function newClientRequestId() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 function MetricCard({
@@ -158,7 +105,7 @@ function StatusPill({ status }: { status: ConversationStatus }) {
 function DeliveryPill({ status }: { status: DeliveryStatus }) {
   return (
     <span className={`delivery-pill ${status}`}>
-      {status === "failed" && <AlertTriangle size={14} />}
+      {(status === "failed" || status === "undelivered") && <AlertTriangle size={14} />}
       {status}
     </span>
   );
@@ -169,66 +116,129 @@ function MessageBubble({ message }: { message: Message }) {
 
   return (
     <article className={`message-bubble ${isOutbound ? "outbound" : "inbound"}`}>
-      {message.attachments?.map((attachment) => (
-        <a className="attachment-preview" href={attachment.url} key={attachment.id}>
-          {attachment.contentType.startsWith("image/") ? (
-            <img alt={attachment.fileName} src={attachment.url} />
+      {message.attachments.map((attachment) => (
+        <a className="attachment-preview" href={attachment.url} key={attachment.url} rel="noreferrer" target="_blank">
+          {attachment.kind === "image" ? (
+            <img alt="Message attachment" src={attachment.url} />
           ) : (
             <span>
-              <Image size={18} />
-              {attachment.fileName}
+              <FileText size={18} />
+              {attachment.contentType}
             </span>
           )}
         </a>
       ))}
       <p>{message.body}</p>
       <footer>
-        <span>{message.createdAt}</span>
+        <span>{formatDate(message.createdAt)}</span>
         <span>{message.deliveryStatus}</span>
       </footer>
     </article>
   );
 }
 
-function Composer({
-  onSend,
+function LoginScreen({
+  error,
+  onLogin,
 }: {
-  onSend: (body: string, files: File[]) => Promise<void>;
+  error: string;
+  onLogin: (password: string) => Promise<void>;
 }) {
-  const [body, setBody] = useState("");
-  const [files, setFiles] = useState<File[]>([]);
-  const [isSending, setIsSending] = useState(false);
-  const canSend = body.trim().length > 0 || files.length > 0;
+  const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canSend || isSending) return;
+    setIsSubmitting(true);
+    try {
+      await onLogin(password);
+      setPassword("");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <main className="login-screen">
+      <form className="login-panel" onSubmit={handleSubmit}>
+        <div className="brand login-brand">
+          <img alt="Maya Graphics and Signs" src={logoMaya} />
+          <div>
+            <strong>MAYA</strong>
+            <span>RELAY</span>
+          </div>
+        </div>
+        <label>
+          <span>Password</span>
+          <input
+            autoComplete="current-password"
+            autoFocus
+            onChange={(event) => setPassword(event.target.value)}
+            type="password"
+            value={password}
+          />
+        </label>
+        {error && <p className="form-error">{error}</p>}
+        <button className="send-button" disabled={!password || isSubmitting} type="submit">
+          {isSubmitting ? "Signing in..." : "Sign in"}
+        </button>
+      </form>
+    </main>
+  );
+}
+
+function Composer({
+  disabled,
+  draft,
+  files,
+  onDraftChange,
+  onFilesChange,
+  onSend,
+}: {
+  disabled: boolean;
+  draft: string;
+  files: File[];
+  onDraftChange: (value: string) => void;
+  onFilesChange: (files: File[]) => void;
+  onSend: (body: string, files: File[]) => Promise<void>;
+}) {
+  const [isSending, setIsSending] = useState(false);
+  const canSend = draft.trim().length > 0 || files.length > 0;
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canSend || isSending || disabled) return;
     setIsSending(true);
-    await onSend(body.trim(), files);
-    setBody("");
-    setFiles([]);
-    setIsSending(false);
+    try {
+      await onSend(draft.trim(), files);
+      onDraftChange("");
+      onFilesChange([]);
+    } finally {
+      setIsSending(false);
+    }
   }
 
   return (
     <form className="composer" onSubmit={handleSubmit}>
       <textarea
         aria-label="Reply message"
-        onChange={(event) => setBody(event.target.value)}
+        disabled={disabled || isSending}
+        onChange={(event) => onDraftChange(event.target.value)}
         placeholder="Type your response directly to the customer here..."
-        value={body}
+        value={draft}
       />
       <div className="composer-actions">
-        <label className="attach-control">
+        <label className={`attach-control ${disabled || isSending ? "is-disabled" : ""}`}>
           <Paperclip size={20} />
           <span>Attach files or imagery</span>
           <input
+            disabled={disabled || isSending}
             multiple
-            onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
+            onChange={(event) => onFilesChange(Array.from(event.target.files ?? []))}
             type="file"
           />
         </label>
-        <button className="send-button" disabled={!canSend || isSending} type="submit">
+        <button className="send-button" disabled={!canSend || isSending || disabled} type="submit">
           <Send size={18} />
           {isSending ? "Sending..." : "Send Message"}
         </button>
@@ -245,77 +255,160 @@ function Composer({
 }
 
 export function App() {
-  const [conversations, setConversations] = useState(initialConversations);
-  const [selectedId, setSelectedId] = useState(initialConversations[0].id);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authError, setAuthError] = useState("");
+  const [conversations, setConversations] = useState<ConversationListItem[]>([]);
+  const [metrics, setMetrics] = useState<Metrics>({ open: 0, failed: 0, recent: 0 });
+  const [selectedId, setSelectedId] = useState("");
+  const [selectedConversation, setSelectedConversation] = useState<ConversationDetail | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [quickResponses, setQuickResponses] = useState<QuickResponse[]>([]);
+  const [suggestedReply, setSuggestedReply] = useState("");
   const [search, setSearch] = useState("");
-  const selected = conversations.find((conversation) => conversation.id === selectedId) ?? conversations[0];
+  const [draft, setDraft] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
+  const [isLoadingList, setIsLoadingList] = useState(false);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+  const [appError, setAppError] = useState("");
 
-  const filteredConversations = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) return conversations;
-    return conversations.filter((conversation) =>
-      [
-        conversation.customerName,
-        conversation.customerPhone,
-        conversation.code,
-        conversation.lastMessagePreview,
-        conversation.channel,
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(query),
-    );
-  }, [conversations, search]);
-
-  const metrics = useMemo(
-    () => ({
-      open: conversations.filter((conversation) => conversation.status === "open").length,
-      failed: conversations.filter((conversation) => conversation.deliveryStatus === "failed").length,
-      recent: conversations.length,
-    }),
-    [conversations],
+  const selectedListItem = useMemo(
+    () => conversations.find((conversation) => conversation.id === selectedId) || null,
+    [conversations, selectedId],
   );
 
-  async function handleSend(body: string, files: File[]) {
-    await new Promise((resolve) => window.setTimeout(resolve, 400));
-    const now = new Date();
-    const createdAt = now.toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZoneName: "short",
-    });
+  const loadConversations = useCallback(
+    async (query = search) => {
+      setIsLoadingList(true);
+      setAppError("");
+      try {
+        const payload = await getConversations(query);
+        setConversations(payload.conversations);
+        setMetrics(payload.metrics);
+        setSelectedId((current) => {
+          if (current && payload.conversations.some((conversation) => conversation.id === current)) return current;
+          return payload.conversations[0]?.id || "";
+        });
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 401) {
+          setIsAuthenticated(false);
+        } else {
+          setAppError(error instanceof Error ? error.message : "Could not load conversations.");
+        }
+      } finally {
+        setIsLoadingList(false);
+      }
+    },
+    [search],
+  );
 
-    setConversations((current) =>
-      current.map((conversation) =>
-        conversation.id === selected.id
-          ? {
-              ...conversation,
-              lastMessagePreview: body || `${files.length} attachment${files.length === 1 ? "" : "s"}`,
-              deliveryStatus: "pending",
-              updatedLabel: "now",
-              messages: [
-                ...conversation.messages,
-                {
-                  id: `local-${Date.now()}`,
-                  direction: "employee_to_customer",
-                  body,
-                  createdAt,
-                  deliveryStatus: "pending",
-                  attachments: files.map((file, index) => ({
-                    id: `local-file-${index}`,
-                    fileName: file.name,
-                    contentType: file.type || "application/octet-stream",
-                    url: URL.createObjectURL(file),
-                  })),
-                },
-              ],
-            }
-          : conversation,
-      ),
+  const loadDetail = useCallback(async (conversationId: string) => {
+    if (!conversationId) {
+      setSelectedConversation(null);
+      setMessages([]);
+      setSuggestedReply("");
+      return;
+    }
+    setIsLoadingDetail(true);
+    setAppError("");
+    try {
+      const payload = await getConversationDetail(conversationId);
+      setSelectedConversation(payload.conversation);
+      setMessages(payload.messages);
+      setSuggestedReply(payload.suggestedReply || "");
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setIsAuthenticated(false);
+      } else {
+        setAppError(error instanceof Error ? error.message : "Could not load this conversation.");
+      }
+    } finally {
+      setIsLoadingDetail(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    getMe()
+      .then(() => {
+        setIsAuthenticated(true);
+      })
+      .catch((error) => {
+        if (error instanceof ApiError && error.status === 401) {
+          setIsAuthenticated(false);
+        } else {
+          setAuthError(error instanceof Error ? error.message : "Could not check session.");
+        }
+      })
+      .finally(() => setIsCheckingSession(false));
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    loadConversations("");
+    getQuickResponses()
+      .then((payload) => setQuickResponses(payload.quickResponses))
+      .catch((error) => setAppError(error instanceof Error ? error.message : "Could not load quick responses."));
+  }, [isAuthenticated, loadConversations]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const timeoutId = window.setTimeout(() => {
+      loadConversations(search);
+    }, 250);
+    return () => window.clearTimeout(timeoutId);
+  }, [isAuthenticated, loadConversations, search]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    loadDetail(selectedId);
+  }, [isAuthenticated, loadDetail, selectedId]);
+
+  async function handleLogin(password: string) {
+    setAuthError("");
+    try {
+      await login(password);
+      setIsAuthenticated(true);
+    } catch (error) {
+      setAuthError(error instanceof ApiError && error.status === 401 ? "Invalid password." : "Could not sign in.");
+    }
+  }
+
+  async function handleLogout() {
+    await logout().catch(() => undefined);
+    setIsAuthenticated(false);
+    setConversations([]);
+    setSelectedConversation(null);
+    setMessages([]);
+  }
+
+  async function handleSend(body: string, selectedFiles: File[]) {
+    if (!selectedId) return;
+    const response = await sendReply(selectedId, body, selectedFiles, newClientRequestId());
+    setMessages((current) => {
+      const withoutDuplicate = current.filter((message) => message.id !== response.message.id);
+      return [...withoutDuplicate, response.message];
+    });
+    await loadConversations(search);
+    await loadDetail(selectedId);
+  }
+
+  if (isCheckingSession) {
+    return (
+      <main className="loading-screen">
+        <RefreshCw size={28} />
+      </main>
     );
   }
+
+  if (!isAuthenticated) {
+    return <LoginScreen error={authError} onLogin={handleLogin} />;
+  }
+
+  const activeConversation = selectedConversation || selectedListItem;
+  const customerName = activeConversation ? displayCustomerName(activeConversation) : "No conversation selected";
+  const customerPhone = activeConversation?.customer.phone || "";
+  const channel = activeConversation?.channel || "sms";
+  const status = activeConversation?.status || "open";
 
   return (
     <div className="app-shell">
@@ -327,7 +420,7 @@ export function App() {
             <span>RELAY</span>
           </div>
         </div>
-        <button className="logout-button" type="button">
+        <button className="logout-button" onClick={handleLogout} type="button">
           <LogOut size={18} />
           Logout
         </button>
@@ -352,23 +445,29 @@ export function App() {
           </label>
 
           <div className="conversation-list">
-            {filteredConversations.map((conversation) => (
+            {isLoadingList && <p className="panel-note">Loading conversations...</p>}
+            {!isLoadingList && conversations.length === 0 && <p className="panel-note">No conversations found.</p>}
+            {conversations.map((conversation) => (
               <button
-                className={`conversation-row ${conversation.id === selected.id ? "selected" : ""}`}
+                className={`conversation-row ${conversation.id === selectedId ? "selected" : ""}`}
                 key={conversation.id}
-                onClick={() => setSelectedId(conversation.id)}
+                onClick={() => {
+                  setSelectedId(conversation.id);
+                  setDraft("");
+                  setFiles([]);
+                }}
                 type="button"
               >
                 <span>
-                  <strong>{conversation.customerName}</strong>
-                  <em>{conversation.updatedLabel}</em>
+                  <strong>{displayCustomerName(conversation)}</strong>
+                  <em>{relativeDate(conversation.updatedAt)}</em>
                 </span>
-                <p>{conversation.lastMessagePreview}</p>
+                <p>{previewBody(conversation)}</p>
                 <footer>
-                  <span className={`channel-pill ${conversation.channel}`}>
-                    {channelLabel(conversation.channel)}
-                  </span>
-                  {conversation.deliveryStatus === "failed" && <DeliveryPill status="failed" />}
+                  <span className={`channel-pill ${conversation.channel}`}>{channelLabel(conversation.channel)}</span>
+                  {(deliveryStatus(conversation) === "failed" || deliveryStatus(conversation) === "undelivered") && (
+                    <DeliveryPill status={deliveryStatus(conversation)} />
+                  )}
                 </footer>
               </button>
             ))}
@@ -378,45 +477,54 @@ export function App() {
         <section className="conversation-panel">
           <header className="conversation-header">
             <div>
-              <h1>{selected.customerName}</h1>
+              <h1>{customerName}</h1>
               <p>
-                via {channelLabel(selected.channel)} {selected.customerPhone}
+                via {channelLabel(channel)} {customerPhone}
               </p>
             </div>
-            <StatusPill status={selected.status} />
+            <StatusPill status={status} />
           </header>
 
           <div className="message-thread">
-            {selected.messages.map((message) => (
+            {appError && <p className="app-error">{appError}</p>}
+            {isLoadingDetail && <p className="panel-note">Loading messages...</p>}
+            {!isLoadingDetail && messages.length === 0 && <p className="panel-note">No messages yet.</p>}
+            {messages.map((message) => (
               <MessageBubble key={message.id} message={message} />
             ))}
           </div>
 
-          <Composer onSend={handleSend} />
+          <Composer
+            disabled={!selectedId}
+            draft={draft}
+            files={files}
+            onDraftChange={setDraft}
+            onFilesChange={setFiles}
+            onSend={handleSend}
+          />
         </section>
 
         <aside className="context-panel">
           <section className="context-section">
             <h2>Customer Profile</h2>
-            <strong>{selected.customerName}</strong>
-            <p>{selected.customerPhone}</p>
-            <em>Account Status: Active Client</em>
+            <strong>{customerName}</strong>
+            <p>{customerPhone}</p>
+            {activeConversation?.code && <em>Conversation code: #{activeConversation.code}</em>}
           </section>
 
           <section className="context-section">
             <h2>
               <Sparkles size={18} />
-              AI Intent Checklist
+              AI Suggested Reply
             </h2>
             <div className="intent-box">
-              <span>{selected.intent.label}</span>
-              <p>Missing info parsed from chat:</p>
-              {selected.intent.missing.map((item) => (
-                <label key={item}>
-                  <input type="checkbox" />
-                  {item}
-                </label>
-              ))}
+              <span>{suggestedReply ? "Ready" : "No suggestion"}</span>
+              <p>{suggestedReply || "No AI suggestion is available for this conversation yet."}</p>
+              {suggestedReply && (
+                <button className="secondary-action" onClick={() => setDraft(suggestedReply)} type="button">
+                  Use suggested reply
+                </button>
+              )}
             </div>
           </section>
 
@@ -424,11 +532,11 @@ export function App() {
             <h2>Quick Responses</h2>
             <div className="quick-responses">
               {quickResponses.map((response, index) => (
-                <button key={response} type="button">
+                <button key={response.id} onClick={() => setDraft(response.body)} type="button">
                   {index === 0 && "?"}
                   {index === 1 && <CheckCircle2 size={16} />}
                   {index === 2 && <Sparkles size={16} />}
-                  <span>{response}</span>
+                  <span>{response.label}</span>
                 </button>
               ))}
             </div>

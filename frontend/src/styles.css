@@ -32,6 +32,67 @@ button {
   background: #f4f7fb;
 }
 
+.loading-screen,
+.login-screen {
+  align-items: center;
+  background: #f4f7fb;
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+}
+
+.loading-screen svg {
+  animation: spin 900ms linear infinite;
+  color: #1688c9;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.login-panel {
+  background: #ffffff;
+  border: 1px solid #dfe4ec;
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgb(20 28 42 / 12%);
+  display: grid;
+  gap: 20px;
+  max-width: 420px;
+  padding: 28px;
+  width: min(420px, calc(100vw - 32px));
+}
+
+.login-brand {
+  justify-content: center;
+}
+
+.login-panel label {
+  color: #475366;
+  display: grid;
+  font-weight: 800;
+  gap: 8px;
+}
+
+.login-panel input {
+  border: 1px solid #cdd5e1;
+  border-radius: 8px;
+  color: #172033;
+  min-height: 48px;
+  padding: 0 14px;
+}
+
+.form-error,
+.app-error {
+  background: #ffe2e4;
+  border-radius: 8px;
+  color: #b42318;
+  font-weight: 800;
+  margin: 0;
+  padding: 12px 14px;
+}
+
 .topbar {
   align-items: center;
   background: #ffffff;
@@ -179,6 +240,13 @@ button {
 
 .conversation-list {
   display: grid;
+}
+
+.panel-note {
+  color: #68748a;
+  font-weight: 700;
+  margin: 0;
+  padding: 22px;
 }
 
 .conversation-row {
@@ -388,6 +456,11 @@ button {
   gap: 8px;
 }
 
+.attach-control.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .attach-control input {
   height: 1px;
   opacity: 0;
@@ -501,6 +574,16 @@ button {
 .quick-responses {
   display: grid;
   gap: 10px;
+}
+
+.secondary-action {
+  background: #1688c9;
+  border: 0;
+  border-radius: 8px;
+  color: #ffffff;
+  font-weight: 800;
+  min-height: 42px;
+  padding: 0 14px;
 }
 
 .quick-responses button {
