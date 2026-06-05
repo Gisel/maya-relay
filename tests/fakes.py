@@ -188,16 +188,25 @@ class FakeRepository:
 
 class FakeSender:
     def __init__(self):
-        self.sent_messages: list[dict[str, str]] = []
+        self.sent_messages: list[dict[str, object]] = []
 
-    def send_sms(self, *, to_phone: str, body: str) -> str:
-        return self.send_message(to_phone=to_phone, body=body, channel="sms")
+    def send_sms(self, *, to_phone: str, body: str, media_urls: tuple[str, ...] = ()) -> str:
+        return self.send_message(to_phone=to_phone, body=body, channel="sms", media_urls=media_urls)
 
-    def send_message(self, *, to_phone: str, body: str, channel: Channel = "sms") -> str:
+    def send_message(
+        self,
+        *,
+        to_phone: str,
+        body: str,
+        channel: Channel = "sms",
+        media_urls: tuple[str, ...] = (),
+    ) -> str:
         sid = f"SMfake{len(self.sent_messages) + 1}"
-        message = {"sid": sid, "to_phone": to_phone, "body": body}
+        message: dict[str, object] = {"sid": sid, "to_phone": to_phone, "body": body}
         if channel != "sms":
             message["channel"] = channel
+        if media_urls:
+            message["media_urls"] = media_urls
         self.sent_messages.append(message)
         return sid
 

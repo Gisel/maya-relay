@@ -180,10 +180,12 @@ def send_conversation_reply(
             files=uploads,
         )
     outbound_body = _reply_body_with_attachments(body, stored_attachments)
+    outbound_media_urls = _image_attachment_urls(stored_attachments)
     outbound_sid = sender.send_message(
         to_phone=conversation.customer_phone,
         body=outbound_body,
         channel=conversation.customer_channel,
+        media_urls=outbound_media_urls,
     )
     created_message = repository.create_message(
         conversation_id=conversation.id,
@@ -275,9 +277,25 @@ def _read_uploads(files: list[UploadFile]) -> tuple[UploadedAttachment, ...]:
 
 def _reply_body_with_attachments(body: str, attachments: tuple[StoredAttachment, ...]) -> str:
     lines = [body] if body else []
-    for index, attachment in enumerate(attachments, start=1):
-        lines.append(f"Attachment {index} ({attachment.content_type}): {attachment.public_url}")
+    attachment_number = 1
+    for attachment in attachments:
+        if _is_image_content_type(attachment.content_type):
+            continue
+        lines.append(f"Attachment {attachment_number} ({attachment.content_type}): {attachment.public_url}")
+        attachment_number += 1
     return "\n".join(lines)
+
+
+def _image_attachment_urls(attachments: tuple[StoredAttachment, ...]) -> tuple[str, ...]:
+    return tuple(
+        attachment.public_url
+        for attachment in attachments
+        if _is_image_content_type(attachment.content_type)
+    )
+
+
+def _is_image_content_type(content_type: str) -> bool:
+    return content_type.lower().startswith("image/")
 
 
 def _layout(title: str, content: str) -> str:

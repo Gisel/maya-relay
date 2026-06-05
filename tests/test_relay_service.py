@@ -71,7 +71,7 @@ def test_customer_message_creates_conversation_and_forwards_to_employee():
     assert repository.messages[1]["direction"] == "system"
 
 
-def test_customer_media_is_stored_and_forwarded_as_attachment_link():
+def test_customer_image_media_is_stored_and_forwarded_as_mms_media():
     service, repository, sender = build_service()
 
     service.handle_inbound_sms(
@@ -91,9 +91,33 @@ def test_customer_media_is_stored_and_forwarded_as_attachment_link():
     assert sender.sent_messages[0]["body"] == (
         "From customer +15550000001 [#C0001]:\n"
         "Here is the design\n"
-        "Attachment 1 (image/jpeg): https://api.twilio.com/media/image.jpg\n"
         "Reply with #C0001 your message"
     )
+    assert sender.sent_messages[0]["media_urls"] == ("https://api.twilio.com/media/image.jpg",)
+
+
+def test_customer_non_image_media_keeps_attachment_link():
+    service, _, sender = build_service()
+
+    service.handle_inbound_sms(
+        IncomingMessage(
+            message_sid="SMcustomer",
+            from_phone="+15550000001",
+            to_phone="+13852208404",
+            body="Here is the proof",
+            num_media=1,
+            media_urls=("https://api.twilio.com/media/proof.pdf",),
+            media_content_types=("application/pdf",),
+        )
+    )
+
+    assert sender.sent_messages[0]["body"] == (
+        "From customer +15550000001 [#C0001]:\n"
+        "Here is the proof\n"
+        "Attachment 1 (application/pdf): https://api.twilio.com/media/proof.pdf\n"
+        "Reply with #C0001 your message"
+    )
+    assert "media_urls" not in sender.sent_messages[0]
 
 
 def test_customer_lookup_name_is_cached_and_used_in_forwarded_label():
@@ -275,6 +299,38 @@ def test_employee_reply_to_whatsapp_conversation_uses_whatsapp_channel():
         "to_phone": "+15550000001",
         "body": "Thanks, WhatsApp customer.",
         "channel": "whatsapp",
+    }
+
+
+def test_employee_reply_to_customer_sends_image_as_media():
+    service, _, sender = build_service()
+    service.handle_inbound_sms(
+        IncomingMessage(
+            message_sid="SMcustomer",
+            from_phone="+15550000001",
+            to_phone="+13852208404",
+            body="Hello",
+        )
+    )
+
+    result = service.handle_inbound_sms(
+        IncomingMessage(
+            message_sid="SMemployee",
+            from_phone="+15551234567",
+            to_phone="+13852208404",
+            body="#C0001 Here is the proof.",
+            num_media=1,
+            media_urls=("https://api.twilio.com/media/proof.jpg",),
+            media_content_types=("image/jpeg",),
+        )
+    )
+
+    assert result == {"status": "forwarded_to_customer", "conversation_id": "conversation-1"}
+    assert sender.sent_messages[-1] == {
+        "sid": "SMfake2",
+        "to_phone": "+15550000001",
+        "body": "Here is the proof.",
+        "media_urls": ("https://api.twilio.com/media/proof.jpg",),
     }
 
 

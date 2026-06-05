@@ -69,7 +69,12 @@ class RelayService:
             conversation_code=conversation.conversation_code,
             triage_note=_triage_context_note(triage_note, suggested_reply),
         )
-        outbound_sid = self.sender.send_sms(to_phone=conversation.assigned_employee, body=forwarded_body)
+        outbound_media_urls = _image_media_urls(media_urls, message.media_content_types)
+        outbound_sid = self.sender.send_sms(
+            to_phone=conversation.assigned_employee,
+            body=forwarded_body,
+            media_urls=outbound_media_urls,
+        )
         self.repository.create_message(
             conversation_id=conversation.id,
             direction="system",
@@ -140,10 +145,12 @@ class RelayService:
             media_urls=media_urls,
             media_content_types=message.media_content_types,
         )
+        outbound_media_urls = _image_media_urls(media_urls, message.media_content_types)
         outbound_sid = self.sender.send_message(
             to_phone=conversation.customer_phone,
             body=forwarded_body,
             channel=conversation.customer_channel,
+            media_urls=outbound_media_urls,
         )
         self.repository.create_message(
             conversation_id=conversation.id,
@@ -176,9 +183,13 @@ class RelayService:
         lines = [f"From {from_label}{suffix}:"]
         if body:
             lines.append(body)
+        attachment_number = 1
         for index, media_url in enumerate(media_urls):
             content_type = media_content_types[index] if index < len(media_content_types) else "attachment"
-            lines.append(f"Attachment {index + 1} ({content_type}): {media_url}")
+            if _is_image_content_type(content_type):
+                continue
+            lines.append(f"Attachment {attachment_number} ({content_type}): {media_url}")
+            attachment_number += 1
         if len(lines) == 1:
             lines.append("[No message body]")
         if conversation_code:
@@ -196,9 +207,13 @@ class RelayService:
         media_content_types: tuple[str, ...],
     ) -> str:
         lines = [body] if body else []
+        attachment_number = 1
         for index, media_url in enumerate(media_urls):
             content_type = media_content_types[index] if index < len(media_content_types) else "attachment"
-            lines.append(f"Attachment {index + 1} ({content_type}): {media_url}")
+            if _is_image_content_type(content_type):
+                continue
+            lines.append(f"Attachment {attachment_number} ({content_type}): {media_url}")
+            attachment_number += 1
         return "\n".join(lines) or "[No message body]"
 
     def _extract_conversation_code(self, body: str) -> str | None:
@@ -272,3 +287,16 @@ def _triage_context_note(triage_note: str | None, suggested_reply: str | None) -
     lines = [line.strip() for line in triage_note.splitlines()]
     context_lines = [line for line in lines if line and line != suggested_reply and line != "---"]
     return "\n".join(context_lines) or None
+
+
+def _image_media_urls(media_urls: tuple[str, ...], media_content_types: tuple[str, ...]) -> tuple[str, ...]:
+    image_urls = []
+    for index, media_url in enumerate(media_urls):
+        content_type = media_content_types[index] if index < len(media_content_types) else ""
+        if _is_image_content_type(content_type):
+            image_urls.append(media_url)
+    return tuple(image_urls)
+
+
+def _is_image_content_type(content_type: str) -> bool:
+    return content_type.lower().startswith("image/")

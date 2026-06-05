@@ -5,6 +5,9 @@ import requests
 from app.config import Settings
 
 
+AI_TRIAGE_MAX_CHARACTERS = 700
+
+
 class MessageTriage(Protocol):
     def summarize(self, *, body: str, has_attachments: bool, conversation_code: str | None = None) -> str | None:
         ...
@@ -50,13 +53,13 @@ class OpenAIMessageTriage:
                         "Use at most 3 short lines. Line 1: intent. Line 2: missing details. "
                         "Line 3: a short suggested reply only when useful. "
                         "If you include a suggested reply, start it with the exact conversation reply code. "
-                        "Match the customer's language. Keep the whole note under 320 characters. "
+                        "Match the customer's language. Keep the whole note under 650 characters. "
                         "Business context: Maya has one location. Office hours are Monday-Friday 9:00 AM-6:00 PM. "
                         "Saturday is by appointment only. "
                         "Do not invent prices, commitments, timelines, or policies."
                     ),
                     "input": prompt,
-                    "max_output_tokens": 300,
+                    "max_output_tokens": 500,
                     "reasoning": {"effort": "low"},
                     "text": {"verbosity": "low"},
                 },
@@ -108,4 +111,13 @@ def _compact_summary(text: str) -> str:
         if index > 0 and line.startswith("#"):
             compact_lines.insert(index, "---")
             break
-    return "\n".join(compact_lines)[:360]
+    return _trim_to_character_limit("\n".join(compact_lines), AI_TRIAGE_MAX_CHARACTERS)
+
+
+def _trim_to_character_limit(text: str, max_characters: int) -> str:
+    if len(text) <= max_characters:
+        return text
+    trimmed = text[: max_characters - 3].rstrip()
+    if " " in trimmed:
+        trimmed = trimmed.rsplit(" ", 1)[0]
+    return f"{trimmed}..."

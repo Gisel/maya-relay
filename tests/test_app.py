@@ -218,6 +218,24 @@ def test_admin_login_and_conversations_page():
         "https://files.example/admin-replies/conversation-1/proof.pdf"
     )
 
+    send_image_reply = client.post(
+        "/admin/conversations/conversation-1/reply",
+        data={"reply_body": "Please review this image."},
+        files=[("reply_files", ("proof.jpg", b"fake jpg", "image/jpeg"))],
+        headers={"cookie": cookie},
+        follow_redirects=False,
+    )
+    assert send_image_reply.status_code == 303
+    assert sender.sent_messages[-1] == {
+        "sid": "SMfake3",
+        "to_phone": "+15550000001",
+        "body": "Please review this image.",
+        "media_urls": ("https://files.example/admin-replies/conversation-1/proof.jpg",),
+    }
+    assert repository.messages[-1]["media_urls"] == (
+        "https://files.example/admin-replies/conversation-1/proof.jpg",
+    )
+
     logout = client.get("/admin/logout", follow_redirects=False)
     assert logout.status_code == 303
     assert "maya_admin" in logout.headers["set-cookie"]
@@ -290,7 +308,8 @@ def test_twilio_sms_webhook_parses_media_fields():
     assert repository.messages[0]["num_media"] == 1
     assert repository.messages[0]["media_urls"] == ("https://api.twilio.com/media/image.jpg",)
     assert repository.messages[0]["media_content_types"] == ("image/jpeg",)
-    assert "Attachment 1 (image/jpeg)" in sender.sent_messages[0]["body"]
+    assert "Attachment 1 (image/jpeg)" not in sender.sent_messages[0]["body"]
+    assert sender.sent_messages[0]["media_urls"] == ("https://api.twilio.com/media/image.jpg",)
 
 
 def test_twilio_whatsapp_webhook_normalizes_channel_addresses():

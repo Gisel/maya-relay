@@ -21,10 +21,19 @@ def test_extract_response_text_supports_raw_responses_output_shape():
     assert _extract_response_text(payload) == "Intent: quote request\nMissing: dimensions"
 
 
-def test_compact_summary_limits_to_three_content_lines_and_360_characters():
+def test_compact_summary_limits_to_three_content_lines():
     summary = _compact_summary("\n".join([f"Line {index}" for index in range(1, 8)]))
 
     assert summary == "Line 1\nLine 2\nLine 3"
+
+
+def test_compact_summary_gives_suggested_reply_enough_room():
+    reply = "#C0001 " + "Please send dimensions, material, finish, installation address, artwork status, deadline, and best contact. " * 4
+
+    summary = _compact_summary(f"Intent: quote\nMissing: details\n{reply}")
+
+    assert len(summary) > 360
+    assert summary.startswith("Intent: quote\nMissing: details\n---\n#C0001")
 
 
 def test_compact_summary_adds_separator_before_suggested_reply():
@@ -65,7 +74,7 @@ def test_openai_triage_uses_low_reasoning_and_enough_output_tokens(monkeypatch):
         triage.summarize(body="Need a banner quote", has_attachments=False, conversation_code="C0001")
         == "Intent: quote request"
     )
-    assert captured["json"]["max_output_tokens"] == 300
+    assert captured["json"]["max_output_tokens"] == 500
     assert captured["json"]["reasoning"] == {"effort": "low"}
     assert captured["json"]["text"] == {"verbosity": "low"}
     assert "Conversation reply code: #C0001" in captured["json"]["input"]
