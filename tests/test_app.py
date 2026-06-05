@@ -267,6 +267,28 @@ def test_twilio_sms_webhook_parses_media_fields():
     assert "Attachment 1 (image/jpeg)" in sender.sent_messages[0]["body"]
 
 
+def test_twilio_whatsapp_webhook_normalizes_channel_addresses():
+    client, repository, sender = make_client()
+
+    response = client.post(
+        "/webhooks/twilio/whatsapp",
+        data={
+            "MessageSid": "WMinbound",
+            "From": "whatsapp:+15550000001",
+            "To": "whatsapp:+13852208404",
+            "Body": "Hola por WhatsApp",
+            "NumMedia": "0",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/xml")
+    assert repository.messages[0]["from_phone"] == "+15550000001"
+    assert repository.messages[0]["to_phone"] == "+13852208404"
+    assert sender.sent_messages[0]["to_phone"] == "+15551234567"
+    assert "Hola por WhatsApp" in sender.sent_messages[0]["body"]
+
+
 def test_status_callback_updates_message_status():
     client, repository, _ = make_client()
 
@@ -323,6 +345,33 @@ def test_signed_sms_webhook_uses_forwarded_public_url_for_validation():
 
     response = client.post(
         "/webhooks/twilio/sms",
+        data=data,
+        headers={
+            "X-Twilio-Signature": signature,
+            "x-forwarded-proto": "https",
+            "x-forwarded-host": "maya-relay-production.up.railway.app",
+        },
+    )
+
+    assert response.status_code == 200
+    assert len(repository.messages) == 2
+    assert sender.sent_messages[0]["to_phone"] == "+15551234567"
+
+
+def test_signed_whatsapp_webhook_uses_forwarded_public_url_for_validation():
+    client, repository, sender = make_client(verify_twilio_signature=True, twilio_auth_token="token")
+    url = "https://maya-relay-production.up.railway.app/webhooks/twilio/whatsapp"
+    data = {
+        "MessageSid": "WMinbound",
+        "From": "whatsapp:+15550000001",
+        "To": "whatsapp:+13852208404",
+        "Body": "Need a quote on WhatsApp",
+        "NumMedia": "0",
+    }
+    signature = RequestValidator("token").compute_signature(url, data)
+
+    response = client.post(
+        "/webhooks/twilio/whatsapp",
         data=data,
         headers={
             "X-Twilio-Signature": signature,

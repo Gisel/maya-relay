@@ -97,6 +97,29 @@ async def inbound_sms(
     return _empty_twiml()
 
 
+@router.post("/whatsapp")
+async def inbound_whatsapp(
+    request: Request,
+    MessageSid: str = Form(default=""),
+    From: str = Form(...),
+    To: str = Form(...),
+    Body: str = Form(default=""),
+    NumMedia: int = Form(default=0),
+    settings: Settings = Depends(get_settings),
+    relay_service: RelayService = Depends(get_relay_service),
+) -> Response:
+    return await inbound_sms(
+        request=request,
+        MessageSid=MessageSid,
+        From=_strip_whatsapp_prefix(From),
+        To=_strip_whatsapp_prefix(To),
+        Body=Body,
+        NumMedia=NumMedia,
+        settings=settings,
+        relay_service=relay_service,
+    )
+
+
 @router.post("/employee")
 async def employee_sms(
     request: Request,
@@ -140,3 +163,10 @@ async def message_status(
         error_message=ErrorMessage,
     )
     return Response(status_code=204)
+
+
+def _strip_whatsapp_prefix(phone_number: str) -> str:
+    prefix = "whatsapp:"
+    if phone_number.lower().startswith(prefix):
+        return phone_number[len(prefix):]
+    return phone_number
