@@ -143,6 +143,27 @@ Later:
 - Mark conversation resolved.
 - Click-to-call.
 
+### Pinned Scope: Click-To-Call Bridge
+
+Keep click-to-call inside the project scope for a near-future phase.
+
+Target workflow:
+
+1. Francisco opens a customer conversation in Maya Relay.
+2. He taps `Call customer`.
+3. Maya Relay asks Twilio to call Francisco's configured `FRANCISCO_PHONE`.
+4. Francisco answers his normal cellphone.
+5. Twilio calls the customer using `MAYA_BUSINESS_NUMBER` as the caller ID.
+6. Twilio bridges both calls when the customer answers.
+
+Implementation notes:
+
+- Source of truth must remain Railway/.env variables and Supabase data.
+- Add `POST /api/conversations/{conversation_id}/call`.
+- Add a Twilio Voice webhook/TwiML route for connecting the second leg.
+- Log call attempts/status in Supabase before adding recordings or transcripts.
+- This is separate from browser microphone calling; the first production version should use Francisco's regular cellphone.
+
 ### Right Intelligence Panel
 
 Required:
