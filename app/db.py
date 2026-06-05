@@ -60,6 +60,9 @@ class RelayRepository(Protocol):
     def get_conversation(self, conversation_id: str) -> Conversation | None:
         ...
 
+    def update_conversation_status(self, conversation_id: str, status: str) -> Conversation:
+        ...
+
     def create_message(
         self,
         *,
@@ -72,7 +75,16 @@ class RelayRepository(Protocol):
         num_media: int = 0,
         media_urls: tuple[str, ...] = (),
         media_content_types: tuple[str, ...] = (),
+        client_request_id: str | None = None,
     ) -> dict[str, Any]:
+        ...
+
+    def get_message_by_client_request_id(
+        self,
+        *,
+        conversation_id: str,
+        client_request_id: str,
+    ) -> dict[str, Any] | None:
         ...
 
     def create_message_attachment(
@@ -227,6 +239,15 @@ class SupabaseRelayRepository:
             return None
         return _conversation_from_row(result.data[0])
 
+    def update_conversation_status(self, conversation_id: str, status: str) -> Conversation:
+        result = (
+            self.client.table("conversations")
+            .update({"status": status})
+            .eq("id", conversation_id)
+            .execute()
+        )
+        return _conversation_from_row(result.data[0])
+
     def create_message(
         self,
         *,
@@ -239,24 +260,49 @@ class SupabaseRelayRepository:
         num_media: int = 0,
         media_urls: tuple[str, ...] = (),
         media_content_types: tuple[str, ...] = (),
+        client_request_id: str | None = None,
     ) -> dict[str, Any]:
+        payload = {
+            "conversation_id": conversation_id,
+            "direction": direction,
+            "from_phone": from_phone,
+            "to_phone": to_phone,
+            "body": body,
+            "twilio_message_sid": twilio_message_sid,
+            "num_media": num_media,
+            "media_urls": list(media_urls),
+            "media_content_types": list(media_content_types),
+        }
+        if client_request_id:
+            payload["client_request_id"] = client_request_id
+
         result = (
             self.client.table("messages")
-            .insert(
-                {
-                    "conversation_id": conversation_id,
-                    "direction": direction,
-                    "from_phone": from_phone,
-                    "to_phone": to_phone,
-                    "body": body,
-                    "twilio_message_sid": twilio_message_sid,
-                    "num_media": num_media,
-                    "media_urls": list(media_urls),
-                    "media_content_types": list(media_content_types),
-                }
-            )
+            .insert(payload)
             .execute()
         )
+        return result.data[0]
+
+    def get_message_by_client_request_id(
+        self,
+        *,
+        conversation_id: str,
+        client_request_id: str,
+    ) -> dict[str, Any] | None:
+        result = (
+            self.client.table("messages")
+            .select(
+                "id, conversation_id, direction, from_phone, to_phone, body, twilio_message_sid, "
+                "num_media, media_urls, media_content_types, delivery_status, delivery_error_code, "
+                "delivery_error_message, client_request_id, created_at"
+            )
+            .eq("conversation_id", conversation_id)
+            .eq("client_request_id", client_request_id)
+            .limit(1)
+            .execute()
+        )
+        if not result.data:
+            return None
         return result.data[0]
 
     def create_message_attachment(
@@ -340,6 +386,8 @@ class SupabaseRelayRepository:
             conversations.append(
                 {
                     **conversation,
+                    "customer_display_name": contact.get("display_name"),
+                    "customer_lookup_name": contact.get("lookup_name"),
                     "customer_name": contact.get("display_name") or contact.get("lookup_name"),
                     "last_message": messages.data[0] if messages.data else None,
                     "message_search_text": _message_search_text(messages.data),
@@ -353,7 +401,7 @@ class SupabaseRelayRepository:
             .select(
                 "id, conversation_id, direction, from_phone, to_phone, body, twilio_message_sid, "
                 "num_media, media_urls, media_content_types, delivery_status, delivery_error_code, "
-                "delivery_error_message, created_at"
+                "delivery_error_message, client_request_id, created_at"
             )
             .eq("conversation_id", conversation_id)
             .order("created_at", desc=False)

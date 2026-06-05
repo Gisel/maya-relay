@@ -270,6 +270,161 @@ def test_admin_reply_uses_conversation_customer_channel():
     }
 
 
+def test_api_requires_admin_session():
+    client, _, _ = make_client(admin_password="secret")
+
+    response = client.get("/api/conversations")
+
+    assert response.status_code == 401
+
+
+def test_api_conversation_contract_and_idempotent_reply():
+    client, repository, sender = make_client(admin_password="secret")
+    repository.update_contact_lookup_name("+15550000001", "GOMEZ, GISEL")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+        customer_channel="whatsapp",
+    )
+    repository.create_message(
+        conversation_id="conversation-1",
+        direction="customer_to_employee",
+        from_phone="+15550000001",
+        to_phone="+13852208404",
+        body="Need a quote for presentation cards",
+        num_media=1,
+        media_urls=("https://files.example/card.jpg",),
+        media_content_types=("image/jpeg",),
+    )
+    repository.create_message(
+        conversation_id="conversation-1",
+        direction="system",
+        from_phone="+13852208404",
+        to_phone="+15551234567",
+        body="#C0001 Please send size and quantity.",
+    )
+
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    me = client.get("/api/me", headers={"cookie": cookie})
+    assert me.status_code == 200
+    assert me.json()["app"]["name"] == "Maya Relay"
+
+    conversations = client.get("/api/conversations?q=cards", headers={"cookie": cookie})
+    assert conversations.status_code == 200
+    assert conversations.json()["metrics"]["open"] == 1
+    assert conversations.json()["conversations"][0] == {
+        "id": "conversation-1",
+        "code": "C0001",
+        "status": "open",
+        "channel": "whatsapp",
+        "customer": {
+            "phone": "+15550000001",
+            "displayName": None,
+            "lookupName": "GOMEZ, GISEL",
+            "name": "GOMEZ, GISEL",
+        },
+        "lastMessage": {
+            "body": "#C0001 Please send size and quantity.",
+            "direction": "system",
+            "deliveryStatus": "pending",
+            "deliveryErrorCode": None,
+            "createdAt": None,
+            "hasAttachments": False,
+        },
+        "updatedAt": "",
+    }
+
+    detail = client.get("/api/conversations/conversation-1", headers={"cookie": cookie})
+    assert detail.status_code == 200
+    assert detail.json()["conversation"]["channel"] == "whatsapp"
+    assert detail.json()["suggestedReply"] == "Please send size and quantity."
+    assert detail.json()["messages"][0]["attachments"] == [
+        {
+            "url": "https://files.example/card.jpg",
+            "contentType": "image/jpeg",
+            "kind": "image",
+        }
+    ]
+
+    send = client.post(
+        "/api/conversations/conversation-1/reply",
+        data={"body": "Thanks, please send the size.", "client_request_id": "request-1"},
+        headers={"cookie": cookie},
+    )
+    assert send.status_code == 200
+    assert send.json()["status"] == "sent"
+    assert send.json()["message"]["clientRequestId"] == "request-1"
+    assert sender.sent_messages[-1] == {
+        "sid": "SMfake1",
+        "to_phone": "+15550000001",
+        "body": "Thanks, please send the size.",
+        "channel": "whatsapp",
+    }
+
+    duplicate = client.post(
+        "/api/conversations/conversation-1/reply",
+        data={"body": "Thanks, please send the size.", "client_request_id": "request-1"},
+        headers={"cookie": cookie},
+    )
+    assert duplicate.status_code == 200
+    assert duplicate.json()["status"] == "duplicate"
+    assert len(sender.sent_messages) == 1
+
+
+def test_api_reply_uploads_image_as_media():
+    client, repository, sender = make_client(admin_password="secret")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    response = client.post(
+        "/api/conversations/conversation-1/reply",
+        data={"body": "Please review.", "client_request_id": "image-request-1"},
+        files=[("reply_files", ("proof.jpg", b"fake jpg", "image/jpeg"))],
+        headers={"cookie": cookie},
+    )
+
+    assert response.status_code == 200
+    assert sender.sent_messages[-1] == {
+        "sid": "SMfake1",
+        "to_phone": "+15550000001",
+        "body": "Please review.",
+        "media_urls": ("https://files.example/api-replies/conversation-1/proof.jpg",),
+    }
+    assert response.json()["message"]["attachments"] == [
+        {
+            "url": "https://files.example/api-replies/conversation-1/proof.jpg",
+            "contentType": "image/jpeg",
+            "kind": "image",
+        }
+    ]
+
+
+def test_api_updates_conversation_status():
+    client, repository, _ = make_client(admin_password="secret")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    response = client.patch(
+        "/api/conversations/conversation-1",
+        json={"status": "closed"},
+        headers={"cookie": cookie},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["conversation"]["status"] == "closed"
+    assert repository.conversations[0].status == "closed"
+
+
 def test_twilio_sms_webhook_acknowledges_with_empty_twiml():
     client, repository, sender = make_client()
 

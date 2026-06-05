@@ -20,9 +20,13 @@ class Settings(BaseSettings):
     twilio_account_sid: str = Field(default="", alias="TWILIO_ACCOUNT_SID")
     twilio_auth_token: str = Field(default="", alias="TWILIO_AUTH_TOKEN")
     twilio_messaging_service_sid: str = Field(default="", alias="TWILIO_MESSAGING_SERVICE_SID")
-    maya_business_number: str = Field(default="+13852208404", alias="MAYA_BUSINESS_NUMBER")
+    maya_business_number: str = Field(default="", alias="MAYA_BUSINESS_NUMBER")
     francisco_phone: str = Field(default="", alias="FRANCISCO_PHONE")
     employee_phone_numbers: str = Field(default="", alias="EMPLOYEE_PHONE_NUMBERS")
+    business_hours_text: str = Field(
+        default="Monday-Friday 9:00 AM-6:00 PM. Saturday is by appointment.",
+        alias="BUSINESS_HOURS_TEXT",
+    )
 
     supabase_url: str = Field(default="", alias="SUPABASE_URL")
     supabase_service_role_key: str = Field(default="", alias="SUPABASE_SERVICE_ROLE_KEY")

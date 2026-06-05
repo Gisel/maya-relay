@@ -5,39 +5,16 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from app.attachments import AttachmentStore, StoredAttachment, UploadedAttachment
+from app.attachments import AttachmentStore
+from app.auth import SESSION_COOKIE, admin_enabled, is_authenticated, require_admin, session_value
 from app.config import Settings, get_settings
 from app.db import RelayRepository
 from app.dependencies import get_attachment_store, get_repository, get_sender
+from app.reply_helpers import image_attachment_urls, is_image_content_type, read_uploads, reply_body_with_attachments
 from app.twilio_client import MessageSender
 
 
 router = APIRouter(prefix="/admin", tags=["admin"])
-SESSION_COOKIE = "maya_admin"
-
-
-def _admin_enabled(settings: Settings) -> None:
-    if not settings.admin_password:
-        raise HTTPException(status_code=404)
-
-
-def _session_value(settings: Settings) -> str:
-    return hmac.new(
-        settings.admin_password.encode("utf-8"),
-        b"maya-admin-session",
-        "sha256",
-    ).hexdigest()
-
-
-def _is_authenticated(request: Request, settings: Settings) -> bool:
-    cookie = request.cookies.get(SESSION_COOKIE, "")
-    return hmac.compare_digest(cookie, _session_value(settings))
-
-
-def _require_admin(request: Request, settings: Settings) -> None:
-    _admin_enabled(settings)
-    if not _is_authenticated(request, settings):
-        raise HTTPException(status_code=401)
 
 
 @router.get("", response_class=HTMLResponse)
@@ -46,8 +23,8 @@ def admin_index(
     settings: Settings = Depends(get_settings),
     repository: RelayRepository = Depends(get_repository),
 ) -> HTMLResponse:
-    _admin_enabled(settings)
-    if not _is_authenticated(request, settings):
+    admin_enabled(settings)
+    if not is_authenticated(request, settings):
         return HTMLResponse(_layout("Maya Admin", _login_form()))
 
     query = (request.query_params.get("q") or "").strip()
@@ -94,17 +71,17 @@ def admin_login(
     password: str = Form(...),
     settings: Settings = Depends(get_settings),
 ) -> RedirectResponse:
-    _admin_enabled(settings)
+    admin_enabled(settings)
     if not hmac.compare_digest(password, settings.admin_password):
         return RedirectResponse("/admin", status_code=303)
     response = RedirectResponse("/admin", status_code=303)
-    response.set_cookie(SESSION_COOKIE, _session_value(settings), httponly=True, secure=True, samesite="lax")
+    response.set_cookie(SESSION_COOKIE, session_value(settings), httponly=True, secure=True, samesite="lax")
     return response
 
 
 @router.get("/logout")
 def admin_logout(settings: Settings = Depends(get_settings)) -> RedirectResponse:
-    _admin_enabled(settings)
+    admin_enabled(settings)
     response = RedirectResponse("/admin", status_code=303)
     response.delete_cookie(SESSION_COOKIE)
     return response
@@ -117,7 +94,7 @@ def conversation_detail(
     settings: Settings = Depends(get_settings),
     repository: RelayRepository = Depends(get_repository),
 ) -> HTMLResponse:
-    _require_admin(request, settings)
+    require_admin(request, settings)
     conversation = repository.get_conversation(conversation_id)
     if conversation is None:
         raise HTTPException(status_code=404)
@@ -161,13 +138,13 @@ def send_conversation_reply(
     sender: MessageSender = Depends(get_sender),
     attachment_store: AttachmentStore = Depends(get_attachment_store),
 ) -> RedirectResponse:
-    _require_admin(request, settings)
+    require_admin(request, settings)
     conversation = repository.get_conversation(conversation_id)
     if conversation is None:
         raise HTTPException(status_code=404)
 
     body = reply_body.strip()
-    uploads = _read_uploads(reply_files)
+    uploads = read_uploads(reply_files)
     if not body and not uploads:
         raise HTTPException(status_code=400, detail="Reply body or file is required.")
 
@@ -177,8 +154,8 @@ def send_conversation_reply(
             object_prefix=f"admin-replies/{conversation.id}",
             files=uploads,
         )
-    outbound_body = _reply_body_with_attachments(body, stored_attachments)
-    outbound_media_urls = _image_attachment_urls(stored_attachments)
+    outbound_body = reply_body_with_attachments(body, stored_attachments)
+    outbound_media_urls = image_attachment_urls(stored_attachments)
     outbound_sid = sender.send_message(
         to_phone=conversation.customer_phone,
         body=outbound_body,
@@ -255,41 +232,12 @@ def _suggested_reply(messages: list[dict], conversation_code: str) -> str:
     return ""
 
 
-def _read_uploads(files: list[UploadFile]) -> tuple[UploadedAttachment, ...]:
-    uploads: list[UploadedAttachment] = []
-    for file in files:
-        if not file.filename:
-            continue
-        content = file.file.read()
-        if not content:
-            continue
-        uploads.append(
-            UploadedAttachment(
-                filename=file.filename,
-                content=content,
-                content_type=file.content_type or "application/octet-stream",
-            )
-        )
-    return tuple(uploads)
-
-
-def _reply_body_with_attachments(body: str, attachments: tuple[StoredAttachment, ...]) -> str:
-    lines = [body] if body else []
-    attachment_number = 1
-    for attachment in attachments:
-        if _is_image_content_type(attachment.content_type):
-            continue
-        lines.append(f"Attachment {attachment_number} ({attachment.content_type}): {attachment.public_url}")
-        attachment_number += 1
-    return "\n".join(lines)
-
-
 def _media_preview_links(media_urls: list[str], media_content_types: list[str]) -> str:
     previews = []
     for index, url in enumerate(media_urls):
         content_type = media_content_types[index] if index < len(media_content_types) else ""
         label = f"Attachment {index + 1}"
-        if _is_image_content_type(content_type):
+        if is_image_content_type(content_type):
             previews.append(
                 "<a class='media media-preview' "
                 f"href='{_e(url)}' target='_blank' rel='noreferrer'>"
@@ -301,18 +249,6 @@ def _media_preview_links(media_urls: list[str], media_content_types: list[str]) 
                 f"<a class='media' href='{_e(url)}' target='_blank' rel='noreferrer'>{_e(label)}</a>"
             )
     return "".join(previews)
-
-
-def _image_attachment_urls(attachments: tuple[StoredAttachment, ...]) -> tuple[str, ...]:
-    return tuple(
-        attachment.public_url
-        for attachment in attachments
-        if _is_image_content_type(attachment.content_type)
-    )
-
-
-def _is_image_content_type(content_type: str) -> bool:
-    return content_type.lower().startswith("image/")
 
 
 def _layout(title: str, content: str) -> str:

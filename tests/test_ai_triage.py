@@ -78,5 +78,5 @@ def test_openai_triage_uses_low_reasoning_and_enough_output_tokens(monkeypatch):
     assert captured["json"]["reasoning"] == {"effort": "low"}
     assert captured["json"]["text"] == {"verbosity": "low"}
     assert "Conversation reply code: #C0001" in captured["json"]["input"]
-    assert "Office hours are Monday-Friday 9:00 AM-6:00 PM" in captured["json"]["instructions"]
-    assert "Saturday is by appointment only" in captured["json"]["instructions"]
+    assert "Office hours: Monday-Friday 9:00 AM-6:00 PM" in captured["json"]["instructions"]
+    assert "Saturday is by appointment" in captured["json"]["instructions"]

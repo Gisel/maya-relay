@@ -84,6 +84,21 @@ class FakeRepository:
                 return conversation
         return None
 
+    def update_conversation_status(self, conversation_id: str, status: str) -> Conversation:
+        for index, conversation in enumerate(self.conversations):
+            if conversation.id == conversation_id:
+                updated = Conversation(
+                    id=conversation.id,
+                    customer_phone=conversation.customer_phone,
+                    assigned_employee=conversation.assigned_employee,
+                    status=status,
+                    conversation_code=conversation.conversation_code,
+                    customer_channel=conversation.customer_channel,
+                )
+                self.conversations[index] = updated
+                return updated
+        raise AssertionError(f"conversation not found: {conversation_id}")
+
     def create_message(
         self,
         *,
@@ -96,6 +111,7 @@ class FakeRepository:
         num_media: int = 0,
         media_urls: tuple[str, ...] = (),
         media_content_types: tuple[str, ...] = (),
+        client_request_id: str | None = None,
     ) -> dict[str, Any]:
         message = {
             "id": f"message-{len(self.messages) + 1}",
@@ -108,9 +124,24 @@ class FakeRepository:
             "num_media": num_media,
             "media_urls": media_urls,
             "media_content_types": media_content_types,
+            "client_request_id": client_request_id,
         }
         self.messages.append(message)
         return message
+
+    def get_message_by_client_request_id(
+        self,
+        *,
+        conversation_id: str,
+        client_request_id: str,
+    ) -> dict[str, Any] | None:
+        for message in self.messages:
+            if (
+                message["conversation_id"] == conversation_id
+                and message.get("client_request_id") == client_request_id
+            ):
+                return message
+        return None
 
     def create_message_attachment(
         self,
@@ -165,6 +196,7 @@ class FakeRepository:
                 (message for message in reversed(messages)),
                 None,
             )
+            contact = self.get_contact(conversation.customer_phone)
             rows.append(
                 {
                     "id": conversation.id,
@@ -175,7 +207,9 @@ class FakeRepository:
                     "status": conversation.status,
                     "created_at": "",
                     "updated_at": "",
-                    "customer_name": None,
+                    "customer_name": contact.best_name if contact else None,
+                    "customer_display_name": contact.display_name if contact else None,
+                    "customer_lookup_name": contact.lookup_name if contact else None,
                     "last_message": last_message,
                     "message_search_text": _message_search_text(messages),
                 }

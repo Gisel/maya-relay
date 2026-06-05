@@ -164,6 +164,27 @@ def test_get_open_conversation_by_code_routes_employee_reply():
     assert conversation.conversation_code == "C0002"
 
 
+def test_update_conversation_status_updates_row():
+    repository, client = build_repository()
+    client.seed(
+        "conversations",
+        [
+            {
+                "id": "conversation-1",
+                "customer_phone": "+15550000001",
+                "assigned_employee": "+15551234567",
+                "conversation_code": "C0001",
+                "status": "open",
+            }
+        ],
+    )
+
+    conversation = repository.update_conversation_status("conversation-1", "closed")
+
+    assert conversation.status == "closed"
+    assert client.rows("conversations")[0]["status"] == "closed"
+
+
 def test_create_message_stores_real_row_shape():
     repository, client = build_repository()
 
@@ -183,6 +204,26 @@ def test_create_message_stores_real_row_shape():
     assert message["media_urls"] == ["https://example.com/image.jpg"]
     assert message["media_content_types"] == ["image/jpeg"]
     assert client.rows("messages")[0]["twilio_message_sid"] == "SM123"
+
+
+def test_get_message_by_client_request_id_returns_existing_message():
+    repository, _ = build_repository()
+    created = repository.create_message(
+        conversation_id="conversation-1",
+        direction="employee_to_customer",
+        from_phone="+13852208404",
+        to_phone="+15550000001",
+        body="Already sent.",
+        client_request_id="browser-request-1",
+    )
+
+    found = repository.get_message_by_client_request_id(
+        conversation_id="conversation-1",
+        client_request_id="browser-request-1",
+    )
+
+    assert found["id"] == created["id"]
+    assert found["client_request_id"] == "browser-request-1"
 
 
 def test_update_message_status_updates_matching_message_only():

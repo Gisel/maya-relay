@@ -22,6 +22,7 @@ class OpenAIMessageTriage:
     def __init__(self, settings: Settings):
         if not settings.openai_api_key:
             raise RuntimeError("OPENAI_API_KEY is required when ENABLE_AI_TRIAGE=true.")
+        self.settings = settings
         self.api_key = settings.openai_api_key
         self.model = settings.openai_model
 
@@ -54,8 +55,7 @@ class OpenAIMessageTriage:
                         "Line 3: a short suggested reply only when useful. "
                         "If you include a suggested reply, start it with the exact conversation reply code. "
                         "Match the customer's language. Keep the whole note under 650 characters. "
-                        "Business context: Maya has one location. Office hours are Monday-Friday 9:00 AM-6:00 PM. "
-                        "Saturday is by appointment only. "
+                        f"Business context: Maya has one location. Office hours: {self.settings.business_hours_text} "
                         "Do not invent prices, commitments, timelines, or policies."
                     ),
                     "input": prompt,

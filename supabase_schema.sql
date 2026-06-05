@@ -31,6 +31,7 @@ create table if not exists public.messages (
   num_media integer not null default 0,
   media_urls jsonb not null default '[]'::jsonb,
   media_content_types jsonb not null default '[]'::jsonb,
+  client_request_id text,
   delivery_status text,
   delivery_error_code text,
   delivery_error_message text,
@@ -65,13 +66,18 @@ create index if not exists messages_twilio_sid_idx
   on public.messages (twilio_message_sid)
   where twilio_message_sid is not null;
 
+create unique index if not exists messages_client_request_idx
+  on public.messages (conversation_id, client_request_id)
+  where client_request_id is not null;
+
 create index if not exists message_attachments_message_idx
   on public.message_attachments (message_id, created_at);
 
 alter table public.messages
   add column if not exists num_media integer not null default 0,
   add column if not exists media_urls jsonb not null default '[]'::jsonb,
-  add column if not exists media_content_types jsonb not null default '[]'::jsonb;
+  add column if not exists media_content_types jsonb not null default '[]'::jsonb,
+  add column if not exists client_request_id text;
 
 alter table public.contacts
   add column if not exists display_name text,

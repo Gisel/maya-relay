@@ -52,6 +52,7 @@ TWILIO_MESSAGING_SERVICE_SID=
 MAYA_BUSINESS_NUMBER=+13852208404
 FRANCISCO_PHONE=
 EMPLOYEE_PHONE_NUMBERS=
+BUSINESS_HOURS_TEXT=Monday-Friday 9:00 AM-6:00 PM. Saturday is by appointment.
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 SUPABASE_ATTACHMENTS_BUCKET=attachments
@@ -105,6 +106,24 @@ Before demoing with Francisco's real phone:
 ## Admin Dashboard
 
 Set `ADMIN_PASSWORD` to enable the read-only operations dashboard at `/admin`. Leave it blank to hide the dashboard.
+
+## React App API Foundation
+
+The React operator inbox will use authenticated JSON routes under `/api`. These routes use the same `ADMIN_PASSWORD` session cookie as `/admin`, keep all secrets server-side, and are additive to the existing Twilio webhooks.
+
+Current Phase 1 routes:
+
+- `GET /api/me`
+- `GET /api/readiness`
+- `GET /api/metrics`
+- `GET /api/quick-responses`
+- `GET /api/conversations`
+- `GET /api/conversations/{conversation_id}`
+- `GET /api/conversations/{conversation_id}/messages`
+- `PATCH /api/conversations/{conversation_id}`
+- `POST /api/conversations/{conversation_id}/reply`
+
+The reply endpoint accepts `multipart/form-data` with `body`, `client_request_id`, and optional `reply_files`. `client_request_id` is stored on the message to prevent accidental duplicate sends from browser retries or double-clicks.
 
 ## MVP Routing
 

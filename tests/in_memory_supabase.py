@@ -73,6 +73,7 @@ class InMemorySupabaseClient:
             row.setdefault("delivery_error_message", None)
             row.setdefault("media_urls", [])
             row.setdefault("media_content_types", [])
+            row.setdefault("client_request_id", None)
 
         return row
 
@@ -82,6 +83,13 @@ class InMemorySupabaseClient:
                 raise AssertionError(f"duplicate contacts.phone_number: {row.get('phone_number')}")
             if table.name == "conversations" and existing.get("conversation_code") == row.get("conversation_code"):
                 raise AssertionError(f"duplicate conversations.conversation_code: {row.get('conversation_code')}")
+            if (
+                table.name == "messages"
+                and row.get("client_request_id") is not None
+                and existing.get("conversation_id") == row.get("conversation_id")
+                and existing.get("client_request_id") == row.get("client_request_id")
+            ):
+                raise AssertionError(f"duplicate messages.client_request_id: {row.get('client_request_id')}")
 
     def _timestamp(self) -> str:
         self._clock += 1

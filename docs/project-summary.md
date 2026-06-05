@@ -81,7 +81,7 @@ Features:
 - Backend: Python 3.12, FastAPI
 - Database: Supabase
 - Hosting: Railway
-- Messaging: Twilio SMS/MMS now, WhatsApp future phase
+- Messaging: Twilio SMS/MMS and WhatsApp
 - AI: OpenAI Responses API for optional internal triage
 - Repository: GitHub
 
@@ -164,21 +164,22 @@ Features:
 
 ### WhatsApp Relay
 
-Blocked until Meta/Twilio sender setup is ready:
+- Production WhatsApp sender is configured through Twilio.
+- Inbound WhatsApp messages use `/webhooks/twilio/whatsapp`.
+- Status callbacks use `/webhooks/twilio/status`.
+- WhatsApp customer messages use the same conversation model as SMS.
+- Replies route through the original customer channel.
+- The app must respect WhatsApp's 24-hour free-form service window.
+- Approved templates will be needed later for outbound messages outside the service window.
 
-- Get Meta admin access.
-- Remove or release the incorrect test sender.
-- Register `+1 (385) 220-8404` as the production WhatsApp sender.
-- Wait for sender status to become `ONLINE`.
-- Configure inbound and status webhooks.
+### React Operator Inbox
 
-Implementation after setup:
+Phase 1 API foundation is implemented:
 
-- Add channel-aware message handling for SMS and WhatsApp.
-- Preserve WhatsApp addresses as `whatsapp:+E.164`.
-- Route WhatsApp customer messages through the same conversation model.
-- Respect WhatsApp's 24-hour free-form service window.
-- Use approved templates for outbound messages outside the service window.
+- Add authenticated `/api` JSON routes for the React frontend.
+- Keep `/admin` as a fallback operations page.
+- Add `client_request_id` to prevent accidental duplicate sends from browser retries or double-clicks.
+- Keep backend configuration driven by `.env` locally and Railway variables in production.
 
 ### Contact Upload
 
