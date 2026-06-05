@@ -92,6 +92,21 @@ uvicorn app.main:app --host 0.0.0.0 --port $PORT
 
 Set the same environment variables from `.env.example` in Railway's Variables tab.
 
+Railway builds the React operator inbox from `frontend/` during the same service build, then FastAPI serves the compiled app at `/app`. The backend remains the only running service.
+
+For local frontend work:
+
+```bash
+npm install
+npm --workspace frontend run dev
+```
+
+For production build verification:
+
+```bash
+npm run build
+```
+
 ## Demo Operations
 
 Before demoing with Francisco's real phone:
