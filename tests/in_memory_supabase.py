@@ -63,6 +63,7 @@ class InMemorySupabaseClient:
 
         if table_name == "conversations":
             row.setdefault("status", "open")
+            row.setdefault("customer_channel", "sms")
             row.setdefault("conversation_code", f"C{self._next_index(table_name):04d}")
             row.setdefault("updated_at", now)
 

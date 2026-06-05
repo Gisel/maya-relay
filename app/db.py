@@ -5,7 +5,7 @@ from typing import Any, Protocol
 from supabase import Client, create_client
 
 from app.config import Settings
-from app.models import Contact, Conversation
+from app.models import Channel, Contact, Conversation
 
 
 def _conversation_from_row(row: dict[str, Any]) -> Conversation:
@@ -16,6 +16,7 @@ def _conversation_from_row(row: dict[str, Any]) -> Conversation:
         assigned_employee=row["assigned_employee"],
         status=row["status"],
         conversation_code=conversation_code,
+        customer_channel=row.get("customer_channel") or "sms",
     )
 
 
@@ -42,7 +43,12 @@ class RelayRepository(Protocol):
     def update_contact_lookup_name(self, phone_number: str, lookup_name: str | None) -> Contact:
         ...
 
-    def get_or_create_customer_conversation(self, customer_phone: str, assigned_employee: str) -> Conversation:
+    def get_or_create_customer_conversation(
+        self,
+        customer_phone: str,
+        assigned_employee: str,
+        customer_channel: Channel = "sms",
+    ) -> Conversation:
         ...
 
     def get_latest_employee_conversation(self, employee_phone: str) -> Conversation | None:
@@ -109,14 +115,20 @@ class SupabaseRelayRepository:
             raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required.")
         return cls(create_client(settings.supabase_url, settings.supabase_service_role_key))
 
-    def get_or_create_customer_conversation(self, customer_phone: str, assigned_employee: str) -> Conversation:
+    def get_or_create_customer_conversation(
+        self,
+        customer_phone: str,
+        assigned_employee: str,
+        customer_channel: Channel = "sms",
+    ) -> Conversation:
         self.get_or_create_contact(customer_phone)
 
         existing = (
             self.client.table("conversations")
-            .select("id, customer_phone, assigned_employee, status, conversation_code")
+            .select("id, customer_phone, assigned_employee, status, conversation_code, customer_channel")
             .eq("customer_phone", customer_phone)
             .eq("assigned_employee", assigned_employee)
+            .eq("customer_channel", customer_channel)
             .eq("status", "open")
             .order("updated_at", desc=True)
             .limit(1)
@@ -132,6 +144,7 @@ class SupabaseRelayRepository:
                 {
                     "customer_phone": customer_phone,
                     "assigned_employee": assigned_employee,
+                    "customer_channel": customer_channel,
                     "status": "open",
                     "conversation_code": _new_conversation_code(),
                 }
@@ -178,7 +191,7 @@ class SupabaseRelayRepository:
     def get_latest_employee_conversation(self, employee_phone: str) -> Conversation | None:
         result = (
             self.client.table("conversations")
-            .select("id, customer_phone, assigned_employee, status, conversation_code")
+            .select("id, customer_phone, assigned_employee, status, conversation_code, customer_channel")
             .eq("assigned_employee", employee_phone)
             .eq("status", "open")
             .order("updated_at", desc=True)
@@ -192,7 +205,7 @@ class SupabaseRelayRepository:
     def get_open_conversation_by_code(self, conversation_code: str) -> Conversation | None:
         result = (
             self.client.table("conversations")
-            .select("id, customer_phone, assigned_employee, status, conversation_code")
+            .select("id, customer_phone, assigned_employee, status, conversation_code, customer_channel")
             .eq("conversation_code", conversation_code.upper())
             .eq("status", "open")
             .limit(1)
@@ -205,7 +218,7 @@ class SupabaseRelayRepository:
     def get_conversation(self, conversation_id: str) -> Conversation | None:
         result = (
             self.client.table("conversations")
-            .select("id, customer_phone, assigned_employee, status, conversation_code")
+            .select("id, customer_phone, assigned_employee, status, conversation_code, customer_channel")
             .eq("id", conversation_id)
             .limit(1)
             .execute()
@@ -298,7 +311,10 @@ class SupabaseRelayRepository:
     def list_conversations(self, limit: int = 50) -> list[dict[str, Any]]:
         result = (
             self.client.table("conversations")
-            .select("id, customer_phone, assigned_employee, conversation_code, status, created_at, updated_at")
+            .select(
+                "id, customer_phone, assigned_employee, customer_channel, "
+                "conversation_code, status, created_at, updated_at"
+            )
             .order("updated_at", desc=True)
             .limit(limit)
             .execute()

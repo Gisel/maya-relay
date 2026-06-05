@@ -47,6 +47,7 @@ async def _incoming_message_from_request(
     from_phone: str,
     to_phone: str,
     body: str,
+    channel: str,
     num_media: int,
 ) -> IncomingMessage:
     form = await request.form()
@@ -64,6 +65,7 @@ async def _incoming_message_from_request(
         from_phone=from_phone,
         to_phone=to_phone,
         body=body,
+        channel=channel,
         num_media=num_media,
         media_urls=tuple(media_urls),
         media_content_types=tuple(media_content_types),
@@ -81,17 +83,43 @@ async def inbound_sms(
     settings: Settings = Depends(get_settings),
     relay_service: RelayService = Depends(get_relay_service),
 ) -> Response:
+    return await _handle_inbound_message(
+        request=request,
+        message_sid=MessageSid,
+        from_phone=From,
+        to_phone=To,
+        body=Body,
+        num_media=NumMedia,
+        channel="sms",
+        settings=settings,
+        relay_service=relay_service,
+    )
+
+
+async def _handle_inbound_message(
+    *,
+    request: Request,
+    message_sid: str,
+    from_phone: str,
+    to_phone: str,
+    body: str,
+    num_media: int,
+    channel: str,
+    settings: Settings,
+    relay_service: RelayService,
+) -> Response:
     if not await _validate_twilio_request(request, settings):
         return PlainTextResponse("Forbidden", status_code=403)
 
     relay_service.handle_inbound_sms(
         await _incoming_message_from_request(
             request,
-            message_sid=MessageSid,
-            from_phone=From,
-            to_phone=To,
-            body=Body,
-            num_media=NumMedia,
+            message_sid=message_sid,
+            from_phone=from_phone,
+            to_phone=to_phone,
+            body=body,
+            channel=channel,
+            num_media=num_media,
         )
     )
     return _empty_twiml()
@@ -108,13 +136,14 @@ async def inbound_whatsapp(
     settings: Settings = Depends(get_settings),
     relay_service: RelayService = Depends(get_relay_service),
 ) -> Response:
-    return await inbound_sms(
+    return await _handle_inbound_message(
         request=request,
-        MessageSid=MessageSid,
-        From=_strip_whatsapp_prefix(From),
-        To=_strip_whatsapp_prefix(To),
-        Body=Body,
-        NumMedia=NumMedia,
+        message_sid=MessageSid,
+        from_phone=_strip_whatsapp_prefix(From),
+        to_phone=_strip_whatsapp_prefix(To),
+        body=Body,
+        num_media=NumMedia,
+        channel="whatsapp",
         settings=settings,
         relay_service=relay_service,
     )

@@ -84,6 +84,27 @@ def test_get_or_create_customer_conversation_creates_contact_and_open_conversati
     assert len(client.rows("conversations")) == 1
 
 
+def test_get_or_create_customer_conversation_separates_channels():
+    repository, client = build_repository()
+
+    sms = repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+        customer_channel="sms",
+    )
+    whatsapp = repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+        customer_channel="whatsapp",
+    )
+
+    assert sms.id != whatsapp.id
+    assert sms.customer_channel == "sms"
+    assert whatsapp.customer_channel == "whatsapp"
+    assert len(client.rows("contacts")) == 1
+    assert len(client.rows("conversations")) == 2
+
+
 def test_get_latest_employee_conversation_uses_open_status_and_latest_updated_at():
     repository, client = build_repository()
     client.seed(

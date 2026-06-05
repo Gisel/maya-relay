@@ -232,6 +232,37 @@ def test_employee_reply_routes_by_conversation_code():
     }
 
 
+def test_employee_reply_to_whatsapp_conversation_uses_whatsapp_channel():
+    service, repository, sender = build_service()
+    service.handle_inbound_sms(
+        IncomingMessage(
+            message_sid="WMcustomer",
+            from_phone="+15550000001",
+            to_phone="+13852208404",
+            body="Hello on WhatsApp",
+            channel="whatsapp",
+        )
+    )
+
+    result = service.handle_inbound_sms(
+        IncomingMessage(
+            message_sid="SMemployee",
+            from_phone="+15551234567",
+            to_phone="+13852208404",
+            body="#C0001 Thanks, WhatsApp customer.",
+        )
+    )
+
+    assert result == {"status": "forwarded_to_customer", "conversation_id": "conversation-1"}
+    assert repository.conversations[0].customer_channel == "whatsapp"
+    assert sender.sent_messages[-1] == {
+        "sid": "SMfake2",
+        "to_phone": "+15550000001",
+        "body": "From Francisco:\nThanks, WhatsApp customer.",
+        "channel": "whatsapp",
+    }
+
+
 def test_allowed_alternate_employee_phone_routes_by_conversation_code():
     service, _, sender = build_service(employee_phone_numbers="+15557654321")
     service.handle_inbound_sms(

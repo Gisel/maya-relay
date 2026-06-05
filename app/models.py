@@ -3,6 +3,7 @@ from typing import Literal
 
 
 Direction = Literal["customer_to_employee", "employee_to_customer", "system"]
+Channel = Literal["sms", "whatsapp"]
 
 
 @dataclass(frozen=True)
@@ -12,6 +13,7 @@ class Conversation:
     assigned_employee: str
     status: str
     conversation_code: str
+    customer_channel: Channel = "sms"
 
 
 @dataclass(frozen=True)
@@ -32,6 +34,7 @@ class IncomingMessage:
     from_phone: str
     to_phone: str
     body: str
+    channel: Channel = "sms"
     num_media: int = 0
     media_urls: tuple[str, ...] = ()
     media_content_types: tuple[str, ...] = ()

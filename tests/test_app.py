@@ -223,6 +223,32 @@ def test_admin_login_and_conversations_page():
     assert "maya_admin" in logout.headers["set-cookie"]
 
 
+def test_admin_reply_uses_conversation_customer_channel():
+    client, repository, sender = make_client(admin_password="secret")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+        customer_channel="whatsapp",
+    )
+
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+    send_reply = client.post(
+        "/admin/conversations/conversation-1/reply",
+        data={"reply_body": "Replying through WhatsApp."},
+        headers={"cookie": cookie},
+        follow_redirects=False,
+    )
+
+    assert send_reply.status_code == 303
+    assert sender.sent_messages[-1] == {
+        "sid": "SMfake1",
+        "to_phone": "+15550000001",
+        "body": "Replying through WhatsApp.",
+        "channel": "whatsapp",
+    }
+
+
 def test_twilio_sms_webhook_acknowledges_with_empty_twiml():
     client, repository, sender = make_client()
 
@@ -283,6 +309,7 @@ def test_twilio_whatsapp_webhook_normalizes_channel_addresses():
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/xml")
+    assert repository.conversations[0].customer_channel == "whatsapp"
     assert repository.messages[0]["from_phone"] == "+15550000001"
     assert repository.messages[0]["to_phone"] == "+13852208404"
     assert sender.sent_messages[0]["to_phone"] == "+15551234567"
@@ -355,6 +382,7 @@ def test_signed_sms_webhook_uses_forwarded_public_url_for_validation():
 
     assert response.status_code == 200
     assert len(repository.messages) == 2
+    assert repository.conversations[0].customer_channel == "sms"
     assert sender.sent_messages[0]["to_phone"] == "+15551234567"
 
 
@@ -382,6 +410,7 @@ def test_signed_whatsapp_webhook_uses_forwarded_public_url_for_validation():
 
     assert response.status_code == 200
     assert len(repository.messages) == 2
+    assert repository.conversations[0].customer_channel == "whatsapp"
     assert sender.sent_messages[0]["to_phone"] == "+15551234567"
 
 

@@ -39,6 +39,7 @@ class RelayService:
         conversation = self.repository.get_or_create_customer_conversation(
             customer_phone=message.from_phone,
             assigned_employee=self.settings.francisco_phone_e164,
+            customer_channel=message.channel,
         )
         inbound_message = self.repository.create_message(
             conversation_id=conversation.id,
@@ -128,7 +129,11 @@ class RelayService:
             media_urls=media_urls,
             media_content_types=message.media_content_types,
         )
-        outbound_sid = self.sender.send_sms(to_phone=conversation.customer_phone, body=forwarded_body)
+        outbound_sid = self.sender.send_message(
+            to_phone=conversation.customer_phone,
+            body=forwarded_body,
+            channel=conversation.customer_channel,
+        )
         self.repository.create_message(
             conversation_id=conversation.id,
             direction="system",

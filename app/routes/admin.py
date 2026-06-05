@@ -63,7 +63,8 @@ def admin_index(
         rows.append(
             "<tr>"
             f"<td><a href='/admin/conversations/{_e(conversation['id'])}'>#{_e(conversation['conversation_code'])}</a></td>"
-            f"<td>{_e(customer)}<br><span>{_e(conversation['customer_phone'])}</span></td>"
+            f"<td>{_e(customer)}<br><span>{_e(conversation['customer_phone'])}</span><br>"
+            f"{_badge(conversation.get('customer_channel') or 'sms')}</td>"
             f"<td>{_badge(conversation['status'])}</td>"
             f"<td>{_e(last_message.get('direction') or '')}</td>"
             f"<td>{_e(body[:140])}</td>"
@@ -179,7 +180,11 @@ def send_conversation_reply(
             files=uploads,
         )
     outbound_body = _reply_body_with_attachments(body, stored_attachments)
-    outbound_sid = sender.send_sms(to_phone=conversation.customer_phone, body=outbound_body)
+    outbound_sid = sender.send_message(
+        to_phone=conversation.customer_phone,
+        body=outbound_body,
+        channel=conversation.customer_channel,
+    )
     created_message = repository.create_message(
         conversation_id=conversation.id,
         direction="employee_to_customer",
@@ -344,6 +349,7 @@ def _conversation_search_text(conversation: dict) -> str:
         conversation.get("conversation_code"),
         conversation.get("customer_phone"),
         conversation.get("customer_name"),
+        conversation.get("customer_channel"),
         conversation.get("status"),
         conversation.get("message_search_text"),
         last_message.get("body"),
@@ -397,6 +403,8 @@ td span,.message p{color:#667085;font-size:12px}
 .badge-failed,.badge-undelivered{background:#fee2e2;color:#991b1b}
 .badge-queued,.badge-pending{background:#fef3c7;color:#92400e}
 .badge-system{background:#e0e7ff;color:#3730a3}
+.badge-sms{background:#f1f5f9;color:#334155}
+.badge-whatsapp{background:#dcfce7;color:#166534}
 .badge-customer-to-employee{background:#dbeafe;color:#1d4ed8}
 .badge-employee-to-customer{background:#f3e8ff;color:#6b21a8}
 .message{margin:16px;padding:16px;background:white;border:1px solid #dde1e7;border-radius:8px}

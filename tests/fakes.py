@@ -1,7 +1,7 @@
 from typing import Any
 
 from app.attachments import StoredAttachment
-from app.models import Contact, Conversation
+from app.models import Channel, Contact, Conversation
 
 
 class FakeRepository:
@@ -37,11 +37,17 @@ class FakeRepository:
         self.contacts = [updated if contact.phone_number == phone_number else contact for contact in self.contacts]
         return updated
 
-    def get_or_create_customer_conversation(self, customer_phone: str, assigned_employee: str) -> Conversation:
+    def get_or_create_customer_conversation(
+        self,
+        customer_phone: str,
+        assigned_employee: str,
+        customer_channel: Channel = "sms",
+    ) -> Conversation:
         for conversation in self.conversations:
             if (
                 conversation.customer_phone == customer_phone
                 and conversation.assigned_employee == assigned_employee
+                and conversation.customer_channel == customer_channel
                 and conversation.status == "open"
             ):
                 return conversation
@@ -52,6 +58,7 @@ class FakeRepository:
             assigned_employee=assigned_employee,
             status="open",
             conversation_code=f"C{len(self.conversations) + 1:04d}",
+            customer_channel=customer_channel,
         )
         self.conversations.append(conversation)
         return conversation
@@ -163,6 +170,7 @@ class FakeRepository:
                     "id": conversation.id,
                     "customer_phone": conversation.customer_phone,
                     "assigned_employee": conversation.assigned_employee,
+                    "customer_channel": conversation.customer_channel,
                     "conversation_code": conversation.conversation_code,
                     "status": conversation.status,
                     "created_at": "",
@@ -183,8 +191,14 @@ class FakeSender:
         self.sent_messages: list[dict[str, str]] = []
 
     def send_sms(self, *, to_phone: str, body: str) -> str:
+        return self.send_message(to_phone=to_phone, body=body, channel="sms")
+
+    def send_message(self, *, to_phone: str, body: str, channel: Channel = "sms") -> str:
         sid = f"SMfake{len(self.sent_messages) + 1}"
-        self.sent_messages.append({"sid": sid, "to_phone": to_phone, "body": body})
+        message = {"sid": sid, "to_phone": to_phone, "body": body}
+        if channel != "sms":
+            message["channel"] = channel
+        self.sent_messages.append(message)
         return sid
 
 
