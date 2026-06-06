@@ -164,7 +164,7 @@ def api_conversation_detail(
     if conversation is None:
         raise HTTPException(status_code=404)
 
-    conversation_row = _conversation_row(repository, conversation)
+    conversation_row = _conversation_metadata(repository, conversation)
     messages = repository.list_messages_for_conversation(conversation_id)
     return {
         "conversation": _serialize_conversation_detail(conversation, conversation_row),
@@ -201,7 +201,7 @@ def api_update_conversation(
         raise HTTPException(status_code=404)
     if payload.status is not None:
         conversation = repository.update_conversation_status(conversation_id, payload.status)
-    return {"conversation": _serialize_conversation_detail(conversation, _conversation_row(repository, conversation))}
+    return {"conversation": _serialize_conversation_detail(conversation, _conversation_metadata(repository, conversation))}
 
 
 @router.post("/conversations/{conversation_id}/reply")
@@ -373,11 +373,14 @@ def _serialize_attachments(media_urls: tuple[str, ...] | list[str], content_type
     return attachments
 
 
-def _conversation_row(repository: RelayRepository, conversation: Conversation) -> dict[str, Any] | None:
-    for row in repository.list_conversations():
-        if row["id"] == conversation.id:
-            return row
-    return None
+def _conversation_metadata(repository: RelayRepository, conversation: Conversation) -> dict[str, Any]:
+    contact = repository.get_contact(conversation.customer_phone)
+    customer_name = (contact.display_name or contact.lookup_name) if contact else None
+    return {
+        "customer_display_name": contact.display_name if contact else None,
+        "customer_lookup_name": contact.lookup_name if contact else None,
+        "customer_name": customer_name,
+    }
 
 
 def _conversation_metrics(conversations: list[dict[str, Any]]) -> dict[str, int]:

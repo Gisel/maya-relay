@@ -271,6 +271,7 @@ export function App() {
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [appError, setAppError] = useState("");
+  const [detailError, setDetailError] = useState("");
 
   const selectedListItem = useMemo(
     () => conversations.find((conversation) => conversation.id === selectedId) || null,
@@ -311,6 +312,10 @@ export function App() {
     }
     setIsLoadingDetail(true);
     setAppError("");
+    setDetailError("");
+    setSelectedConversation(null);
+    setMessages([]);
+    setSuggestedReply("");
     try {
       const payload = await getConversationDetail(conversationId);
       setSelectedConversation(payload.conversation);
@@ -320,7 +325,7 @@ export function App() {
       if (error instanceof ApiError && error.status === 401) {
         setIsAuthenticated(false);
       } else {
-        setAppError(error instanceof Error ? error.message : "Could not load this conversation.");
+        setDetailError(error instanceof Error ? error.message : "Could not load this conversation.");
       }
     } finally {
       setIsLoadingDetail(false);
@@ -379,10 +384,12 @@ export function App() {
     setConversations([]);
     setSelectedConversation(null);
     setMessages([]);
+    setSuggestedReply("");
   }
 
   async function handleSend(body: string, selectedFiles: File[]) {
     if (!selectedId) return;
+    setSuggestedReply("");
     const response = await sendReply(selectedId, body, selectedFiles, newClientRequestId());
     setMessages((current) => {
       const withoutDuplicate = current.filter((message) => message.id !== response.message.id);
@@ -390,6 +397,7 @@ export function App() {
     });
     await loadConversations(search);
     await loadDetail(selectedId);
+    setSuggestedReply("");
   }
 
   if (isCheckingSession) {
@@ -455,6 +463,8 @@ export function App() {
                   setSelectedId(conversation.id);
                   setDraft("");
                   setFiles([]);
+                  setDetailError("");
+                  setSuggestedReply("");
                 }}
                 type="button"
               >
@@ -487,8 +497,9 @@ export function App() {
 
           <div className="message-thread">
             {appError && <p className="app-error">{appError}</p>}
+            {detailError && <p className="app-error">Could not load this conversation. Try selecting it again.</p>}
             {isLoadingDetail && <p className="panel-note">Loading messages...</p>}
-            {!isLoadingDetail && messages.length === 0 && <p className="panel-note">No messages yet.</p>}
+            {!isLoadingDetail && !detailError && messages.length === 0 && <p className="panel-note">No messages yet.</p>}
             {messages.map((message) => (
               <MessageBubble key={message.id} message={message} />
             ))}
@@ -521,7 +532,14 @@ export function App() {
               <span>{suggestedReply ? "Ready" : "No suggestion"}</span>
               <p>{suggestedReply || "No AI suggestion is available for this conversation yet."}</p>
               {suggestedReply && (
-                <button className="secondary-action" onClick={() => setDraft(suggestedReply)} type="button">
+                <button
+                  className="secondary-action"
+                  onClick={() => {
+                    setDraft(suggestedReply);
+                    setSuggestedReply("");
+                  }}
+                  type="button"
+                >
                   Use suggested reply
                 </button>
               )}
