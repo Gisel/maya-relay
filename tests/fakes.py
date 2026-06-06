@@ -195,9 +195,9 @@ class FakeRepository:
             }
         )
 
-    def list_conversations(self, limit: int = 50) -> list[dict[str, Any]]:
+    def list_conversations(self, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
         rows = []
-        for conversation in self.conversations[:limit]:
+        for conversation in self.conversations[offset: offset + limit]:
             messages = [
                 message
                 for message in self.messages

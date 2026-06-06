@@ -421,6 +421,7 @@ export function App() {
   const [draft, setDraft] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [isLoadingList, setIsLoadingList] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isCallingCustomer, setIsCallingCustomer] = useState(false);
@@ -428,6 +429,8 @@ export function App() {
   const [callStatus, setCallStatus] = useState("");
   const [appError, setAppError] = useState("");
   const [detailError, setDetailError] = useState("");
+  const [nextConversationOffset, setNextConversationOffset] = useState<number | null>(null);
+  const [hasMoreConversations, setHasMoreConversations] = useState(false);
   const [isContextOpen, setIsContextOpen] = useState(() => {
     if (typeof window === "undefined") return true;
     return !window.matchMedia("(max-width: 760px)").matches;
@@ -446,6 +449,8 @@ export function App() {
       const payload = await getConversations(query);
       setConversations(payload.conversations);
       setMetrics(payload.metrics);
+      setNextConversationOffset(payload.pagination?.nextOffset ?? null);
+      setHasMoreConversations(payload.pagination?.hasMore ?? false);
       setSelectedId((current) => {
         if (current && payload.conversations.some((conversation) => conversation.id === current)) return current;
         if (fallbackSelectedId) return fallbackSelectedId;
@@ -461,6 +466,32 @@ export function App() {
       setIsLoadingList(false);
     }
   }, []);
+
+  const loadMoreConversations = useCallback(async () => {
+    if (nextConversationOffset === null || search.trim()) return;
+    setIsLoadingMore(true);
+    setAppError("");
+    try {
+      const payload = await getConversations("", nextConversationOffset);
+      setConversations((current) => {
+        const seen = new Set(current.map((conversation) => conversation.id));
+        return [
+          ...current,
+          ...payload.conversations.filter((conversation) => !seen.has(conversation.id)),
+        ];
+      });
+      setNextConversationOffset(payload.pagination?.nextOffset ?? null);
+      setHasMoreConversations(payload.pagination?.hasMore ?? false);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setIsAuthenticated(false);
+      } else {
+        setAppError(error instanceof Error ? error.message : "Could not load more conversations.");
+      }
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [nextConversationOffset, search]);
 
   const loadDetail = useCallback(async (conversationId: string) => {
     if (!conversationId) {
@@ -553,6 +584,8 @@ export function App() {
     setIsAuthenticated(false);
     didRunInitialSearchEffect.current = false;
     setConversations([]);
+    setNextConversationOffset(null);
+    setHasMoreConversations(false);
     setSelectedConversation(null);
     setMessages([]);
     setSuggestedReply("");
@@ -746,6 +779,16 @@ export function App() {
                 );
               })()
             ))}
+            {!search.trim() && hasMoreConversations && (
+              <button
+                className="load-more-button"
+                disabled={isLoadingMore}
+                onClick={loadMoreConversations}
+                type="button"
+              >
+                {isLoadingMore ? "Loading..." : "Load more"}
+              </button>
+            )}
           </div>
         </aside>
 

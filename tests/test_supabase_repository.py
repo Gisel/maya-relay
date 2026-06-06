@@ -330,3 +330,34 @@ def test_list_conversations_batches_contacts_and_messages():
     assert "Older message" in conversations[0]["message_search_text"]
     assert conversations[1]["customer_lookup_name"] == "Lookup Client"
     assert conversations[1]["last_message"]["body"] == "Second conversation"
+
+
+def test_list_conversations_applies_offset_and_limit():
+    repository, client = build_repository()
+    client.seed(
+        "conversations",
+        [
+            {
+                "id": "conversation-1",
+                "customer_phone": "+15550000001",
+                "assigned_employee": "+15551234567",
+                "updated_at": "2026-06-04T00:00:03+00:00",
+            },
+            {
+                "id": "conversation-2",
+                "customer_phone": "+15550000002",
+                "assigned_employee": "+15551234567",
+                "updated_at": "2026-06-04T00:00:02+00:00",
+            },
+            {
+                "id": "conversation-3",
+                "customer_phone": "+15550000003",
+                "assigned_employee": "+15551234567",
+                "updated_at": "2026-06-04T00:00:01+00:00",
+            },
+        ],
+    )
+
+    conversations = repository.list_conversations(limit=1, offset=1)
+
+    assert [conversation["id"] for conversation in conversations] == ["conversation-2"]

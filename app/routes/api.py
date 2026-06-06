@@ -141,19 +141,31 @@ def api_conversations(
     q: str = "",
     status: str = "",
     channel: str = "",
+    limit: int = 50,
+    offset: int = 0,
     settings: Settings = Depends(get_settings),
     repository: RelayRepository = Depends(get_repository),
 ) -> dict[str, Any]:
     require_admin(request, settings)
-    conversations = repository.list_conversations()
+    safe_limit = min(max(limit, 1), 100)
+    safe_offset = max(offset, 0)
+    conversations = repository.list_conversations(limit=safe_limit + 1, offset=safe_offset)
+    has_more = len(conversations) > safe_limit
+    page_conversations = conversations[:safe_limit]
     filtered = [
         conversation
-        for conversation in conversations
+        for conversation in page_conversations
         if _matches_filters(conversation, q=q, status=status, channel=channel)
     ]
     return {
-        "metrics": _conversation_metrics(conversations),
+        "metrics": _conversation_metrics(page_conversations),
         "conversations": [_serialize_conversation_list_item(conversation) for conversation in filtered],
+        "pagination": {
+            "limit": safe_limit,
+            "offset": safe_offset,
+            "nextOffset": safe_offset + safe_limit if has_more else None,
+            "hasMore": has_more,
+        },
     }
 
 

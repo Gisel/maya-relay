@@ -22,6 +22,23 @@ async function mockMayaRelayApi(page: import("@playwright/test").Page) {
     },
     updatedAt: "2026-06-06T14:00:00Z",
   };
+  const olderConversation = {
+    ...conversation,
+    id: "conversation-2",
+    code: "C0002",
+    customer: {
+      phone: "+15550000002",
+      displayName: "Older Customer",
+      lookupName: null,
+      name: "Older Customer",
+    },
+    lastMessage: {
+      ...conversation.lastMessage,
+      body: "Older hello",
+      createdAt: "2026-06-05T14:00:00Z",
+    },
+    updatedAt: "2026-06-05T14:00:00Z",
+  };
   const requestCounts = {
     conversations: 0,
     detail: 0,
@@ -40,13 +57,22 @@ async function mockMayaRelayApi(page: import("@playwright/test").Page) {
     });
   });
 
-  await page.route("**/api/conversations", async (route) => {
+  await page.route(/\/api\/conversations(?:\?.*)?$/, async (route) => {
+    const url = new URL(route.request().url());
+    const offset = Number(url.searchParams.get("offset") || "0");
+    const pageConversations = offset > 0 ? [olderConversation] : [conversation];
     requestCounts.conversations += 1;
     await route.fulfill({
       contentType: "application/json",
       json: {
         metrics: { open: 1, failed: 0, recent: 1, withAttachments: 0 },
-        conversations: [conversation],
+        conversations: pageConversations,
+        pagination: {
+          limit: 50,
+          offset,
+          nextOffset: offset > 0 ? null : 1,
+          hasMore: offset === 0,
+        },
       },
     });
   });
@@ -152,6 +178,20 @@ test("authenticated boot loads each initial resource once", async ({ page }) => 
   await expect.poll(() => requestCounts.quickResponses).toBe(1);
   expect(requestCounts.me).toBeGreaterThanOrEqual(1);
   expect(requestCounts.me).toBeLessThanOrEqual(2);
+});
+
+test("Load more appends the next conversation page", async ({ page }) => {
+  const requestCounts = await mockMayaRelayApi(page);
+
+  await page.goto("/app/");
+  await expect(page.getByRole("button", { name: /Test Customer/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Older Customer/ })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Load more" }).click();
+
+  await expect(page.getByRole("button", { name: /Test Customer/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Older Customer/ })).toBeVisible();
+  await expect.poll(() => requestCounts.conversations).toBe(2);
 });
 
 test("login input focus does not create mobile zoom risk", async ({ page }) => {

@@ -76,6 +76,12 @@ export type QuickResponse = {
 export type ConversationsResponse = {
   metrics: Metrics;
   conversations: ConversationListItem[];
+  pagination?: {
+    limit: number;
+    offset: number;
+    nextOffset: number | null;
+    hasMore: boolean;
+  };
 };
 
 export type ConversationDetailResponse = {
@@ -152,9 +158,11 @@ export function logout() {
   return request<{ authenticated: false }>("/api/auth/logout", { method: "POST" });
 }
 
-export function getConversations(query = "") {
+export function getConversations(query = "", offset = 0, limit = 50) {
   const params = new URLSearchParams();
   if (query.trim()) params.set("q", query.trim());
+  if (offset > 0) params.set("offset", String(offset));
+  if (limit !== 50) params.set("limit", String(limit));
   const suffix = params.toString() ? `?${params.toString()}` : "";
   return request<ConversationsResponse>(`/api/conversations${suffix}`);
 }

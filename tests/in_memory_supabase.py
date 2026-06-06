@@ -113,6 +113,7 @@ class InMemoryQuery:
         self.filters: list[tuple[str, str, Any]] = []
         self.order_by: tuple[str, bool] | None = None
         self.limit_count: int | None = None
+        self.range_bounds: tuple[int, int] | None = None
         self.selected_columns: list[str] | None = None
         self.operation: str = "select"
         self.payload: dict[str, Any] | None = None
@@ -136,6 +137,10 @@ class InMemoryQuery:
 
     def limit(self, count: int) -> "InMemoryQuery":
         self.limit_count = count
+        return self
+
+    def range(self, start: int, end: int) -> "InMemoryQuery":
+        self.range_bounds = (start, end)
         return self
 
     def insert(self, payload: dict[str, Any]) -> "InMemoryQuery":
@@ -177,6 +182,9 @@ class InMemoryQuery:
             rows.sort(key=lambda row: row.get(column), reverse=desc)
         if self.limit_count is not None:
             rows = rows[: self.limit_count]
+        if self.range_bounds is not None:
+            start, end = self.range_bounds
+            rows = rows[start: end + 1]
         return [self._project(row) for row in rows]
 
     def _update_rows(self) -> list[dict[str, Any]]:

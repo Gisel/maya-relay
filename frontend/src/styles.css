@@ -393,6 +393,25 @@ button {
   white-space: nowrap;
 }
 
+.load-more-button {
+  background: #eef8ff;
+  border: 1px solid #b8ddf4;
+  border-radius: 8px;
+  color: #146a8f;
+  font-size: 13px;
+  font-weight: 800;
+  min-height: 42px;
+  margin: 12px 18px 18px;
+  padding: 0 16px;
+}
+
+.load-more-button:disabled {
+  background: #eef1f5;
+  border-color: #d7dde7;
+  color: #98a2b6;
+  cursor: not-allowed;
+}
+
 .conversation-row footer {
   align-items: center;
   display: flex;
@@ -1032,6 +1051,11 @@ button {
     padding: 5px 7px 9px;
   }
 
+  .load-more-button {
+    margin: 8px 5px 4px;
+    width: calc(100% - 10px);
+  }
+
   .conversation-row {
     border: 1px solid transparent;
     border-bottom-color: #eef2f6;
@@ -1339,6 +1363,16 @@ button {
     min-width: 0;
     padding: 0 14px;
     scroll-snap-align: start;
+    width: auto;
+  }
+
+  .load-more-button {
+    border-radius: 999px;
+    flex: 0 0 auto;
+    margin: 0;
+    min-height: 38px;
+    padding: 0 16px;
+    white-space: nowrap;
     width: auto;
   }
 
