@@ -162,7 +162,9 @@ button {
 }
 
 .logout-button,
-.send-button {
+.send-button,
+.new-call-button,
+.ghost-button {
   align-items: center;
   border: 0;
   border-radius: 8px;
@@ -172,11 +174,32 @@ button {
   justify-content: center;
 }
 
+.topbar-actions {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
 .logout-button {
   background: #eef1f5;
   color: #475366;
   min-height: 44px;
   padding: 0 22px;
+}
+
+.new-call-button {
+  background: #1688c9;
+  color: #ffffff;
+  min-height: 44px;
+  padding: 0 18px;
+}
+
+.ghost-button {
+  background: #ffffff;
+  border: 1px solid #d7dde7;
+  color: #475366;
+  min-height: 42px;
+  padding: 0 16px;
 }
 
 .workspace {
@@ -796,6 +819,90 @@ button {
   white-space: nowrap;
 }
 
+.modal-backdrop {
+  align-items: center;
+  background: rgb(20 28 42 / 42%);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 18px;
+  position: fixed;
+  z-index: 40;
+}
+
+.modal-panel {
+  background: #ffffff;
+  border: 1px solid #dfe4ec;
+  border-radius: 8px;
+  box-shadow: 0 22px 60px rgb(20 28 42 / 24%);
+  display: grid;
+  gap: 18px;
+  max-width: 460px;
+  padding: 22px;
+  width: min(460px, 100%);
+}
+
+.modal-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.modal-header h2 {
+  font-size: 22px;
+  line-height: 1.15;
+  margin: 0 0 6px;
+}
+
+.modal-header p {
+  color: #667085;
+  font-size: 14px;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.modal-close {
+  align-items: center;
+  background: #eef1f5;
+  border: 0;
+  border-radius: 8px;
+  color: #475366;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 36px;
+  justify-content: center;
+  width: 36px;
+}
+
+.modal-form {
+  display: grid;
+  gap: 14px;
+}
+
+.modal-form label {
+  color: #475366;
+  display: grid;
+  font-size: 13px;
+  font-weight: 800;
+  gap: 7px;
+}
+
+.modal-form input {
+  border: 1px solid #cdd5e1;
+  border-radius: 8px;
+  color: #172033;
+  min-height: 44px;
+  padding: 0 13px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
 @media (max-width: 1100px) {
   .workspace {
     grid-template-columns: 300px minmax(0, 1fr);
@@ -835,12 +942,14 @@ button {
     width: 48px;
   }
 
-  .logout-button {
+  .logout-button,
+  .new-call-button {
     min-width: 48px;
     padding: 0;
   }
 
-  .logout-button {
+  .logout-button,
+  .new-call-button {
     font-size: 0;
   }
 
@@ -1133,5 +1242,25 @@ button {
 
   .intent-box {
     padding: 16px;
+  }
+
+  .modal-backdrop {
+    align-items: flex-end;
+    padding: 10px;
+  }
+
+  .modal-panel {
+    border-radius: 8px;
+    padding: 18px;
+  }
+
+  .modal-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .modal-actions .send-button {
+    min-width: 0;
+    padding: 0 12px;
   }
 }

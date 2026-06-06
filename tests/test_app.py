@@ -478,6 +478,53 @@ def test_api_starts_click_to_call_bridge():
     ]
 
 
+def test_api_starts_new_call_and_creates_contact_conversation():
+    client, repository, _ = make_client(admin_password="secret")
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    response = client.post(
+        "/api/calls",
+        json={"phone_number": "+15550000003", "display_name": "New Client"},
+        headers={"cookie": cookie},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "calling"
+    assert payload["callSid"] == "CAfake1"
+    assert payload["to"] == "+15550000003"
+    assert payload["employeePhone"] == "+15551234567"
+    assert payload["conversation"]["id"] == "conversation-1"
+    assert payload["conversation"]["channel"] == "sms"
+    assert payload["conversation"]["customer"]["displayName"] == "New Client"
+    assert repository.conversations[0].customer_phone == "+15550000003"
+    assert repository.conversations[0].assigned_employee == "+15551234567"
+    assert repository.conversations[0].customer_channel == "sms"
+    assert client.app.state.fake_voice_caller.calls == [
+        {
+            "employee_phone": "+15551234567",
+            "bridge_url": "https://maya-relay.example/webhooks/twilio/voice/bridge/conversation-1",
+            "status_callback_url": "https://maya-relay.example/webhooks/twilio/voice/status",
+        }
+    ]
+
+
+def test_api_new_call_rejects_maya_business_number():
+    client, _, _ = make_client(admin_password="secret")
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    response = client.post(
+        "/api/calls",
+        json={"phone_number": "+13852208404"},
+        headers={"cookie": cookie},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Customer phone number cannot be the Maya business number."
+
+
 def test_twilio_voice_bridge_dials_customer():
     client, repository, _ = make_client()
     repository.get_or_create_customer_conversation(

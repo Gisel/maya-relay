@@ -22,6 +22,11 @@ class ConversationUpdate(BaseModel):
     status: Literal["open", "closed"] | None = None
 
 
+class NewCallRequest(BaseModel):
+    phone_number: str
+    display_name: str | None = None
+
+
 class LoginRequest(BaseModel):
     password: str
 
@@ -289,6 +294,56 @@ def api_call_conversation_customer(
     if conversation is None:
         raise HTTPException(status_code=404)
 
+    return _start_click_to_call(request=request, settings=settings, conversation=conversation, voice_caller=voice_caller)
+
+
+@router.post("/calls")
+def api_start_new_call(
+    payload: NewCallRequest,
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    repository: RelayRepository = Depends(get_repository),
+    voice_caller: VoiceCaller = Depends(get_voice_caller),
+) -> dict[str, Any]:
+    require_admin(request, settings)
+    employee_phone = settings.francisco_phone_e164
+    if not employee_phone:
+        raise HTTPException(status_code=503, detail="FRANCISCO_PHONE is required for click-to-call.")
+
+    customer_phone = _voice_phone_number(payload.phone_number)
+    if not customer_phone:
+        raise HTTPException(status_code=400, detail="Customer phone number is not callable.")
+    if customer_phone == settings.maya_business_number_e164:
+        raise HTTPException(status_code=400, detail="Customer phone number cannot be the Maya business number.")
+
+    display_name = (payload.display_name or "").strip()
+    if display_name:
+        repository.upsert_contact_display_name(customer_phone, display_name)
+
+    conversation = repository.get_or_create_customer_conversation(
+        customer_phone=customer_phone,
+        assigned_employee=employee_phone,
+        customer_channel="sms",
+    )
+    call_response = _start_click_to_call(
+        request=request,
+        settings=settings,
+        conversation=conversation,
+        voice_caller=voice_caller,
+    )
+    return {
+        **call_response,
+        "conversation": _serialize_conversation_detail(conversation, _conversation_metadata(repository, conversation)),
+    }
+
+
+def _start_click_to_call(
+    *,
+    request: Request,
+    settings: Settings,
+    conversation: Conversation,
+    voice_caller: VoiceCaller,
+) -> dict[str, str]:
     employee_phone = settings.francisco_phone_e164
     customer_phone = _voice_phone_number(conversation.customer_phone)
     if not employee_phone:

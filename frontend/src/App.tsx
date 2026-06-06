@@ -8,6 +8,7 @@ import {
   PanelRightOpen,
   Paperclip,
   Phone,
+  Plus,
   RefreshCw,
   Search,
   Send,
@@ -33,6 +34,7 @@ import {
   login,
   logout,
   sendReply,
+  startNewCall,
   updateConversationStatus,
 } from "./api";
 import logoMaya from "./assets/logo-maya.jpg";
@@ -194,6 +196,87 @@ function LoginScreen({
   );
 }
 
+function NewCallModal({
+  open,
+  onClose,
+  onStartCall,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onStartCall: (phoneNumber: string, displayName: string) => Promise<void>;
+}) {
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (!open) return null;
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setIsSubmitting(true);
+    try {
+      await onStartCall(phoneNumber, displayName);
+      setPhoneNumber("");
+      setDisplayName("");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Could not start the call.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section aria-labelledby="new-call-title" aria-modal="true" className="modal-panel" role="dialog">
+        <div className="modal-header">
+          <div>
+            <h2 id="new-call-title">New call</h2>
+            <p>Francisco receives the first call, then Maya Relay connects the customer.</p>
+          </div>
+          <button aria-label="Close new call modal" className="modal-close" onClick={onClose} type="button">
+            <X size={18} />
+          </button>
+        </div>
+        <form className="modal-form" onSubmit={handleSubmit}>
+          <label>
+            <span>Customer phone</span>
+            <input
+              autoFocus
+              inputMode="tel"
+              onChange={(event) => setPhoneNumber(event.target.value)}
+              placeholder="+1 555 000 0000"
+              required
+              type="tel"
+              value={phoneNumber}
+            />
+          </label>
+          <label>
+            <span>Customer name</span>
+            <input
+              onChange={(event) => setDisplayName(event.target.value)}
+              placeholder="Optional"
+              type="text"
+              value={displayName}
+            />
+          </label>
+          {error && <p className="form-error">{error}</p>}
+          <div className="modal-actions">
+            <button className="ghost-button" disabled={isSubmitting} onClick={onClose} type="button">
+              Cancel
+            </button>
+            <button className="send-button" disabled={!phoneNumber.trim() || isSubmitting} type="submit">
+              <Phone size={17} />
+              {isSubmitting ? "Calling..." : "Start call"}
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
 function Composer({
   disabled,
   draft,
@@ -288,6 +371,7 @@ export function App() {
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isCallingCustomer, setIsCallingCustomer] = useState(false);
+  const [isNewCallOpen, setIsNewCallOpen] = useState(false);
   const [callStatus, setCallStatus] = useState("");
   const [appError, setAppError] = useState("");
   const [detailError, setDetailError] = useState("");
@@ -476,6 +560,35 @@ export function App() {
     }
   }
 
+  async function handleStartNewCall(phoneNumber: string, displayName: string) {
+    setIsCallingCustomer(true);
+    setAppError("");
+    setCallStatus("");
+    try {
+      const response = await startNewCall(phoneNumber, displayName);
+      setIsNewCallOpen(false);
+      setSelectedConversation(response.conversation);
+      setSelectedId(response.conversation.id);
+      setMessages([]);
+      setSuggestedReply("");
+      setDraft("");
+      setFiles([]);
+      setCallStatus(`Calling Francisco first, then ${response.to}.`);
+      await loadConversations(search);
+      setSelectedId(response.conversation.id);
+      await loadDetail(response.conversation.id);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setIsAuthenticated(false);
+      } else {
+        setAppError(error instanceof Error ? error.message : "Could not start the call.");
+      }
+      throw error;
+    } finally {
+      setIsCallingCustomer(false);
+    }
+  }
+
   if (isCheckingSession) {
     return (
       <main className="loading-screen">
@@ -504,10 +617,16 @@ export function App() {
             <span>RELAY</span>
           </div>
         </div>
-        <button className="logout-button" onClick={handleLogout} type="button">
-          <LogOut size={18} />
-          Logout
-        </button>
+        <div className="topbar-actions">
+          <button className="new-call-button" onClick={() => setIsNewCallOpen(true)} type="button">
+            <Plus size={18} />
+            New call
+          </button>
+          <button className="logout-button" onClick={handleLogout} type="button">
+            <LogOut size={18} />
+            Logout
+          </button>
+        </div>
       </header>
 
       <main className="workspace">
@@ -682,6 +801,11 @@ export function App() {
           </section>
         </aside>
       </main>
+      <NewCallModal
+        onClose={() => setIsNewCallOpen(false)}
+        onStartCall={handleStartNewCall}
+        open={isNewCallOpen}
+      />
     </div>
   );
 }

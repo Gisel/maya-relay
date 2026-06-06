@@ -43,6 +43,9 @@ class RelayRepository(Protocol):
     def update_contact_lookup_name(self, phone_number: str, lookup_name: str | None) -> Contact:
         ...
 
+    def upsert_contact_display_name(self, phone_number: str, display_name: str) -> Contact:
+        ...
+
     def get_or_create_customer_conversation(
         self,
         customer_phone: str,
@@ -193,6 +196,20 @@ class SupabaseRelayRepository:
                     "phone_number": phone_number,
                     "lookup_name": lookup_name,
                     "lookup_checked_at": datetime.now(UTC).isoformat(),
+                },
+                on_conflict="phone_number",
+            )
+            .execute()
+        )
+        return _contact_from_row(result.data[0])
+
+    def upsert_contact_display_name(self, phone_number: str, display_name: str) -> Contact:
+        result = (
+            self.client.table("contacts")
+            .upsert(
+                {
+                    "phone_number": phone_number,
+                    "display_name": display_name,
                 },
                 on_conflict="phone_number",
             )

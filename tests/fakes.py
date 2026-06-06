@@ -37,6 +37,17 @@ class FakeRepository:
         self.contacts = [updated if contact.phone_number == phone_number else contact for contact in self.contacts]
         return updated
 
+    def upsert_contact_display_name(self, phone_number: str, display_name: str) -> Contact:
+        existing = self.get_or_create_contact(phone_number)
+        updated = Contact(
+            id=existing.id,
+            phone_number=existing.phone_number,
+            display_name=display_name,
+            lookup_name=existing.lookup_name,
+        )
+        self.contacts = [updated if contact.phone_number == phone_number else contact for contact in self.contacts]
+        return updated
+
     def get_or_create_customer_conversation(
         self,
         customer_phone: str,

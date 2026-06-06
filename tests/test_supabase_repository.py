@@ -63,6 +63,22 @@ def test_update_contact_lookup_name_creates_contact_when_missing():
     assert len(client.rows("contacts")) == 1
 
 
+def test_upsert_contact_display_name_preserves_lookup_name():
+    repository, client = build_repository()
+    client.seed(
+        "contacts",
+        [{"phone_number": "+15550000001", "display_name": None, "lookup_name": "Lookup Name"}],
+    )
+
+    contact = repository.upsert_contact_display_name("+15550000001", "Manual Name")
+
+    stored = client.rows("contacts")[0]
+    assert contact.display_name == "Manual Name"
+    assert contact.lookup_name == "Lookup Name"
+    assert stored["display_name"] == "Manual Name"
+    assert stored["lookup_name"] == "Lookup Name"
+
+
 def test_get_or_create_customer_conversation_creates_contact_and_open_conversation_once():
     repository, client = build_repository()
 

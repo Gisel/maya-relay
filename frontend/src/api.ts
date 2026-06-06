@@ -100,6 +100,10 @@ export type CallConversationResponse = {
   employeePhone: string;
 };
 
+export type StartNewCallResponse = CallConversationResponse & {
+  conversation: ConversationDetail;
+};
+
 export class ApiError extends Error {
   status: number;
 
@@ -185,5 +189,15 @@ export function updateConversationStatus(conversationId: string, status: Convers
 export function callConversationCustomer(conversationId: string) {
   return request<CallConversationResponse>(`/api/conversations/${conversationId}/call`, {
     method: "POST",
+  });
+}
+
+export function startNewCall(phoneNumber: string, displayName: string) {
+  return request<StartNewCallResponse>("/api/calls", {
+    method: "POST",
+    body: JSON.stringify({
+      phone_number: phoneNumber,
+      display_name: displayName.trim() || null,
+    }),
   });
 }
