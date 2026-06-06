@@ -73,6 +73,20 @@ function cleanRelayBody(body: string) {
     .trim();
 }
 
+function cleanAttachmentUrls(body: string) {
+  return body
+    .split(/\r?\n/)
+    .filter((line) => !/^Attachment\s+\d+\s+\([^)]+\):\s+https?:\/\//i.test(line.trim()))
+    .filter((line) => !/^https?:\/\/\S+$/i.test(line.trim()))
+    .join("\n")
+    .trim();
+}
+
+function displayMessageBody(message: Message) {
+  const body = cleanRelayBody(message.body);
+  return message.attachments.length > 0 ? cleanAttachmentUrls(body) : body;
+}
+
 function previewBody(conversation: ConversationListItem) {
   if (conversation.lastMessage?.body) return cleanRelayBody(conversation.lastMessage.body);
   if (conversation.lastMessage?.hasAttachments) return "Attachment received";
@@ -186,7 +200,7 @@ function DeliveryPill({ status }: { status: DeliveryStatus }) {
 
 function MessageBubble({ message, onMediaLoad }: { message: Message; onMediaLoad: () => void }) {
   const isOutbound = message.direction === "employee_to_customer";
-  const body = cleanRelayBody(message.body);
+  const body = displayMessageBody(message);
 
   return (
     <article className={`message-bubble ${isOutbound ? "outbound" : "inbound"}`}>

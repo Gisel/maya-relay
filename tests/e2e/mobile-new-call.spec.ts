@@ -131,6 +131,27 @@ async function mockMayaRelayApi(page: import("@playwright/test").Page) {
         createdAt: "2026-06-06T14:00:02Z",
         attachments: [],
       },
+      {
+        id: "message-attachment",
+        conversationId: "conversation-1",
+        direction: "customer_to_employee",
+        body: "Please see attached\nAttachment 1 (image/png): https://files.example/proof.png",
+        fromPhone: "+15550000001",
+        toPhone: "+13852208404",
+        twilioMessageSid: "SMattachment",
+        deliveryStatus: "delivered",
+        deliveryErrorCode: null,
+        deliveryErrorMessage: null,
+        clientRequestId: null,
+        createdAt: "2026-06-06T14:00:02Z",
+        attachments: [
+          {
+            url: "https://files.example/proof.png",
+            contentType: "image/png",
+            kind: "image",
+          },
+        ],
+      },
     ];
     if (requestCounts.detail > 1) {
       messages.push({
@@ -253,6 +274,7 @@ test("system relay and AI suggestion messages stay out of the chat timeline", as
   await expect(page.getByRole("article").getByText("Hello")).toBeVisible();
   await expect(page.getByRole("article").getByText("Please send size and deadline.")).toHaveCount(0);
   await expect(page.getByRole("article").getByText(/Reply with #C0001/)).toHaveCount(0);
+  await expect(page.getByRole("article").getByText(/https:\/\/files\.example\/proof\.png/)).toHaveCount(0);
   await expect(page.getByText("Please send size and deadline.")).toHaveCount(1);
 });
 
