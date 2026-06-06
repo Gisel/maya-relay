@@ -156,6 +156,11 @@ Acceptance criteria:
 
 ## Deferred / Backlog
 
+- Post-presentation growth backlog: keep contact/client search and scalable loading design visible after today's client presentation.
+  - Add a contact/client search endpoint so the app can search clients directly, not only conversations already loaded or conversation history.
+  - Define the scalable client/conversation loading model for 100+ clients and many conversations per client.
+  - Likely direction: clients search separately, conversations stay paginated, loaded conversations remain locally filterable, server search covers older/unloaded matches, and conversation details load only when selected.
+  - Do not rush this before the presentation; the current data volume does not require the full client model yet.
 - Close conversation UX: confirmation and closed filtering.
 - Call logging: save attempts/statuses in Supabase and show call history.
 - Manual outbound call improvements: create-contact flow, notes, and call outcome.
@@ -169,11 +174,10 @@ Acceptance criteria:
 
 ## Recommended Next Session Order
 
-1. Replace New Call modal with the same working drawer primitive used by details/AI.
-2. Verify New Call on mobile Safari before touching anything else.
-3. Fix duplicate frontend fetches.
-4. Add display-only message formatting.
-5. Run the desktop density pass.
-6. Polish attachment previews.
-7. Polish the composer.
-8. Optimize `/api/conversations` query shape.
+1. Add a clear "needs reply" / new conversation visual state for conversations whose latest message is from the customer.
+2. Add display-only message formatting so the dashboard reads like a normal chat without raw relay instructions or attachment URLs.
+3. Run a focused desktop density pass for the client presentation.
+4. Polish attachment previews and file cards enough for demo confidence.
+5. Polish the composer for multi-line replies without making mobile bulky.
+6. After today's session, add the contact/client search endpoint.
+7. After today's session, define the scalable client/conversation loading model.
