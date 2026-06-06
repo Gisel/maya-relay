@@ -15,7 +15,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ApiError,
   Channel,
@@ -221,7 +221,42 @@ function LoginScreen({
   );
 }
 
-function NewCallModal({
+function Drawer({
+  children,
+  description,
+  labelledBy,
+  onClose,
+  open,
+  title,
+}: {
+  children: ReactNode;
+  description?: string;
+  labelledBy: string;
+  onClose: () => void;
+  open: boolean;
+  title: string;
+}) {
+  if (!open) return null;
+
+  return (
+    <div className="drawer-backdrop" role="presentation">
+      <section aria-labelledby={labelledBy} aria-modal="true" className="drawer-surface mobile-drawer" role="dialog">
+        <div className="drawer-header">
+          <div>
+            <h2 id={labelledBy}>{title}</h2>
+            {description && <p>{description}</p>}
+          </div>
+          <button aria-label={`Close ${title}`} className="drawer-close" onClick={onClose} type="button">
+            <X size={18} />
+          </button>
+        </div>
+        {children}
+      </section>
+    </div>
+  );
+}
+
+function NewCallDrawer({
   open,
   onClose,
   onStartCall,
@@ -234,8 +269,6 @@ function NewCallModal({
   const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  if (!open) return null;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -253,52 +286,47 @@ function NewCallModal({
   }
 
   return (
-    <div className="modal-backdrop" role="presentation">
-      <section aria-labelledby="new-call-title" aria-modal="true" className="modal-panel call-drawer" role="dialog">
-        <div className="modal-header">
-          <div>
-            <h2 id="new-call-title">New call</h2>
-            <p>Francisco receives the first call, then Maya Relay connects the customer.</p>
-          </div>
-          <button aria-label="Close new call modal" className="modal-close" onClick={onClose} type="button">
-            <X size={18} />
+    <Drawer
+      description="Francisco receives the first call, then Maya Relay connects the customer."
+      labelledBy="new-call-title"
+      onClose={onClose}
+      open={open}
+      title="New call"
+    >
+      <form className="drawer-form" onSubmit={handleSubmit}>
+        <label>
+          <span>Customer phone</span>
+          <input
+            autoFocus
+            inputMode="tel"
+            onChange={(event) => setPhoneNumber(event.target.value)}
+            placeholder="+1 555 000 0000"
+            required
+            type="tel"
+            value={phoneNumber}
+          />
+        </label>
+        <label>
+          <span>Customer name</span>
+          <input
+            onChange={(event) => setDisplayName(event.target.value)}
+            placeholder="Optional"
+            type="text"
+            value={displayName}
+          />
+        </label>
+        {error && <p className="form-error">{error}</p>}
+        <div className="drawer-actions">
+          <button className="ghost-button" disabled={isSubmitting} onClick={onClose} type="button">
+            Cancel
+          </button>
+          <button className="send-button" disabled={!phoneNumber.trim() || isSubmitting} type="submit">
+            <Phone size={17} />
+            {isSubmitting ? "Calling..." : "Start call"}
           </button>
         </div>
-        <form className="modal-form" onSubmit={handleSubmit}>
-          <label>
-            <span>Customer phone</span>
-            <input
-              autoFocus
-              inputMode="tel"
-              onChange={(event) => setPhoneNumber(event.target.value)}
-              placeholder="+1 555 000 0000"
-              required
-              type="tel"
-              value={phoneNumber}
-            />
-          </label>
-          <label>
-            <span>Customer name</span>
-            <input
-              onChange={(event) => setDisplayName(event.target.value)}
-              placeholder="Optional"
-              type="text"
-              value={displayName}
-            />
-          </label>
-          {error && <p className="form-error">{error}</p>}
-          <div className="modal-actions">
-            <button className="ghost-button" disabled={isSubmitting} onClick={onClose} type="button">
-              Cancel
-            </button>
-            <button className="send-button" disabled={!phoneNumber.trim() || isSubmitting} type="submit">
-              <Phone size={17} />
-              {isSubmitting ? "Calling..." : "Start call"}
-            </button>
-          </div>
-        </form>
-      </section>
-    </div>
+      </form>
+    </Drawer>
   );
 }
 
@@ -782,7 +810,7 @@ export function App() {
           />
         </section>
 
-        <aside className={`context-panel ${isContextOpen ? "is-open" : "is-collapsed"}`}>
+        <aside className={`context-panel mobile-drawer ${isContextOpen ? "is-open" : "is-collapsed"}`}>
           <div className="context-panel-header">
             <span>Details</span>
             <button aria-label="Close details panel" onClick={() => setIsContextOpen(false)} type="button">
@@ -835,7 +863,7 @@ export function App() {
           </section>
         </aside>
       </main>
-      <NewCallModal
+      <NewCallDrawer
         onClose={() => setIsNewCallOpen(false)}
         onStartCall={handleStartNewCall}
         open={isNewCallOpen}

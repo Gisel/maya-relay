@@ -841,7 +841,7 @@ button {
   white-space: nowrap;
 }
 
-.modal-backdrop {
+.drawer-backdrop {
   align-items: center;
   background: rgb(20 28 42 / 42%);
   display: flex;
@@ -853,7 +853,7 @@ button {
   z-index: 40;
 }
 
-.modal-panel {
+.drawer-surface {
   background: #ffffff;
   border: 1px solid #dfe4ec;
   border-radius: 8px;
@@ -869,27 +869,28 @@ button {
   width: 100%;
 }
 
-.modal-header {
+.drawer-header {
   align-items: flex-start;
   display: flex;
   gap: 14px;
   justify-content: space-between;
+  min-width: 0;
 }
 
-.modal-header h2 {
+.drawer-header h2 {
   font-size: 22px;
   line-height: 1.15;
   margin: 0 0 6px;
 }
 
-.modal-header p {
+.drawer-header p {
   color: #667085;
   font-size: 14px;
   line-height: 1.4;
   margin: 0;
 }
 
-.modal-close {
+.drawer-close {
   align-items: center;
   background: #eef1f5;
   border: 0;
@@ -902,13 +903,13 @@ button {
   width: 36px;
 }
 
-.modal-form {
+.drawer-form {
   display: grid;
   gap: 14px;
   min-width: 0;
 }
 
-.modal-form label {
+.drawer-form label {
   color: #475366;
   display: grid;
   font-size: 13px;
@@ -916,7 +917,7 @@ button {
   gap: 7px;
 }
 
-.modal-form input {
+.drawer-form input {
   border: 1px solid #cdd5e1;
   border-radius: 8px;
   color: #172033;
@@ -926,11 +927,16 @@ button {
   width: 100%;
 }
 
-.modal-actions {
+.drawer-actions {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
   margin-top: 4px;
+}
+
+.drawer-actions .send-button,
+.drawer-actions .ghost-button {
+  flex: 0 1 auto;
 }
 
 @media (min-width: 761px) {
@@ -1583,20 +1589,31 @@ button {
     width: 42px;
   }
 
-  .context-panel {
+  .mobile-drawer {
     background: #ffffff;
     border-left: 0;
     border-top: 1px solid #dfe4ec;
     border-radius: 16px 16px 0 0;
     bottom: 0;
     box-shadow: 0 -14px 40px rgb(20 28 42 / 18%);
+    box-sizing: border-box;
+    display: block;
     left: 0;
     max-height: min(76svh, 680px);
+    max-width: 100%;
+    min-width: 0;
     overflow: auto;
-    padding: 18px 16px;
+    overflow-x: hidden;
+    padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
     position: fixed;
     right: 0;
+    width: auto;
     z-index: 20;
+  }
+
+  .mobile-drawer * {
+    box-sizing: border-box;
+    max-width: 100%;
   }
 
   .context-panel.is-collapsed {
@@ -1638,9 +1655,10 @@ button {
     padding: 16px;
   }
 
-  .modal-backdrop {
+  .drawer-backdrop {
     align-items: stretch;
     display: block;
+    inset: 0;
     left: 0;
     max-width: none;
     overflow: hidden;
@@ -1649,49 +1667,43 @@ button {
     width: auto;
   }
 
-  .modal-panel.call-drawer {
-    border-radius: 16px 16px 0 0;
-    bottom: 0;
-    box-sizing: border-box;
-    box-shadow: 0 -14px 40px rgb(20 28 42 / 18%);
+  .drawer-surface {
     display: grid;
+    gap: 18px;
     inline-size: auto;
-    left: 0;
-    max-height: min(76svh, 680px);
-    max-width: none;
-    min-width: 0;
-    overflow: auto;
-    overflow-x: hidden;
-    padding: 18px;
-    position: fixed;
-    right: 0;
-    width: auto;
+    z-index: 41;
   }
 
-  .modal-panel.call-drawer * {
-    box-sizing: border-box;
-    max-width: 100%;
-  }
-
-  .modal-header,
-  .modal-form,
-  .modal-form label,
-  .modal-form input {
+  .drawer-header,
+  .drawer-form,
+  .drawer-form label,
+  .drawer-form input {
     min-width: 0;
     width: 100%;
   }
 
-  .modal-actions {
+  .drawer-actions {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     min-width: 0;
   }
 
-  .modal-actions .ghost-button,
-  .modal-actions .send-button {
+  .drawer-actions .ghost-button,
+  .drawer-actions .send-button {
     font-size: 13px;
     min-width: 0;
     padding: 0 12px;
     width: 100%;
+  }
+
+  .drawer-actions .send-button svg,
+  .drawer-actions .ghost-button svg {
+    flex: 0 0 auto;
+  }
+}
+
+@media (max-width: 360px) {
+  .drawer-actions {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
