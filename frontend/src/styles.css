@@ -459,6 +459,16 @@ button {
   white-space: nowrap;
 }
 
+.session-id {
+  color: #667085;
+  display: none;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+}
+
 .conversation-header p {
   color: #98a2b6;
   font-size: 14px;
@@ -917,6 +927,123 @@ button {
   gap: 10px;
   justify-content: flex-end;
   margin-top: 4px;
+}
+
+@media (min-width: 761px) {
+  .app-shell {
+    background: #eef2f7;
+  }
+
+  .topbar {
+    border-bottom: 1px solid #dce3ee;
+    box-shadow: 0 2px 12px rgb(20 28 42 / 4%);
+  }
+
+  .workspace {
+    gap: 16px;
+    padding: 16px;
+  }
+
+  .inbox-panel,
+  .conversation-panel,
+  .context-panel {
+    background: #ffffff;
+    border: 1px solid #dce3ee;
+    border-radius: 16px;
+    box-shadow: 0 12px 30px rgb(20 28 42 / 7%);
+    overflow: hidden;
+  }
+
+  .inbox-panel {
+    border-right: 1px solid #dce3ee;
+  }
+
+  .context-panel {
+    border-left: 1px solid #dce3ee;
+  }
+
+  .metrics-row,
+  .search-box,
+  .conversation-row,
+  .conversation-header,
+  .composer {
+    border-color: #e3e8f0;
+  }
+
+  .metrics-row {
+    padding: 18px;
+  }
+
+  .metric-card {
+    background: #f8fafc;
+  }
+
+  .search-box {
+    padding: 16px 18px;
+  }
+
+  .conversation-list {
+    background: #ffffff;
+    padding: 8px 10px 14px;
+  }
+
+  .conversation-row {
+    border: 1px solid transparent;
+    border-radius: 12px;
+    margin-bottom: 8px;
+  }
+
+  .conversation-row.selected {
+    border-color: #cfe6f7;
+    box-shadow: inset 4px 0 0 #1688c9;
+  }
+
+  .conversation-panel {
+    background: #f5f8fc;
+  }
+
+  .conversation-header {
+    border-radius: 16px 16px 0 0;
+  }
+
+  .session-id {
+    display: block;
+  }
+
+  .message-thread {
+    background: #f5f8fc;
+    padding: 28px 30px;
+  }
+
+  .message-bubble {
+    border-radius: 14px;
+    box-shadow: 0 12px 26px rgb(20 28 42 / 8%);
+  }
+
+  .message-bubble.inbound {
+    border-top-left-radius: 6px;
+  }
+
+  .message-bubble.outbound {
+    border-top-right-radius: 6px;
+  }
+
+  .context-panel {
+    padding: 28px 26px;
+  }
+
+  .context-section {
+    border-color: #e6ebf2;
+  }
+
+  .intent-box {
+    background: #fffafd;
+  }
+
+  .quick-responses button,
+  .composer textarea {
+    background: #ffffff;
+  }
 }
 
 @media (max-width: 1100px) {

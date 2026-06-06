@@ -60,9 +60,13 @@ function displayCustomerName(conversation: ConversationListItem | ConversationDe
 }
 
 function cleanRelayBody(body: string) {
+  const codePattern = "[A-Za-z0-9]+";
+
   return body
-    .replace(/^From\s+.*?(?:\s+\[#?[A-Za-z0-9]+\])?:\s*/i, "")
-    .replace(/\s+Reply with\s+#[A-Za-z0-9]+\s+your message(?:\s+---[\s\S]*)?$/i, "")
+    .replace(new RegExp(`^From\\s+[\\s\\S]*?\\s+\\[#?${codePattern}\\]:\\s*`, "i"), "")
+    .replace(/^From\s+[^:]+:\s*/i, "")
+    .replace(new RegExp(`^#${codePattern}\\s+`, "i"), "")
+    .replace(new RegExp(`\\s+Reply with\\s+#${codePattern}\\s+your message(?:\\s+---[\\s\\S]*)?$`, "i"), "")
     .replace(/\s+---\s+AI note:[\s\S]*$/i, "")
     .trim();
 }
@@ -721,6 +725,7 @@ export function App() {
           <header className="conversation-header">
             <div className="conversation-title-block">
               <h1>{customerName}</h1>
+              {activeConversation?.code && <span className="session-id">Session ID: #{activeConversation.code}</span>}
               <div className="conversation-meta-row">
                 <p>
                   <span className="desktop-channel-label">via {channelLabel(channel)} </span>
@@ -789,7 +794,7 @@ export function App() {
             <h2>Customer Profile</h2>
             <strong>{customerName}</strong>
             <p>{displayPhone}</p>
-            {activeConversation?.code && <em>Conversation code: #{activeConversation.code}</em>}
+            {activeConversation?.code && <em>Session ID: #{activeConversation.code}</em>}
           </section>
 
           <section className="context-section">
