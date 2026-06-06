@@ -274,7 +274,10 @@ export function App() {
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [appError, setAppError] = useState("");
   const [detailError, setDetailError] = useState("");
-  const [isContextOpen, setIsContextOpen] = useState(true);
+  const [isContextOpen, setIsContextOpen] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return !window.matchMedia("(max-width: 760px)").matches;
+  });
 
   const selectedListItem = useMemo(
     () => conversations.find((conversation) => conversation.id === selectedId) || null,
@@ -473,6 +476,9 @@ export function App() {
                   setFiles([]);
                   setDetailError("");
                   setSuggestedReply("");
+                  if (window.matchMedia("(max-width: 760px)").matches) {
+                    setIsContextOpen(false);
+                  }
                 }}
                 type="button"
               >
