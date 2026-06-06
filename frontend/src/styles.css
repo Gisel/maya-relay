@@ -55,7 +55,11 @@ button {
   background: #f4f7fb;
   display: grid;
   min-height: 100vh;
+  max-width: 100%;
+  overflow-x: hidden;
+  padding: 16px;
   place-items: center;
+  width: 100%;
 }
 
 .loading-screen svg {
@@ -77,12 +81,18 @@ button {
   display: grid;
   gap: 20px;
   max-width: 420px;
+  min-width: 0;
   padding: 28px;
-  width: min(420px, calc(100vw - 32px));
+  width: 100%;
 }
 
 .login-brand {
   justify-content: center;
+}
+
+.login-brand,
+.login-brand div {
+  min-width: 0;
 }
 
 .login-panel label {
@@ -90,6 +100,7 @@ button {
   display: grid;
   font-weight: 800;
   gap: 8px;
+  min-width: 0;
 }
 
 .login-panel input {
@@ -97,7 +108,14 @@ button {
   border-radius: 8px;
   color: #172033;
   min-height: 48px;
+  min-width: 0;
   padding: 0 14px;
+  width: 100%;
+}
+
+.login-panel .send-button {
+  min-width: 0;
+  width: 100%;
 }
 
 .form-error,

@@ -98,6 +98,13 @@ async function expectNoIosInputZoomRisk(locator: import("@playwright/test").Loca
   expect(fontSize).toBeGreaterThanOrEqual(16);
 }
 
+async function expectInsideViewport(locator: import("@playwright/test").Locator) {
+  const box = await locator.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(locator.page().viewportSize()!.width);
+}
+
 test("New Call drawer stays inside the mobile viewport", async ({ page }) => {
   await mockMayaRelayApi(page);
   await page.goto("/app/");
@@ -117,10 +124,7 @@ test("New Call drawer stays inside the mobile viewport", async ({ page }) => {
     page.getByRole("button", { name: /start call/i }),
     phoneInput,
   ]) {
-    const box = await control.boundingBox();
-    expect(box).not.toBeNull();
-    expect(box!.x).toBeGreaterThanOrEqual(0);
-    expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+    await expectInsideViewport(control);
   }
 });
 
@@ -138,4 +142,8 @@ test("login input focus does not create mobile zoom risk", async ({ page }) => {
   await passwordInput.focus();
   await expectNoIosInputZoomRisk(passwordInput);
   await expectNoHorizontalOverflow(page);
+
+  await expectInsideViewport(page.locator(".login-panel"));
+  await expectInsideViewport(passwordInput);
+  await expectInsideViewport(page.getByRole("button", { name: "Sign in" }));
 });
