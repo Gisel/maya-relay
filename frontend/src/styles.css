@@ -1,5 +1,10 @@
 :root {
-  --topbar-height: 78px;
+  --topbar-height: 72px;
+  --brand-blue: #2563eb;
+  --brand-blue-dark: #1d4ed8;
+  --brand-blue-soft: #eff6ff;
+  --brand-green: #22b65f;
+  --brand-green-dark: #178a48;
   --font-sans:
     "Roboto", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
@@ -64,7 +69,7 @@ button {
 
 .loading-screen svg {
   animation: spin 900ms linear infinite;
-  color: #1688c9;
+  color: var(--brand-blue);
 }
 
 @keyframes spin {
@@ -143,22 +148,22 @@ button {
   height: var(--topbar-height);
   min-height: var(--topbar-height);
   min-width: 0;
-  padding: 10px 28px;
+  padding: 8px 28px;
   width: 100%;
 }
 
 .brand {
   align-items: center;
   display: flex;
-  gap: 14px;
+  gap: 12px;
   min-width: 0;
 }
 
 .brand img {
   border-radius: 8px;
-  height: 50px;
+  height: 46px;
   object-fit: cover;
-  width: 50px;
+  width: 46px;
 }
 
 .brand div {
@@ -171,14 +176,14 @@ button {
 
 .brand strong {
   color: #172033;
-  font-size: 23px;
-  font-weight: 800;
+  font-size: 22px;
+  font-weight: 750;
 }
 
 .brand span {
-  color: #2f86c5;
-  font-size: 23px;
-  font-weight: 600;
+  color: var(--brand-blue);
+  font-size: 22px;
+  font-weight: 650;
 }
 
 .logout-button,
@@ -190,9 +195,12 @@ button {
   border: 0;
   border-radius: 8px;
   display: inline-flex;
-  font-weight: 800;
+  font-family:
+    "Montserrat", "Inter", var(--font-sans);
+  font-weight: 700;
   gap: 8px;
   justify-content: center;
+  letter-spacing: 0;
 }
 
 .topbar-actions {
@@ -204,22 +212,22 @@ button {
 .logout-button {
   background: #eef1f5;
   color: #475366;
-  min-height: 44px;
-  padding: 0 22px;
+  min-height: 40px;
+  padding: 0 20px;
 }
 
 .new-call-button {
-  background: #1688c9;
+  background: var(--brand-blue);
   color: #ffffff;
-  min-height: 44px;
+  min-height: 40px;
   padding: 0 18px;
 }
 
 .refresh-button {
   background: #ffffff;
-  border: 1px solid #c7d7e6;
-  color: #146a8f;
-  min-height: 44px;
+  border: 1px solid #bfd5f8;
+  color: var(--brand-blue-dark);
+  min-height: 40px;
   padding: 0 16px;
 }
 
@@ -295,8 +303,8 @@ button {
 }
 
 .metric-card.is-active {
-  border-color: #1688c9;
-  box-shadow: inset 3px 0 0 #1688c9;
+  border-color: var(--brand-blue);
+  box-shadow: inset 3px 0 0 var(--brand-blue);
 }
 
 .metric-card span {
@@ -308,7 +316,7 @@ button {
 }
 
 .metric-card strong {
-  color: #1688c9;
+  color: var(--brand-blue);
   display: block;
   font-size: 26px;
   line-height: 1;
@@ -365,8 +373,8 @@ button {
 }
 
 .conversation-row.selected {
-  background: #f8fbff;
-  box-shadow: inset 4px 0 0 #1688c9;
+  background: var(--brand-blue-soft);
+  box-shadow: inset 4px 0 0 var(--brand-blue);
 }
 
 .conversation-row.needs-reply {
@@ -419,12 +427,12 @@ button {
 }
 
 .load-more-button {
-  background: #eef8ff;
-  border: 1px solid #b8ddf4;
+  background: var(--brand-blue-soft);
+  border: 1px solid #bfd5f8;
   border-radius: 8px;
-  color: #146a8f;
+  color: var(--brand-blue-dark);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   min-height: 42px;
   margin: 12px 18px 18px;
   padding: 0 16px;
@@ -474,7 +482,7 @@ button {
 
 .channel-pill.whatsapp {
   background: #d9fadd;
-  color: #16813a;
+  color: var(--brand-green-dark);
 }
 
 .channel-pill.sms {
@@ -607,9 +615,9 @@ button {
 }
 
 .conversation-call-action {
-  background: #f0f8ff;
-  border-color: #b9dcf4;
-  color: #237cac;
+  background: var(--brand-blue-soft);
+  border-color: #bfd5f8;
+  color: var(--brand-blue-dark);
 }
 
 .conversation-status-action:disabled,
@@ -648,15 +656,15 @@ button {
 }
 
 .message-bubble.outbound {
-  background: #2f93d1;
-  border-color: #2f93d1;
+  background: var(--brand-blue);
+  border-color: var(--brand-blue);
   color: #ffffff;
   justify-self: end;
 }
 
 .conversation-panel.channel-whatsapp .message-bubble.outbound {
-  background: #20a85a;
-  border-color: #20a85a;
+  background: var(--brand-green);
+  border-color: var(--brand-green);
 }
 
 .message-bubble p {
@@ -704,7 +712,7 @@ button {
   align-items: center;
   background: #f4f8fc;
   border: 1px solid #dbe5ee;
-  color: #237cac;
+  color: var(--brand-blue-dark);
   display: flex;
   gap: 8px;
   padding: 12px;
@@ -768,7 +776,7 @@ button {
 }
 
 .send-button {
-  background: #1688c9;
+  background: var(--brand-blue);
   color: #ffffff;
   font-size: 14px;
   min-height: 46px;
@@ -878,7 +886,7 @@ button {
 }
 
 .intent-box input {
-  accent-color: #1688c9;
+  accent-color: var(--brand-blue);
   height: 18px;
   width: 18px;
 }
@@ -889,11 +897,11 @@ button {
 }
 
 .secondary-action {
-  background: #2f93d1;
+  background: var(--brand-blue);
   border: 0;
   border-radius: 8px;
   color: #ffffff;
-  font-weight: 800;
+  font-weight: 700;
   min-height: 42px;
   padding: 0 14px;
 }
@@ -1025,8 +1033,8 @@ button {
   .topbar {
     border-bottom: 1px solid #dce3ee;
     box-shadow: 0 2px 12px rgb(20 28 42 / 4%);
-    min-height: 72px;
-    padding: 8px 24px;
+    min-height: var(--topbar-height);
+    padding: 7px 24px;
   }
 
   .workspace {
@@ -1107,8 +1115,8 @@ button {
   }
 
   .conversation-row.selected {
-    border-color: #cfe6f7;
-    box-shadow: inset 3px 0 0 #1688c9;
+    border-color: #bfd5f8;
+    box-shadow: inset 3px 0 0 var(--brand-blue);
   }
 
   .conversation-row strong {
@@ -1253,7 +1261,7 @@ button {
 
 @media (max-width: 760px) {
   :root {
-    --topbar-height: 70px;
+    --topbar-height: 68px;
   }
 
   .topbar {
@@ -1289,12 +1297,12 @@ button {
 
   .brand strong,
   .brand span {
-    font-size: 20px;
+    font-size: 19px;
   }
 
   .brand img {
-    height: 48px;
-    width: 48px;
+    height: 44px;
+    width: 44px;
   }
 
   .logout-button,
@@ -1313,7 +1321,7 @@ button {
 
   .new-call-button,
   .refresh-button {
-    color: #1688c9;
+    color: var(--brand-blue);
   }
 
   .workspace {
@@ -1370,7 +1378,7 @@ button {
   }
 
   .metric-card.is-active {
-    box-shadow: inset 3px 0 0 #1688c9;
+    box-shadow: inset 3px 0 0 var(--brand-blue);
   }
 
   .metric-card span {
@@ -1425,15 +1433,15 @@ button {
   }
 
   .conversation-row.selected {
-    background: #eef8ff;
-    border-color: #1688c9;
-    box-shadow: inset 3px 0 0 #1688c9;
+    background: var(--brand-blue-soft);
+    border-color: var(--brand-blue);
+    box-shadow: inset 3px 0 0 var(--brand-blue);
   }
 
   .conversation-row.channel-whatsapp.selected {
     background: #effbf3;
-    border-color: #22a95a;
-    box-shadow: inset 3px 0 0 #22a95a;
+    border-color: var(--brand-green);
+    box-shadow: inset 3px 0 0 var(--brand-green);
   }
 
   .conversation-row.needs-reply {
@@ -1470,11 +1478,11 @@ button {
   }
 
   .conversation-row.channel-whatsapp strong::before {
-    background: #21a55b;
+    background: var(--brand-green);
   }
 
   .conversation-row.channel-sms strong::before {
-    background: #1688c9;
+    background: var(--brand-blue);
   }
 
   .conversation-row.delivery-failed strong::before,
@@ -1613,11 +1621,11 @@ button {
   }
 
   .conversation-call-action {
-    color: #1688c9;
+    color: var(--brand-blue);
   }
 
   .conversation-panel.channel-whatsapp .conversation-call-action {
-    color: #16813a;
+    color: var(--brand-green-dark);
   }
 
   .conversation-status-action {
