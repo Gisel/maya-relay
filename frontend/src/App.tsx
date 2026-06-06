@@ -10,6 +10,7 @@ import {
   Search,
   Send,
   Sparkles,
+  X,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -536,6 +537,13 @@ export function App() {
         </section>
 
         <aside className={`context-panel ${isContextOpen ? "is-open" : "is-collapsed"}`}>
+          <div className="context-panel-header">
+            <span>Details</span>
+            <button aria-label="Close details panel" onClick={() => setIsContextOpen(false)} type="button">
+              <X size={18} />
+            </button>
+          </div>
+
           <section className="context-section">
             <h2>Customer Profile</h2>
             <strong>{customerName}</strong>
