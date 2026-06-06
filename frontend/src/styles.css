@@ -490,6 +490,11 @@ button {
   flex: 0 1 auto;
 }
 
+.mobile-chat-label,
+.mobile-channel-label {
+  display: none;
+}
+
 .context-toggle {
   align-items: center;
   background: #eef1f5;
@@ -932,6 +937,10 @@ button {
     padding: 10px 14px;
   }
 
+  .topbar-actions {
+    gap: 8px;
+  }
+
   .brand strong,
   .brand span {
     font-size: 20px;
@@ -965,21 +974,21 @@ button {
   }
 
   .inbox-panel {
-    background: #f8fbff;
+    background: #ffffff;
     border-bottom: 1px solid #dfe4ec;
     border-right: 0;
-    height: 214px;
-    max-height: 32svh;
-    min-height: 178px;
+    height: auto;
+    max-height: none;
+    min-height: 0;
     overflow: hidden;
-    padding: 0 10px 10px;
+    padding: 0 14px 12px;
   }
 
   .search-box {
     background: #ffffff;
     border: 0;
     order: -1;
-    padding: 12px 0 10px;
+    padding: 12px 0;
     position: sticky;
     top: 0;
     z-index: 3;
@@ -1014,17 +1023,44 @@ button {
   }
 
   .conversation-list {
-    background: #ffffff;
-    border: 1px solid #dfe4ec;
-    border-radius: 8px;
-    height: calc(100% - 64px);
-    overflow: auto;
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    display: flex;
+    gap: 10px;
+    height: auto;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 2px 0 4px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
     width: 100%;
   }
 
   .conversation-row {
-    min-height: 72px;
-    padding: 12px;
+    align-items: center;
+    border: 1px solid #dfe4ec;
+    border-radius: 999px;
+    box-shadow: none;
+    display: inline-flex;
+    flex: 0 0 auto;
+    justify-content: center;
+    min-height: 38px;
+    min-width: 0;
+    padding: 0 14px;
+    scroll-snap-align: start;
+    width: auto;
+  }
+
+  .conversation-row.selected {
+    background: #eef8ff;
+    border-color: #1688c9;
+    box-shadow: inset 3px 0 0 #1688c9;
+  }
+
+  .conversation-row-heading {
+    gap: 0;
   }
 
   .conversation-row strong {
@@ -1032,7 +1068,7 @@ button {
     display: inline-flex;
     font-size: 13px;
     gap: 7px;
-    max-width: 100%;
+    max-width: 150px;
   }
 
   .conversation-row strong::before {
@@ -1058,8 +1094,11 @@ button {
   }
 
   .conversation-row p {
-    font-size: 12px;
-    margin: 8px 0 10px;
+    display: none;
+  }
+
+  .conversation-row em {
+    display: none;
   }
 
   .conversation-identity .channel-pill,
@@ -1083,37 +1122,61 @@ button {
   }
 
   .conversation-header {
-    align-items: flex-start;
+    align-items: center;
+    background: #f4f7fb;
     min-height: auto;
-    padding-bottom: 12px;
+    padding-bottom: 10px;
     padding-top: 12px;
   }
 
   .conversation-header h1 {
-    font-size: 17px;
-    margin-bottom: 6px;
+    display: none;
   }
 
   .conversation-header p {
+    align-items: center;
+    background: #e9edf2;
+    border-radius: 999px;
+    color: #475366;
+    display: inline-flex;
     font-size: 12px;
+    font-weight: 800;
+    justify-content: center;
+    max-width: 100%;
+    min-height: 28px;
+    padding: 0 12px;
   }
 
   .conversation-header-actions {
     align-items: center;
     flex-direction: row;
-    gap: 8px;
+    gap: 6px;
   }
 
   .conversation-meta-row {
     align-items: center;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     flex-wrap: wrap;
     gap: 8px;
+    width: 100%;
+  }
+
+  .conversation-meta-row p {
+    justify-self: center;
+  }
+
+  .desktop-channel-label {
+    display: none;
+  }
+
+  .mobile-chat-label,
+  .mobile-channel-label {
+    display: inline;
   }
 
   .conversation-meta-row .status-pill {
-    font-size: 11px;
-    min-height: 24px;
-    padding: 0 10px;
+    display: none;
   }
 
   .context-toggle {
@@ -1125,8 +1188,19 @@ button {
 
   .conversation-status-action,
   .conversation-call-action {
-    min-height: 30px;
-    padding: 0 10px;
+    border-radius: 8px;
+    min-height: 34px;
+    padding: 0;
+    width: 34px;
+  }
+
+  .conversation-call-action {
+    background: #eef8ff;
+  }
+
+  .conversation-status-action,
+  .conversation-call-action {
+    font-size: 0;
   }
 
   .context-toggle span {

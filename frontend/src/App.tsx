@@ -696,7 +696,10 @@ export function App() {
               <h1>{customerName}</h1>
               <div className="conversation-meta-row">
                 <p>
-                  via {channelLabel(channel)} {customerPhone}
+                  <span className="desktop-channel-label">via {channelLabel(channel)} </span>
+                  <span className="mobile-chat-label">Chatting with </span>
+                  {customerPhone}
+                  <span className="mobile-channel-label"> via {channelLabel(channel)}</span>
                 </p>
                 <div className="conversation-header-actions">
                   <StatusPill status={status} />
