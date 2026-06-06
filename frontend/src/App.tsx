@@ -478,7 +478,14 @@ export function App() {
             {!isLoadingList && conversations.length === 0 && <p className="panel-note">No conversations found.</p>}
             {conversations.map((conversation) => (
               <button
-                className={`conversation-row ${conversation.id === selectedId ? "selected" : ""}`}
+                className={[
+                  "conversation-row",
+                  `channel-${conversation.channel}`,
+                  `delivery-${deliveryStatus(conversation)}`,
+                  conversation.id === selectedId ? "selected" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
                 key={conversation.id}
                 onClick={() => {
                   setSelectedId(conversation.id);
@@ -510,18 +517,20 @@ export function App() {
 
         <section className="conversation-panel">
           <header className="conversation-header">
-            <div>
+            <div className="conversation-title-block">
               <h1>{customerName}</h1>
-              <p>
-                via {channelLabel(channel)} {customerPhone}
-              </p>
-            </div>
-            <div className="conversation-header-actions">
-              <StatusPill status={status} />
-              <button className="context-toggle" onClick={() => setIsContextOpen((current) => !current)} type="button">
-                {isContextOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
-                <span>{isContextOpen ? "Hide details" : "Details"}</span>
-              </button>
+              <div className="conversation-meta-row">
+                <p>
+                  via {channelLabel(channel)} {customerPhone}
+                </p>
+                <div className="conversation-header-actions">
+                  <StatusPill status={status} />
+                  <button className="context-toggle" onClick={() => setIsContextOpen((current) => !current)} type="button">
+                    {isContextOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
+                    <span>{isContextOpen ? "Hide details" : "Details"}</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </header>
 

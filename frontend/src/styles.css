@@ -375,7 +375,7 @@ button {
   background: #ffffff;
   border-bottom: 1px solid #dfe4ec;
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   min-height: 86px;
   min-width: 0;
   overflow: hidden;
@@ -413,6 +413,22 @@ button {
   gap: 10px;
 }
 
+.conversation-title-block {
+  min-width: 0;
+  width: 100%;
+}
+
+.conversation-meta-row {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+
+.conversation-meta-row p {
+  flex: 0 1 auto;
+}
+
 .context-toggle {
   align-items: center;
   background: #eef1f5;
@@ -445,10 +461,14 @@ button {
   border: 1px solid #e1e6ee;
   border-radius: 8px;
   box-shadow: 0 3px 10px rgb(20 28 42 / 10%);
-  max-width: min(720px, 92%);
-  min-width: min(480px, 100%);
+  max-width: min(680px, 78%);
+  min-width: 0;
   overflow-wrap: anywhere;
   padding: 18px 20px;
+}
+
+.message-bubble.inbound {
+  justify-self: start;
 }
 
 .message-bubble.outbound {
@@ -828,12 +848,42 @@ button {
   }
 
   .conversation-row strong {
+    align-items: center;
+    display: inline-flex;
     font-size: 13px;
+    gap: 7px;
+    max-width: 100%;
+  }
+
+  .conversation-row strong::before {
+    background: #98a2b6;
+    border-radius: 999px;
+    content: "";
+    flex: 0 0 auto;
+    height: 8px;
+    width: 8px;
+  }
+
+  .conversation-row.channel-whatsapp strong::before {
+    background: #21a55b;
+  }
+
+  .conversation-row.channel-sms strong::before {
+    background: #1688c9;
+  }
+
+  .conversation-row.delivery-failed strong::before,
+  .conversation-row.delivery-undelivered strong::before {
+    background: #dc1f46;
   }
 
   .conversation-row p {
     font-size: 12px;
     margin: 8px 0 10px;
+  }
+
+  .conversation-row footer {
+    display: none;
   }
 
   .conversation-panel {
@@ -853,22 +903,43 @@ button {
 
   .conversation-header {
     align-items: flex-start;
-    min-height: 76px;
-    padding-bottom: 14px;
-    padding-top: 14px;
+    min-height: auto;
+    padding-bottom: 12px;
+    padding-top: 12px;
   }
 
   .conversation-header h1 {
-    font-size: 18px;
+    font-size: 17px;
+    margin-bottom: 6px;
   }
 
   .conversation-header p {
-    font-size: 13px;
+    font-size: 12px;
   }
 
   .conversation-header-actions {
-    align-items: flex-end;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  .conversation-meta-row {
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .conversation-meta-row .status-pill {
+    font-size: 11px;
+    min-height: 24px;
+    padding: 0 10px;
+  }
+
+  .context-toggle {
+    justify-content: center;
+    min-height: 30px;
+    padding: 0;
+    width: 34px;
   }
 
   .context-toggle span {
@@ -885,9 +956,19 @@ button {
   }
 
   .message-bubble {
-    max-width: 100%;
+    max-width: 88%;
     min-width: 0;
     padding: 16px;
+  }
+
+  .message-bubble.inbound {
+    border-radius: 14px 14px 14px 4px;
+    justify-self: start;
+  }
+
+  .message-bubble.outbound {
+    border-radius: 14px 14px 4px 14px;
+    justify-self: end;
   }
 
   .message-bubble p {
