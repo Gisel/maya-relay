@@ -744,17 +744,19 @@ button {
   .workspace {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto auto;
-    height: calc(100vh - var(--topbar-height));
+    grid-template-rows: auto minmax(0, 1fr);
+    height: calc(100svh - var(--topbar-height));
     overflow-x: hidden;
-    overflow-y: auto;
+    overflow-y: hidden;
   }
 
   .inbox-panel {
+    background: #f8fbff;
     border-bottom: 1px solid #dfe4ec;
     border-right: 0;
-    height: auto;
-    max-height: 40vh;
+    height: 214px;
+    max-height: 32svh;
+    min-height: 178px;
     overflow: hidden;
     padding: 0 10px 10px;
   }
@@ -770,12 +772,7 @@ button {
   }
 
   .metrics-row {
-    border: 1px solid #dfe4ec;
-    border-radius: 8px;
-    gap: 0;
-    margin-bottom: 10px;
-    overflow: hidden;
-    padding: 0;
+    display: none;
   }
 
   .metric-card {
@@ -806,12 +803,12 @@ button {
     background: #ffffff;
     border: 1px solid #dfe4ec;
     border-radius: 8px;
-    max-height: 190px;
+    height: calc(100% - 64px);
     overflow: auto;
   }
 
   .conversation-row {
-    min-height: 82px;
+    min-height: 72px;
     padding: 12px;
   }
 
@@ -826,10 +823,10 @@ button {
 
   .conversation-panel {
     display: grid;
-    grid-template-rows: auto minmax(220px, 1fr) auto;
-    height: auto;
-    min-height: calc(100svh - var(--topbar-height));
-    overflow: visible;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .conversation-header,
@@ -865,7 +862,7 @@ button {
 
   .message-thread {
     gap: 14px;
-    max-height: 48vh;
+    max-height: none;
     min-height: 0;
     overflow: auto;
     padding-bottom: 18px;
@@ -883,11 +880,10 @@ button {
   }
 
   .composer {
-    bottom: 0;
     gap: 10px;
     padding-bottom: 16px;
     padding-top: 16px;
-    position: sticky;
+    position: relative;
     z-index: 4;
   }
 
@@ -905,11 +901,19 @@ button {
   }
 
   .context-panel {
+    background: #ffffff;
     border-left: 0;
     border-top: 1px solid #dfe4ec;
-    height: auto;
-    overflow: visible;
+    border-radius: 16px 16px 0 0;
+    bottom: 0;
+    box-shadow: 0 -14px 40px rgb(20 28 42 / 18%);
+    left: 0;
+    max-height: min(76svh, 680px);
+    overflow: auto;
     padding: 18px 16px;
+    position: fixed;
+    right: 0;
+    z-index: 20;
   }
 
   .context-panel.is-collapsed {
