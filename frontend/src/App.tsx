@@ -111,6 +111,10 @@ function deliveryStatus(conversation: ConversationListItem): DeliveryStatus {
   return conversation.lastMessage?.deliveryStatus || "pending";
 }
 
+function needsReply(conversation: ConversationListItem) {
+  return conversation.status === "open" && conversation.lastMessage?.direction === "customer_to_employee";
+}
+
 function formatDate(value: string | null | undefined) {
   if (!value) return "";
   const date = new Date(value);
@@ -814,12 +818,14 @@ export function App() {
             {visibleConversations.map((conversation) => (
               (() => {
                 const listChannel = effectiveChannel(conversation.channel, conversation.customer.phone);
+                const requiresReply = needsReply(conversation);
                 return (
                   <button
                     className={[
                       "conversation-row",
                       `channel-${listChannel}`,
                       `delivery-${deliveryStatus(conversation)}`,
+                      requiresReply ? "needs-reply" : "",
                       conversation.id === selectedId ? "selected" : "",
                     ]
                       .filter(Boolean)
@@ -842,6 +848,7 @@ export function App() {
                       <span className="conversation-identity">
                         <strong>{displayCustomerName(conversation)}</strong>
                         <span className={`channel-pill ${listChannel}`}>{channelLabel(listChannel)}</span>
+                        {requiresReply && <span className="attention-pill">Needs reply</span>}
                         {(deliveryStatus(conversation) === "failed" || deliveryStatus(conversation) === "undelivered") && (
                           <DeliveryPill status={deliveryStatus(conversation)} />
                         )}

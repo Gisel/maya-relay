@@ -35,6 +35,7 @@ async function mockMayaRelayApi(page: import("@playwright/test").Page) {
     lastMessage: {
       ...conversation.lastMessage,
       body: "Older hello",
+      direction: "employee_to_customer",
       createdAt: "2026-06-05T14:00:00Z",
     },
     updatedAt: "2026-06-05T14:00:00Z",
@@ -183,6 +184,17 @@ test("authenticated boot loads each initial resource once", async ({ page }) => 
   await expect.poll(() => requestCounts.quickResponses).toBe(1);
   expect(requestCounts.me).toBeGreaterThanOrEqual(1);
   expect(requestCounts.me).toBeLessThanOrEqual(2);
+});
+
+test("customer messages mark conversations as needing reply", async ({ page }) => {
+  await mockMayaRelayApi(page);
+
+  await page.goto("/app/");
+  await expect(page.getByRole("button", { name: /Test Customer/ })).toHaveClass(/needs-reply/);
+
+  await page.getByRole("button", { name: "Load more" }).click();
+
+  await expect(page.getByRole("button", { name: /Older Customer/ })).not.toHaveClass(/needs-reply/);
 });
 
 test("Load more appends the next conversation page", async ({ page }) => {

@@ -354,6 +354,16 @@ button {
   box-shadow: inset 4px 0 0 #1688c9;
 }
 
+.conversation-row.needs-reply {
+  background: #fffaf0;
+  box-shadow: inset 4px 0 0 #f2a900;
+}
+
+.conversation-row.needs-reply.selected {
+  background: #fff7e6;
+  box-shadow: inset 4px 0 0 #d98500;
+}
+
 .conversation-row-heading {
   align-items: center;
   display: flex;
@@ -422,6 +432,7 @@ button {
 
 .channel-pill,
 .delivery-pill,
+.attention-pill,
 .status-pill {
   align-items: center;
   border-radius: 999px;
@@ -434,10 +445,16 @@ button {
 }
 
 .conversation-identity .channel-pill,
-.conversation-identity .delivery-pill {
+.conversation-identity .delivery-pill,
+.conversation-identity .attention-pill {
   font-size: 10px;
   min-height: 20px;
   padding: 0 8px;
+}
+
+.attention-pill {
+  background: #fff1d6;
+  color: #9a5600;
 }
 
 .channel-pill.whatsapp {
@@ -1388,6 +1405,18 @@ button {
     box-shadow: inset 3px 0 0 #22a95a;
   }
 
+  .conversation-row.needs-reply {
+    background: #fff7e6;
+    border-color: #f0ba56;
+    box-shadow: none;
+  }
+
+  .conversation-row.needs-reply.selected {
+    background: #fff1d6;
+    border-color: #d98500;
+    box-shadow: inset 3px 0 0 #d98500;
+  }
+
   .conversation-row-heading {
     gap: 0;
   }
@@ -1422,6 +1451,10 @@ button {
     background: #dc1f46;
   }
 
+  .conversation-row.needs-reply strong::before {
+    background: #d98500;
+  }
+
   .conversation-row p {
     display: none;
   }
@@ -1431,7 +1464,8 @@ button {
   }
 
   .conversation-identity .channel-pill,
-  .conversation-identity .delivery-pill {
+  .conversation-identity .delivery-pill,
+  .conversation-identity .attention-pill {
     display: none;
   }
 
