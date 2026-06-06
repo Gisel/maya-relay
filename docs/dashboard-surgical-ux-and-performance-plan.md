@@ -4,6 +4,28 @@ Date: 2026-06-06
 
 This document captures the next dashboard work after the mobile Safari and New Call testing session. The goal is to keep the work precise, protect existing production behavior, and avoid broad rewrites while improving daily operator usability.
 
+## UX Vision Note
+
+The dashboard should feel soft, modern, calm, and client-ready. It should not feel loud, blocky, overly bold, or like an older admin dashboard. The product is an operator inbox, so the visual design should support quick scanning and confident replies without drawing attention to the interface itself.
+
+Current visual feedback to preserve for the next styling pass:
+
+- Reduce bold font weights across the header, CTA buttons, tabs, pills, and dashboard labels.
+- Avoid heavy all-bold button text. CTAs should feel confident but not shouty.
+- The brand/header should feel softer and more intentional, not like a 90s heading.
+- Do not use pure cyan or electric blue. Choose a more modern, composed blue.
+- The current green still feels ugly. Replace it with a softer, cleaner green that feels closer to a polished WhatsApp/Maya-friendly tone.
+- Keep the mobile polish that is already working.
+- Keep all styling changes surgical and frontend-only unless the user explicitly asks for behavior changes.
+
+Visual direction for the next attempt:
+
+- Use lighter typography weights, likely 500-600 for most UI labels and 600 max for primary CTAs.
+- Use restrained color: softer blue for actions and selected states, warmer/cleaner green for WhatsApp/outbound message bubbles.
+- Preserve readability and contrast, but avoid saturated colors dominating the screen.
+- Prefer subtle borders, quiet backgrounds, and compact spacing over heavy badges or oversized emphasis.
+- Make attachment previews and message bubbles feel production-ready without changing message behavior.
+
 ## Non-Negotiables
 
 - Do not delete or disable existing functionality.
