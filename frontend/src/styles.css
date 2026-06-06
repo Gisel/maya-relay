@@ -475,6 +475,26 @@ button {
   padding: 0 10px;
 }
 
+.conversation-status-action {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #d7dde7;
+  border-radius: 999px;
+  color: #475366;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 800;
+  gap: 5px;
+  min-height: 28px;
+  padding: 0 11px;
+}
+
+.conversation-status-action:disabled {
+  background: #eef1f5;
+  color: #98a2b6;
+  cursor: not-allowed;
+}
+
 .message-thread {
   align-content: start;
   display: grid;
@@ -978,6 +998,11 @@ button {
     min-height: 30px;
     padding: 0;
     width: 34px;
+  }
+
+  .conversation-status-action {
+    min-height: 30px;
+    padding: 0 10px;
   }
 
   .context-toggle span {

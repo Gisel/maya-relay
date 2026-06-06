@@ -143,6 +143,11 @@ Later:
 - Mark conversation resolved.
 - Click-to-call.
 
+Pending UX polish:
+
+- Make the reply composer easier to manage for longer responses. The current compact chat composer is good for mobile space, but it should grow vertically to 2-3 lines while typing or offer an expanded compose mode.
+- Refine the selected conversation header. The name/phone/status/details area currently works functionally, but the white full-width band feels unfinished compared with the padded cards below. It should get a more intentional mobile/desktop layout treatment without blocking functionality work.
+
 ### Pinned Scope: Click-To-Call Bridge
 
 Keep click-to-call inside the project scope for a near-future phase.

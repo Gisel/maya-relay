@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  Archive,
   CheckCircle2,
   FileText,
   LogOut,
@@ -30,6 +31,7 @@ import {
   login,
   logout,
   sendReply,
+  updateConversationStatus,
 } from "./api";
 import logoMaya from "./assets/logo-maya.jpg";
 
@@ -282,6 +284,7 @@ export function App() {
   const [files, setFiles] = useState<File[]>([]);
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [appError, setAppError] = useState("");
   const [detailError, setDetailError] = useState("");
   const [isContextOpen, setIsContextOpen] = useState(() => {
@@ -421,6 +424,32 @@ export function App() {
     setSuggestedReply("");
   }
 
+  async function handleToggleConversationStatus() {
+    if (!selectedId || !activeConversation) return;
+    const nextStatus: ConversationStatus = activeConversation.status === "open" ? "closed" : "open";
+    setIsUpdatingStatus(true);
+    setAppError("");
+    try {
+      const response = await updateConversationStatus(selectedId, nextStatus);
+      setSelectedConversation(response.conversation);
+      setConversations((current) =>
+        current.map((conversation) =>
+          conversation.id === selectedId ? { ...conversation, status: response.conversation.status } : conversation,
+        ),
+      );
+      await loadConversations(search);
+      await loadDetail(selectedId);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setIsAuthenticated(false);
+      } else {
+        setAppError(error instanceof Error ? error.message : "Could not update conversation.");
+      }
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  }
+
   if (isCheckingSession) {
     return (
       <main className="loading-screen">
@@ -525,6 +554,15 @@ export function App() {
                 </p>
                 <div className="conversation-header-actions">
                   <StatusPill status={status} />
+                  <button
+                    className="conversation-status-action"
+                    disabled={!selectedId || isUpdatingStatus}
+                    onClick={handleToggleConversationStatus}
+                    type="button"
+                  >
+                    <Archive size={15} />
+                    {status === "open" ? "Close" : "Reopen"}
+                  </button>
                   <button className="context-toggle" onClick={() => setIsContextOpen((current) => !current)} type="button">
                     {isContextOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
                     <span>{isContextOpen ? "Hide details" : "Details"}</span>

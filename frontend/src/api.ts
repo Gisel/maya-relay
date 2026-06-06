@@ -89,6 +89,10 @@ export type ReplyResponse = {
   message: Message;
 };
 
+export type UpdateConversationResponse = {
+  conversation: ConversationDetail;
+};
+
 export class ApiError extends Error {
   status: number;
 
@@ -161,5 +165,12 @@ export function sendReply(conversationId: string, body: string, files: File[], c
   return request<ReplyResponse>(`/api/conversations/${conversationId}/reply`, {
     method: "POST",
     body: form,
+  });
+}
+
+export function updateConversationStatus(conversationId: string, status: ConversationStatus) {
+  return request<UpdateConversationResponse>(`/api/conversations/${conversationId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
   });
 }
