@@ -698,7 +698,7 @@ export function App() {
                 <p>
                   <span className="desktop-channel-label">via {channelLabel(channel)} </span>
                   <span className="mobile-chat-label">Chatting with </span>
-                  {customerPhone}
+                  <span className="chat-phone">{customerPhone}</span>
                   <span className="mobile-channel-label"> via {channelLabel(channel)}</span>
                 </p>
                 <div className="conversation-header-actions">

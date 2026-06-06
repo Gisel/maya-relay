@@ -840,6 +840,7 @@ button {
   border: 1px solid #dfe4ec;
   border-radius: 8px;
   box-shadow: 0 22px 60px rgb(20 28 42 / 24%);
+  box-sizing: border-box;
   display: grid;
   gap: 18px;
   max-width: 460px;
@@ -897,6 +898,7 @@ button {
   border: 1px solid #cdd5e1;
   border-radius: 8px;
   color: #172033;
+  min-width: 0;
   min-height: 44px;
   padding: 0 13px;
 }
@@ -953,6 +955,7 @@ button {
 
   .logout-button,
   .new-call-button {
+    background: #eef1f5;
     min-width: 48px;
     padding: 0;
   }
@@ -960,6 +963,10 @@ button {
   .logout-button,
   .new-call-button {
     font-size: 0;
+  }
+
+  .new-call-button {
+    color: #1688c9;
   }
 
   .workspace {
@@ -1141,6 +1148,7 @@ button {
     display: inline-flex;
     font-size: 12px;
     font-weight: 800;
+    gap: 3px;
     justify-content: center;
     max-width: 100%;
     min-height: 28px;
@@ -1166,6 +1174,12 @@ button {
     justify-self: center;
   }
 
+  .chat-phone {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .desktop-channel-label {
     display: none;
   }
@@ -1180,6 +1194,7 @@ button {
   }
 
   .context-toggle {
+    background: #eef1f5;
     justify-content: center;
     min-height: 30px;
     padding: 0;
@@ -1188,14 +1203,22 @@ button {
 
   .conversation-status-action,
   .conversation-call-action {
+    align-items: center;
+    background: #eef1f5;
+    border: 0;
     border-radius: 8px;
+    justify-content: center;
     min-height: 34px;
     padding: 0;
     width: 34px;
   }
 
   .conversation-call-action {
-    background: #eef8ff;
+    color: #1688c9;
+  }
+
+  .conversation-status-action {
+    color: #475366;
   }
 
   .conversation-status-action,
@@ -1325,16 +1348,24 @@ button {
 
   .modal-panel {
     border-radius: 8px;
+    max-height: calc(100svh - 20px);
+    max-width: calc(100vw - 20px);
+    overflow: auto;
     padding: 18px;
+    width: calc(100vw - 20px);
   }
 
   .modal-actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
+    min-width: 0;
   }
 
+  .modal-actions .ghost-button,
   .modal-actions .send-button {
+    font-size: 13px;
     min-width: 0;
     padding: 0 12px;
+    width: 100%;
   }
 }
