@@ -85,6 +85,70 @@ async function mockMayaRelayApi(page: import("@playwright/test").Page) {
 
   await page.route("**/api/conversations/conversation-1", async (route) => {
     requestCounts.detail += 1;
+    const messages = [
+      {
+        id: "message-1",
+        conversationId: "conversation-1",
+        direction: "customer_to_employee",
+        body: "Hello",
+        fromPhone: "+15550000001",
+        toPhone: "+13852208404",
+        twilioMessageSid: "SMfake",
+        deliveryStatus: "delivered",
+        deliveryErrorCode: null,
+        deliveryErrorMessage: null,
+        clientRequestId: null,
+        createdAt: "2026-06-06T14:00:00Z",
+        attachments: [],
+      },
+      {
+        id: "message-2",
+        conversationId: "conversation-1",
+        direction: "system",
+        body: "From Test Customer [#C0001]:\nHello\nReply with #C0001 your message",
+        fromPhone: "+13852208404",
+        toPhone: "+15551234567",
+        twilioMessageSid: "SMforward",
+        deliveryStatus: "delivered",
+        deliveryErrorCode: null,
+        deliveryErrorMessage: null,
+        clientRequestId: null,
+        createdAt: "2026-06-06T14:00:01Z",
+        attachments: [],
+      },
+      {
+        id: "message-3",
+        conversationId: "conversation-1",
+        direction: "system",
+        body: "#C0001 Please send size and deadline.",
+        fromPhone: "+13852208404",
+        toPhone: "+15551234567",
+        twilioMessageSid: "SMsuggestion",
+        deliveryStatus: "delivered",
+        deliveryErrorCode: null,
+        deliveryErrorMessage: null,
+        clientRequestId: null,
+        createdAt: "2026-06-06T14:00:02Z",
+        attachments: [],
+      },
+    ];
+    if (requestCounts.detail > 1) {
+      messages.push({
+        id: "message-4",
+        conversationId: "conversation-1",
+        direction: "customer_to_employee",
+        body: "New automatic customer message",
+        fromPhone: "+15550000001",
+        toPhone: "+13852208404",
+        twilioMessageSid: "SMnew",
+        deliveryStatus: "delivered",
+        deliveryErrorCode: null,
+        deliveryErrorMessage: null,
+        clientRequestId: null,
+        createdAt: "2026-06-06T14:00:03Z",
+        attachments: [],
+      });
+    }
     await route.fulfill({
       contentType: "application/json",
       json: {
@@ -93,53 +157,7 @@ async function mockMayaRelayApi(page: import("@playwright/test").Page) {
           assignedEmployee: "+15551234567",
           createdAt: "2026-06-06T14:00:00Z",
         },
-        messages: [
-          {
-            id: "message-1",
-            conversationId: "conversation-1",
-            direction: "customer_to_employee",
-            body: "Hello",
-            fromPhone: "+15550000001",
-            toPhone: "+13852208404",
-            twilioMessageSid: "SMfake",
-            deliveryStatus: "delivered",
-            deliveryErrorCode: null,
-            deliveryErrorMessage: null,
-            clientRequestId: null,
-            createdAt: "2026-06-06T14:00:00Z",
-            attachments: [],
-          },
-          {
-            id: "message-2",
-            conversationId: "conversation-1",
-            direction: "system",
-            body: "From Test Customer [#C0001]:\nHello\nReply with #C0001 your message",
-            fromPhone: "+13852208404",
-            toPhone: "+15551234567",
-            twilioMessageSid: "SMforward",
-            deliveryStatus: "delivered",
-            deliveryErrorCode: null,
-            deliveryErrorMessage: null,
-            clientRequestId: null,
-            createdAt: "2026-06-06T14:00:01Z",
-            attachments: [],
-          },
-          {
-            id: "message-3",
-            conversationId: "conversation-1",
-            direction: "system",
-            body: "#C0001 Please send size and deadline.",
-            fromPhone: "+13852208404",
-            toPhone: "+15551234567",
-            twilioMessageSid: "SMsuggestion",
-            deliveryStatus: "delivered",
-            deliveryErrorCode: null,
-            deliveryErrorMessage: null,
-            clientRequestId: null,
-            createdAt: "2026-06-06T14:00:02Z",
-            attachments: [],
-          },
-        ],
+        messages,
         suggestedReply: "Please send size and deadline.",
       },
     });
@@ -236,6 +254,20 @@ test("system relay and AI suggestion messages stay out of the chat timeline", as
   await expect(page.getByRole("article").getByText("Please send size and deadline.")).toHaveCount(0);
   await expect(page.getByRole("article").getByText(/Reply with #C0001/)).toHaveCount(0);
   await expect(page.getByText("Please send size and deadline.")).toHaveCount(1);
+});
+
+test("selected conversation refreshes new messages automatically", async ({ page }) => {
+  await page.addInitScript(() => {
+    const originalSetInterval = window.setInterval;
+    window.setInterval = ((handler: TimerHandler, timeout?: number, ...args: unknown[]) =>
+      originalSetInterval(handler, timeout === 15000 ? 100 : timeout, ...args)) as typeof window.setInterval;
+  });
+  const requestCounts = await mockMayaRelayApi(page);
+
+  await page.goto("/app/");
+  await expect(page.getByRole("article").getByText("Hello")).toBeVisible();
+  await expect(page.getByRole("article").getByText("New automatic customer message")).toBeVisible();
+  await expect.poll(() => requestCounts.detail).toBeGreaterThan(1);
 });
 
 test("Load more appends the next conversation page", async ({ page }) => {

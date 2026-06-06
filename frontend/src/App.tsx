@@ -39,6 +39,8 @@ import {
 } from "./api";
 import logoMaya from "./assets/logo-maya.jpg";
 
+const INBOX_REFRESH_INTERVAL_MS = 15000;
+
 function channelLabel(channel: Channel) {
   return channel === "whatsapp" ? "WhatsApp" : "SMS";
 }
@@ -477,6 +479,8 @@ export function App() {
   });
   const didRunInitialSearchEffect = useRef(false);
   const searchRequestId = useRef(0);
+  const isRefreshingList = useRef(false);
+  const isRefreshingDetail = useRef(false);
 
   const allKnownConversations = useMemo(
     () => mergeConversationLists(conversations, searchResults),
@@ -582,6 +586,43 @@ export function App() {
     }
   }, []);
 
+  const refreshConversationList = useCallback(async () => {
+    if (isRefreshingList.current) return;
+    isRefreshingList.current = true;
+    try {
+      const payload = await getConversations();
+      setConversations((current) => mergeConversationLists(payload.conversations, current));
+      setMetrics(payload.metrics);
+      setNextConversationOffset(payload.pagination?.nextOffset ?? null);
+      setHasMoreConversations(payload.pagination?.hasMore ?? false);
+      setSelectedId((current) => current || payload.conversations[0]?.id || "");
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setIsAuthenticated(false);
+      }
+    } finally {
+      isRefreshingList.current = false;
+    }
+  }, []);
+
+  const refreshDetail = useCallback(async (conversationId: string) => {
+    if (!conversationId || isRefreshingDetail.current) return;
+    isRefreshingDetail.current = true;
+    try {
+      const payload = await getConversationDetail(conversationId);
+      setSelectedConversation(payload.conversation);
+      setMessages(payload.messages);
+      setSuggestedReply(payload.suggestedReply || "");
+      setDetailError("");
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setIsAuthenticated(false);
+      }
+    } finally {
+      isRefreshingDetail.current = false;
+    }
+  }, []);
+
   useEffect(() => {
     getMe()
       .then(() => {
@@ -649,6 +690,20 @@ export function App() {
     if (!isAuthenticated) return;
     loadDetail(selectedId);
   }, [isAuthenticated, loadDetail, selectedId]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      if (!search.trim()) {
+        void refreshConversationList();
+      }
+      if (selectedId && !draft.trim() && files.length === 0) {
+        void refreshDetail(selectedId);
+      }
+    }, INBOX_REFRESH_INTERVAL_MS);
+    return () => window.clearInterval(intervalId);
+  }, [draft, files.length, isAuthenticated, refreshConversationList, refreshDetail, search, selectedId]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 760px)");
