@@ -93,6 +93,11 @@ async function expectNoHorizontalOverflow(page: import("@playwright/test").Page)
   expect(overflow.documentScrollWidth).toBeLessThanOrEqual(overflow.viewportWidth);
 }
 
+async function expectNoIosInputZoomRisk(locator: import("@playwright/test").Locator) {
+  const fontSize = await locator.evaluate((element) => Number.parseFloat(window.getComputedStyle(element).fontSize));
+  expect(fontSize).toBeGreaterThanOrEqual(16);
+}
+
 test("New Call drawer stays inside the mobile viewport", async ({ page }) => {
   await mockMayaRelayApi(page);
   await page.goto("/app/");
@@ -104,6 +109,7 @@ test("New Call drawer stays inside the mobile viewport", async ({ page }) => {
   const phoneInput = page.getByLabel("Customer phone");
   await phoneInput.focus();
   await phoneInput.fill("+1 555 000 0000");
+  await expectNoIosInputZoomRisk(phoneInput);
   await expectNoHorizontalOverflow(page);
 
   for (const control of [
@@ -116,4 +122,20 @@ test("New Call drawer stays inside the mobile viewport", async ({ page }) => {
     expect(box!.x).toBeGreaterThanOrEqual(0);
     expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
   }
+});
+
+test("login input focus does not create mobile zoom risk", async ({ page }) => {
+  await page.route("**/api/me", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      status: 401,
+      json: { detail: "Unauthorized" },
+    });
+  });
+
+  await page.goto("/app/");
+  const passwordInput = page.getByLabel("Password");
+  await passwordInput.focus();
+  await expectNoIosInputZoomRisk(passwordInput);
+  await expectNoHorizontalOverflow(page);
 });
