@@ -270,6 +270,24 @@ test("selected conversation refreshes new messages automatically", async ({ page
   await expect.poll(() => requestCounts.detail).toBeGreaterThan(1);
 });
 
+test("message thread scrolls to the newest message", async ({ page }) => {
+  const requestCounts = await mockMayaRelayApi(page);
+
+  await page.goto("/app/");
+  await page.addStyleTag({ content: ".message-thread { max-height: 160px !important; }" });
+  await page.getByRole("button", { name: "Refresh inbox" }).click();
+  await expect(page.getByRole("article").getByText("New automatic customer message")).toBeVisible();
+
+  await expect
+    .poll(() =>
+      page.locator(".message-thread").evaluate((element) => (
+        element.scrollTop + element.clientHeight >= element.scrollHeight - 2
+      )),
+    )
+    .toBe(true);
+  expect(requestCounts.detail).toBeGreaterThan(1);
+});
+
 test("manual inbox refresh pulls new selected messages", async ({ page }) => {
   const requestCounts = await mockMayaRelayApi(page);
 

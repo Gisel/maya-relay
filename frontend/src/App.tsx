@@ -482,6 +482,7 @@ export function App() {
   const searchRequestId = useRef(0);
   const isRefreshingList = useRef(false);
   const isRefreshingDetail = useRef(false);
+  const messageThreadRef = useRef<HTMLDivElement | null>(null);
 
   const allKnownConversations = useMemo(
     () => mergeConversationLists(conversations, searchResults),
@@ -504,6 +505,7 @@ export function App() {
     () => messages.filter(isCustomerVisibleMessage),
     [messages],
   );
+  const latestVisibleMessageId = visibleMessages[visibleMessages.length - 1]?.id || "";
 
   const loadConversations = useCallback(async (fallbackSelectedId = "") => {
     setIsLoadingList(true);
@@ -691,6 +693,14 @@ export function App() {
     if (!isAuthenticated) return;
     loadDetail(selectedId);
   }, [isAuthenticated, loadDetail, selectedId]);
+
+  useEffect(() => {
+    const messageThread = messageThreadRef.current;
+    if (!messageThread) return;
+    requestAnimationFrame(() => {
+      messageThread.scrollTop = messageThread.scrollHeight;
+    });
+  }, [latestVisibleMessageId, selectedId]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -1023,7 +1033,7 @@ export function App() {
             </div>
           </header>
 
-          <div className="message-thread">
+          <div className="message-thread" ref={messageThreadRef}>
             {appError && <p className="app-error">{appError}</p>}
             {callStatus && <p className="app-success">{callStatus}</p>}
             {detailError && <p className="app-error">Could not load this conversation. Try selecting it again.</p>}
