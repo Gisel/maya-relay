@@ -7,6 +7,7 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Paperclip,
+  Phone,
   RefreshCw,
   Search,
   Send,
@@ -24,6 +25,7 @@ import {
   Message,
   Metrics,
   QuickResponse,
+  callConversationCustomer,
   getConversationDetail,
   getConversations,
   getMe,
@@ -285,6 +287,8 @@ export function App() {
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isCallingCustomer, setIsCallingCustomer] = useState(false);
+  const [callStatus, setCallStatus] = useState("");
   const [appError, setAppError] = useState("");
   const [detailError, setDetailError] = useState("");
   const [isContextOpen, setIsContextOpen] = useState(() => {
@@ -327,6 +331,7 @@ export function App() {
       setSelectedConversation(null);
       setMessages([]);
       setSuggestedReply("");
+      setCallStatus("");
       return;
     }
     setIsLoadingDetail(true);
@@ -335,6 +340,7 @@ export function App() {
     setSelectedConversation(null);
     setMessages([]);
     setSuggestedReply("");
+    setCallStatus("");
     try {
       const payload = await getConversationDetail(conversationId);
       setSelectedConversation(payload.conversation);
@@ -409,6 +415,7 @@ export function App() {
     setSelectedConversation(null);
     setMessages([]);
     setSuggestedReply("");
+    setCallStatus("");
   }
 
   async function handleSend(body: string, selectedFiles: File[]) {
@@ -447,6 +454,25 @@ export function App() {
       }
     } finally {
       setIsUpdatingStatus(false);
+    }
+  }
+
+  async function handleCallCustomer() {
+    if (!selectedId) return;
+    setIsCallingCustomer(true);
+    setAppError("");
+    setCallStatus("");
+    try {
+      const response = await callConversationCustomer(selectedId);
+      setCallStatus(`Calling Francisco first, then ${response.to}.`);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setIsAuthenticated(false);
+      } else {
+        setAppError(error instanceof Error ? error.message : "Could not start the call.");
+      }
+    } finally {
+      setIsCallingCustomer(false);
     }
   }
 
@@ -522,6 +548,7 @@ export function App() {
                   setFiles([]);
                   setDetailError("");
                   setSuggestedReply("");
+                  setCallStatus("");
                   if (window.matchMedia("(max-width: 760px)").matches) {
                     setIsContextOpen(false);
                   }
@@ -555,6 +582,15 @@ export function App() {
                 <div className="conversation-header-actions">
                   <StatusPill status={status} />
                   <button
+                    className="conversation-call-action"
+                    disabled={!selectedId || isCallingCustomer}
+                    onClick={handleCallCustomer}
+                    type="button"
+                  >
+                    <Phone size={15} />
+                    {isCallingCustomer ? "Calling" : "Call"}
+                  </button>
+                  <button
                     className="conversation-status-action"
                     disabled={!selectedId || isUpdatingStatus}
                     onClick={handleToggleConversationStatus}
@@ -574,6 +610,7 @@ export function App() {
 
           <div className="message-thread">
             {appError && <p className="app-error">{appError}</p>}
+            {callStatus && <p className="app-success">{callStatus}</p>}
             {detailError && <p className="app-error">Could not load this conversation. Try selecting it again.</p>}
             {isLoadingDetail && <p className="panel-note">Loading messages...</p>}
             {!isLoadingDetail && !detailError && messages.length === 0 && <p className="panel-note">No messages yet.</p>}

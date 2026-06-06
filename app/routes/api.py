@@ -7,12 +7,12 @@ from fastapi.responses import JSONResponse
 
 from app.attachments import AttachmentStore
 from app.auth import SESSION_COOKIE, admin_enabled, require_admin, session_value
-from app.config import Settings, get_settings
+from app.config import Settings, get_settings, normalize_phone_number
 from app.db import RelayRepository
-from app.dependencies import get_attachment_store, get_repository, get_sender
+from app.dependencies import get_attachment_store, get_repository, get_sender, get_voice_caller
 from app.models import Conversation
 from app.reply_helpers import image_attachment_urls, read_uploads, reply_body_with_attachments
-from app.twilio_client import MessageSender
+from app.twilio_client import MessageSender, VoiceCaller
 
 
 router = APIRouter(prefix="/api", tags=["api"])
@@ -276,6 +276,42 @@ def api_send_conversation_reply(
     return {"status": "sent", "message": _serialize_message(created_message)}
 
 
+@router.post("/conversations/{conversation_id}/call")
+def api_call_conversation_customer(
+    conversation_id: str,
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    repository: RelayRepository = Depends(get_repository),
+    voice_caller: VoiceCaller = Depends(get_voice_caller),
+) -> dict[str, str]:
+    require_admin(request, settings)
+    conversation = repository.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404)
+
+    employee_phone = settings.francisco_phone_e164
+    customer_phone = _voice_phone_number(conversation.customer_phone)
+    if not employee_phone:
+        raise HTTPException(status_code=503, detail="FRANCISCO_PHONE is required for click-to-call.")
+    if not settings.maya_business_number_e164:
+        raise HTTPException(status_code=503, detail="MAYA_BUSINESS_NUMBER is required for click-to-call.")
+    if not customer_phone:
+        raise HTTPException(status_code=400, detail="Customer phone number is not callable.")
+
+    base_url = _public_base_url(request, settings)
+    call_sid = voice_caller.start_click_to_call(
+        employee_phone=employee_phone,
+        bridge_url=f"{base_url}/webhooks/twilio/voice/bridge/{conversation.id}",
+        status_callback_url=f"{base_url}/webhooks/twilio/voice/status",
+    )
+    return {
+        "status": "calling",
+        "callSid": call_sid,
+        "to": customer_phone,
+        "employeePhone": employee_phone,
+    }
+
+
 def _serialize_conversation_list_item(conversation: dict[str, Any]) -> dict[str, Any]:
     last_message = conversation.get("last_message") or {}
     return {
@@ -433,3 +469,22 @@ def _suggested_reply(messages: list[dict[str, Any]], conversation_code: str) -> 
             if clean.upper().startswith(prefix):
                 return clean[len(prefix):].strip()
     return ""
+
+
+def _public_base_url(request: Request, settings: Settings) -> str:
+    if settings.app_base_url.strip():
+        return settings.app_base_url.strip().rstrip("/")
+
+    forwarded_proto = request.headers.get("x-forwarded-proto")
+    forwarded_host = request.headers.get("x-forwarded-host") or request.headers.get("host")
+    if forwarded_proto and forwarded_host:
+        return f"{forwarded_proto}://{forwarded_host}"
+
+    return str(request.base_url).rstrip("/")
+
+
+def _voice_phone_number(phone_number: str) -> str:
+    prefix = "whatsapp:"
+    if phone_number.lower().startswith(prefix):
+        phone_number = phone_number[len(prefix):]
+    return normalize_phone_number(phone_number)

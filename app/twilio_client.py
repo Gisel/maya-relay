@@ -21,6 +21,17 @@ class MessageSender(Protocol):
         ...
 
 
+class VoiceCaller(Protocol):
+    def start_click_to_call(
+        self,
+        *,
+        employee_phone: str,
+        bridge_url: str,
+        status_callback_url: str,
+    ) -> str:
+        ...
+
+
 class TwilioMessageSender:
     def __init__(self, settings: Settings):
         if not settings.twilio_account_sid or not settings.twilio_auth_token:
@@ -52,6 +63,35 @@ class TwilioMessageSender:
 
         message = self.client.messages.create(**message_kwargs)
         return message.sid
+
+
+class TwilioVoiceCaller:
+    def __init__(self, settings: Settings):
+        if not settings.twilio_account_sid or not settings.twilio_auth_token:
+            raise RuntimeError("TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN are required.")
+        if not settings.maya_business_number_e164:
+            raise RuntimeError("MAYA_BUSINESS_NUMBER is required.")
+
+        self.settings = settings
+        self.client = Client(settings.twilio_account_sid, settings.twilio_auth_token)
+
+    def start_click_to_call(
+        self,
+        *,
+        employee_phone: str,
+        bridge_url: str,
+        status_callback_url: str,
+    ) -> str:
+        call = self.client.calls.create(
+            to=employee_phone,
+            from_=self.settings.maya_business_number_e164,
+            url=bridge_url,
+            method="POST",
+            status_callback=status_callback_url,
+            status_callback_method="POST",
+            status_callback_event=["initiated", "ringing", "answered", "completed"],
+        )
+        return call.sid
 
 
 def _recipient_for_channel(phone_number: str, channel: Channel) -> str:

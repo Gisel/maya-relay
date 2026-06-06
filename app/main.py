@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.routes import admin, api, health, twilio_sms
+from app.routes import admin, api, health, twilio_sms, twilio_voice
 
 FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 
@@ -13,6 +13,7 @@ def create_app() -> FastAPI:
     app = FastAPI(title="Maya SMS Relay")
     app.include_router(health.router)
     app.include_router(twilio_sms.router)
+    app.include_router(twilio_voice.router)
     app.include_router(api.router)
     app.include_router(admin.router)
     if FRONTEND_DIST.exists():

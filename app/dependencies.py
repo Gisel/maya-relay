@@ -6,7 +6,7 @@ from app.config import Settings, get_settings
 from app.db import RelayRepository, SupabaseRelayRepository
 from app.lookup import ContactNameLookup, NoopContactNameLookup, TwilioContactNameLookup
 from app.services.relay import RelayService
-from app.twilio_client import MessageSender, TwilioMessageSender
+from app.twilio_client import MessageSender, TwilioMessageSender, TwilioVoiceCaller, VoiceCaller
 
 
 @lru_cache
@@ -17,6 +17,11 @@ def get_repository() -> RelayRepository:
 @lru_cache
 def get_sender() -> MessageSender:
     return TwilioMessageSender(get_settings())
+
+
+@lru_cache
+def get_voice_caller() -> VoiceCaller:
+    return TwilioVoiceCaller(get_settings())
 
 
 @lru_cache

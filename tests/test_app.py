@@ -2,10 +2,10 @@ from fastapi.testclient import TestClient
 from twilio.request_validator import RequestValidator
 
 from app.config import Settings, get_settings
-from app.dependencies import get_attachment_store, get_relay_service, get_repository, get_sender
+from app.dependencies import get_attachment_store, get_relay_service, get_repository, get_sender, get_voice_caller
 from app.main import create_app
 from app.services.relay import RelayService
-from tests.fakes import FakeAttachmentStore, FakeRepository, FakeSender
+from tests.fakes import FakeAttachmentStore, FakeRepository, FakeSender, FakeVoiceCaller
 
 
 def make_client(
@@ -24,9 +24,11 @@ def make_client(
         TWILIO_MESSAGING_SERVICE_SID="",
         SUPABASE_URL="",
         SUPABASE_SERVICE_ROLE_KEY="",
+        APP_BASE_URL="https://maya-relay.example",
     )
     repository = FakeRepository()
     sender = FakeSender()
+    voice_caller = FakeVoiceCaller()
     attachment_store = FakeAttachmentStore()
     app = create_app()
 
@@ -36,8 +38,10 @@ def make_client(
     app.dependency_overrides[get_relay_service] = relay_override
     app.dependency_overrides[get_repository] = lambda: repository
     app.dependency_overrides[get_sender] = lambda: sender
+    app.dependency_overrides[get_voice_caller] = lambda: voice_caller
     app.dependency_overrides[get_attachment_store] = lambda: attachment_store
     app.dependency_overrides[get_settings] = lambda: settings
+    app.state.fake_voice_caller = voice_caller
     return TestClient(app), repository, sender
 
 
@@ -444,6 +448,52 @@ def test_api_updates_conversation_status():
     assert response.status_code == 200
     assert response.json()["conversation"]["status"] == "closed"
     assert repository.conversations[0].status == "closed"
+
+
+def test_api_starts_click_to_call_bridge():
+    client, repository, _ = make_client(admin_password="secret")
+    repository.get_or_create_customer_conversation(
+        customer_phone="whatsapp:+15550000001",
+        assigned_employee="+15551234567",
+        customer_channel="whatsapp",
+    )
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    response = client.post("/api/conversations/conversation-1/call", headers={"cookie": cookie})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "calling",
+        "callSid": "CAfake1",
+        "to": "+15550000001",
+        "employeePhone": "+15551234567",
+    }
+    assert client.app.state.fake_voice_caller.calls == [
+        {
+            "employee_phone": "+15551234567",
+            "bridge_url": "https://maya-relay.example/webhooks/twilio/voice/bridge/conversation-1",
+            "status_callback_url": "https://maya-relay.example/webhooks/twilio/voice/status",
+        }
+    ]
+
+
+def test_twilio_voice_bridge_dials_customer():
+    client, repository, _ = make_client()
+    repository.get_or_create_customer_conversation(
+        customer_phone="whatsapp:+15550000001",
+        assigned_employee="+15551234567",
+        customer_channel="whatsapp",
+    )
+
+    response = client.post("/webhooks/twilio/voice/bridge/conversation-1")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/xml")
+    assert "Connecting you to the customer." in response.text
+    assert "<Dial" in response.text
+    assert "+15550000001" in response.text
+    assert "+13852208404" in response.text
 
 
 def test_twilio_sms_webhook_acknowledges_with_empty_twiml():

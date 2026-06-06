@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-5-mini", alias="OPENAI_MODEL")
     admin_password: str = Field(default="", alias="ADMIN_PASSWORD")
+    app_base_url: str = Field(default="", alias="APP_BASE_URL")
 
     twilio_account_sid: str = Field(default="", alias="TWILIO_ACCOUNT_SID")
     twilio_auth_token: str = Field(default="", alias="TWILIO_AUTH_TOKEN")

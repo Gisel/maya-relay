@@ -99,13 +99,19 @@ button {
 }
 
 .form-error,
-.app-error {
+.app-error,
+.app-success {
   background: #ffe2e4;
   border-radius: 8px;
   color: #b42318;
   font-weight: 800;
   margin: 0;
   padding: 12px 14px;
+}
+
+.app-success {
+  background: #d9fae6;
+  color: #146a3a;
 }
 
 .topbar {
@@ -475,7 +481,8 @@ button {
   padding: 0 10px;
 }
 
-.conversation-status-action {
+.conversation-status-action,
+.conversation-call-action {
   align-items: center;
   background: #ffffff;
   border: 1px solid #d7dde7;
@@ -489,7 +496,14 @@ button {
   padding: 0 11px;
 }
 
-.conversation-status-action:disabled {
+.conversation-call-action {
+  background: #eef8ff;
+  border-color: #b8ddf4;
+  color: #146a8f;
+}
+
+.conversation-status-action:disabled,
+.conversation-call-action:disabled {
   background: #eef1f5;
   color: #98a2b6;
   cursor: not-allowed;
@@ -1000,7 +1014,8 @@ button {
     width: 34px;
   }
 
-  .conversation-status-action {
+  .conversation-status-action,
+  .conversation-call-action {
     min-height: 30px;
     padding: 0 10px;
   }

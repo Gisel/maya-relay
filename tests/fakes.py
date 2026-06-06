@@ -245,6 +245,22 @@ class FakeSender:
         return sid
 
 
+class FakeVoiceCaller:
+    def __init__(self):
+        self.calls: list[dict[str, str]] = []
+
+    def start_click_to_call(self, *, employee_phone: str, bridge_url: str, status_callback_url: str) -> str:
+        sid = f"CAfake{len(self.calls) + 1}"
+        self.calls.append(
+            {
+                "employee_phone": employee_phone,
+                "bridge_url": bridge_url,
+                "status_callback_url": status_callback_url,
+            }
+        )
+        return sid
+
+
 class FakeAttachmentStore:
     def __init__(self):
         self.uploads: list[dict[str, object]] = []

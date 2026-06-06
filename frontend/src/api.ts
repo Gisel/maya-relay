@@ -93,6 +93,13 @@ export type UpdateConversationResponse = {
   conversation: ConversationDetail;
 };
 
+export type CallConversationResponse = {
+  status: "calling";
+  callSid: string;
+  to: string;
+  employeePhone: string;
+};
+
 export class ApiError extends Error {
   status: number;
 
@@ -172,5 +179,11 @@ export function updateConversationStatus(conversationId: string, status: Convers
   return request<UpdateConversationResponse>(`/api/conversations/${conversationId}`, {
     method: "PATCH",
     body: JSON.stringify({ status }),
+  });
+}
+
+export function callConversationCustomer(conversationId: string) {
+  return request<CallConversationResponse>(`/api/conversations/${conversationId}/call`, {
+    method: "POST",
   });
 }
