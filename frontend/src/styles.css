@@ -1,10 +1,10 @@
 :root {
   --topbar-height: 72px;
-  --brand-blue: #2563eb;
-  --brand-blue-dark: #1d4ed8;
-  --brand-blue-soft: #eff6ff;
-  --brand-green: #22b65f;
-  --brand-green-dark: #178a48;
+  --brand-blue: #3b6f9f;
+  --brand-blue-dark: #2c557a;
+  --brand-blue-soft: #f0f6fb;
+  --brand-green: #4f9a68;
+  --brand-green-dark: #35724a;
   --font-sans:
     "Roboto", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
@@ -103,7 +103,7 @@ button {
 .login-panel label {
   color: #475366;
   display: grid;
-  font-weight: 800;
+  font-weight: 600;
   gap: 8px;
   min-width: 0;
 }
@@ -129,7 +129,7 @@ button {
   background: #ffe2e4;
   border-radius: 8px;
   color: #b42318;
-  font-weight: 800;
+  font-weight: 600;
   margin: 0;
   padding: 12px 14px;
 }
@@ -176,14 +176,14 @@ button {
 
 .brand strong {
   color: #172033;
-  font-size: 22px;
-  font-weight: 750;
+  font-size: 21px;
+  font-weight: 620;
 }
 
 .brand span {
   color: var(--brand-blue);
-  font-size: 22px;
-  font-weight: 650;
+  font-size: 21px;
+  font-weight: 520;
 }
 
 .logout-button,
@@ -196,8 +196,8 @@ button {
   border-radius: 8px;
   display: inline-flex;
   font-family:
-    "Montserrat", "Inter", var(--font-sans);
-  font-weight: 700;
+    "Inter", var(--font-sans);
+  font-weight: 560;
   gap: 8px;
   justify-content: center;
   letter-spacing: 0;
@@ -310,7 +310,7 @@ button {
 .metric-card span {
   display: block;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 560;
   margin-bottom: 6px;
   text-transform: uppercase;
 }
@@ -319,6 +319,7 @@ button {
   color: var(--brand-blue);
   display: block;
   font-size: 26px;
+  font-weight: 560;
   line-height: 1;
 }
 
@@ -354,7 +355,7 @@ button {
 
 .panel-note {
   color: #68748a;
-  font-weight: 700;
+  font-weight: 560;
   margin: 0;
   padding: 22px;
 }
@@ -404,6 +405,7 @@ button {
 
 .conversation-row strong {
   font-size: 13px;
+  font-weight: 620;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -432,7 +434,7 @@ button {
   border-radius: 8px;
   color: var(--brand-blue-dark);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 560;
   min-height: 42px;
   margin: 12px 18px 18px;
   padding: 0 16px;
@@ -461,7 +463,7 @@ button {
   border-radius: 999px;
   display: inline-flex;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   gap: 4px;
   min-height: 26px;
   padding: 0 12px;
@@ -529,7 +531,7 @@ button {
 
 .conversation-header h1 {
   font-size: 18px;
-  font-weight: 800;
+  font-weight: 620;
   line-height: 1.1;
   margin: 0 0 6px;
   overflow: hidden;
@@ -541,7 +543,7 @@ button {
   color: #7b8799;
   display: none;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 560;
   letter-spacing: 0.02em;
   margin: 0 0 8px;
   text-transform: uppercase;
@@ -550,7 +552,7 @@ button {
 .conversation-header p {
   color: #7b8799;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 560;
   margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -593,7 +595,7 @@ button {
   color: #475366;
   display: none;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 560;
   gap: 6px;
   min-height: 34px;
   padding: 0 10px;
@@ -608,7 +610,7 @@ button {
   color: #475366;
   display: inline-flex;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 560;
   gap: 5px;
   min-height: 30px;
   padding: 0 12px;
@@ -678,7 +680,7 @@ button {
   color: #7a8496;
   display: flex;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 560;
   gap: 10px;
   justify-content: flex-end;
   margin-top: 10px;
@@ -815,7 +817,7 @@ button {
   border-radius: 999px;
   color: #475366;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 560;
   padding: 7px 12px;
 }
 
@@ -833,7 +835,7 @@ button {
   color: #9ba4b6;
   display: flex;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 560;
   gap: 8px;
   letter-spacing: 0.08em;
   margin: 0 0 14px;
@@ -843,6 +845,7 @@ button {
 .context-section > strong {
   display: block;
   font-size: 16px;
+  font-weight: 620;
   margin-bottom: 6px;
   overflow-wrap: anywhere;
 }
@@ -868,7 +871,7 @@ button {
   background: #ffdce8;
   border-radius: 6px;
   color: #dc1f70;
-  font-weight: 900;
+  font-weight: 620;
   justify-self: start;
   padding: 6px 12px;
 }
@@ -901,7 +904,7 @@ button {
   border: 0;
   border-radius: 8px;
   color: #ffffff;
-  font-weight: 700;
+  font-weight: 560;
   min-height: 42px;
   padding: 0 14px;
 }
@@ -999,7 +1002,7 @@ button {
   color: #475366;
   display: grid;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 560;
   gap: 7px;
 }
 
@@ -1547,7 +1550,7 @@ button {
     color: #475366;
     display: inline-flex;
     font-size: 12px;
-    font-weight: 800;
+    font-weight: 560;
     gap: 3px;
     justify-content: center;
     max-width: 100%;
@@ -1775,7 +1778,7 @@ button {
   .context-panel-header span {
     color: #98a2b6;
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 560;
     letter-spacing: 0.08em;
     text-transform: uppercase;
   }
