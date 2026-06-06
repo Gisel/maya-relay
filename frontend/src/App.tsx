@@ -223,17 +223,13 @@ function Composer({
 
   return (
     <form className="composer" onSubmit={handleSubmit}>
-      <textarea
-        aria-label="Reply message"
-        disabled={disabled || isSending}
-        onChange={(event) => onDraftChange(event.target.value)}
-        placeholder="Type your response directly to the customer here..."
-        value={draft}
-      />
       <div className="composer-actions">
-        <label className={`attach-control ${disabled || isSending ? "is-disabled" : ""}`}>
-          <Paperclip size={20} />
-          <span>Attach files or imagery</span>
+        <label
+          aria-label="Attach files or imagery"
+          className={`attach-control ${disabled || isSending ? "is-disabled" : ""}`}
+          title="Attach files or imagery"
+        >
+          <Paperclip size={22} />
           <input
             disabled={disabled || isSending}
             multiple
@@ -241,9 +237,22 @@ function Composer({
             type="file"
           />
         </label>
-        <button className="send-button" disabled={!canSend || isSending || disabled} type="submit">
-          <Send size={18} />
-          {isSending ? "Sending..." : "Send Message"}
+        <textarea
+          aria-label="Reply message"
+          disabled={disabled || isSending}
+          onChange={(event) => onDraftChange(event.target.value)}
+          placeholder="Message"
+          rows={1}
+          value={draft}
+        />
+        <button
+          aria-label={isSending ? "Sending message" : "Send message"}
+          className="send-button composer-send-button"
+          disabled={!canSend || isSending || disabled}
+          title={isSending ? "Sending..." : "Send message"}
+          type="submit"
+        >
+          <Send size={20} />
         </button>
       </div>
       {files.length > 0 && (
