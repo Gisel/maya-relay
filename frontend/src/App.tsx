@@ -115,6 +115,10 @@ function needsReply(conversation: ConversationListItem) {
   return conversation.status === "open" && conversation.lastMessage?.direction === "customer_to_employee";
 }
 
+function isCustomerVisibleMessage(message: Message) {
+  return message.direction !== "system";
+}
+
 function formatDate(value: string | null | undefined) {
   if (!value) return "";
   const date = new Date(value);
@@ -489,6 +493,11 @@ export function App() {
   const selectedListItem = useMemo(
     () => allKnownConversations.find((conversation) => conversation.id === selectedId) || null,
     [allKnownConversations, selectedId],
+  );
+
+  const visibleMessages = useMemo(
+    () => messages.filter(isCustomerVisibleMessage),
+    [messages],
   );
 
   const loadConversations = useCallback(async (fallbackSelectedId = "") => {
@@ -921,8 +930,8 @@ export function App() {
             {callStatus && <p className="app-success">{callStatus}</p>}
             {detailError && <p className="app-error">Could not load this conversation. Try selecting it again.</p>}
             {isLoadingDetail && <p className="panel-note">Loading messages...</p>}
-            {!isLoadingDetail && !detailError && messages.length === 0 && <p className="panel-note">No messages yet.</p>}
-            {messages.map((message) => (
+            {!isLoadingDetail && !detailError && visibleMessages.length === 0 && <p className="panel-note">No messages yet.</p>}
+            {visibleMessages.map((message) => (
               <MessageBubble key={message.id} message={message} />
             ))}
           </div>

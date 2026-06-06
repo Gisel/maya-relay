@@ -204,7 +204,7 @@ class FakeRepository:
                 if message["conversation_id"] == conversation.id
             ]
             last_message = next(
-                (message for message in reversed(messages)),
+                (message for message in reversed(messages) if message.get("direction") != "system"),
                 None,
             )
             contact = self.get_contact(conversation.customer_phone)

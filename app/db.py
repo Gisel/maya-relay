@@ -419,7 +419,7 @@ class SupabaseRelayRepository:
                     "customer_display_name": contact.get("display_name"),
                     "customer_lookup_name": contact.get("lookup_name"),
                     "customer_name": contact.get("display_name") or contact.get("lookup_name"),
-                    "last_message": conversation_messages[0] if conversation_messages else None,
+                    "last_message": _latest_customer_visible_message(conversation_messages),
                     "message_search_text": _message_search_text(conversation_messages),
                 }
             )
@@ -455,3 +455,10 @@ def _message_search_text(messages: list[dict[str, Any]]) -> str:
             if value
         )
     return " ".join(parts)
+
+
+def _latest_customer_visible_message(messages: list[dict[str, Any]]) -> dict[str, Any] | None:
+    for message in messages:
+        if message.get("direction") != "system":
+            return message
+    return None

@@ -311,6 +311,13 @@ def test_list_conversations_batches_contacts_and_messages():
                 "created_at": "2026-06-04T00:00:03+00:00",
             },
             {
+                "conversation_id": "conversation-1",
+                "body": "#C0001 Internal AI suggestion",
+                "direction": "system",
+                "delivery_status": "delivered",
+                "created_at": "2026-06-04T00:00:04+00:00",
+            },
+            {
                 "conversation_id": "conversation-2",
                 "body": "Second conversation",
                 "direction": "customer_to_employee",
@@ -327,6 +334,7 @@ def test_list_conversations_batches_contacts_and_messages():
     assert conversations[0]["customer_display_name"] == "Maria Lopez"
     assert conversations[0]["customer_name"] == "Maria Lopez"
     assert conversations[0]["last_message"]["body"] == "Latest message"
+    assert "Internal AI suggestion" in conversations[0]["message_search_text"]
     assert "Older message" in conversations[0]["message_search_text"]
     assert conversations[1]["customer_lookup_name"] == "Lookup Client"
     assert conversations[1]["last_message"]["body"] == "Second conversation"

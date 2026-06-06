@@ -167,7 +167,7 @@ def test_admin_login_and_conversations_page():
     assert "Logout" in dashboard.text
     assert "Open conversations" in dashboard.text
     assert "#C0001" in dashboard.text
-    assert "Reply with #C0001 your message" in dashboard.text
+    assert "Reply with #C0001 your message" not in dashboard.text
 
     search = client.get("/admin?q=cotización", headers={"cookie": cookie})
     assert search.status_code == 200
@@ -351,12 +351,12 @@ def test_api_conversation_contract_and_idempotent_reply():
             "name": "GOMEZ, GISEL",
         },
         "lastMessage": {
-            "body": "#C0001 Please send size and quantity.",
-            "direction": "system",
+            "body": "Need a quote for presentation cards",
+            "direction": "customer_to_employee",
             "deliveryStatus": "pending",
             "deliveryErrorCode": None,
             "createdAt": None,
-            "hasAttachments": False,
+            "hasAttachments": True,
         },
         "updatedAt": "",
     }

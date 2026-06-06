@@ -109,8 +109,38 @@ async function mockMayaRelayApi(page: import("@playwright/test").Page) {
             createdAt: "2026-06-06T14:00:00Z",
             attachments: [],
           },
+          {
+            id: "message-2",
+            conversationId: "conversation-1",
+            direction: "system",
+            body: "From Test Customer [#C0001]:\nHello\nReply with #C0001 your message",
+            fromPhone: "+13852208404",
+            toPhone: "+15551234567",
+            twilioMessageSid: "SMforward",
+            deliveryStatus: "delivered",
+            deliveryErrorCode: null,
+            deliveryErrorMessage: null,
+            clientRequestId: null,
+            createdAt: "2026-06-06T14:00:01Z",
+            attachments: [],
+          },
+          {
+            id: "message-3",
+            conversationId: "conversation-1",
+            direction: "system",
+            body: "#C0001 Please send size and deadline.",
+            fromPhone: "+13852208404",
+            toPhone: "+15551234567",
+            twilioMessageSid: "SMsuggestion",
+            deliveryStatus: "delivered",
+            deliveryErrorCode: null,
+            deliveryErrorMessage: null,
+            clientRequestId: null,
+            createdAt: "2026-06-06T14:00:02Z",
+            attachments: [],
+          },
         ],
-        suggestedReply: "",
+        suggestedReply: "Please send size and deadline.",
       },
     });
   });
@@ -195,6 +225,17 @@ test("customer messages mark conversations as needing reply", async ({ page }) =
   await page.getByRole("button", { name: "Load more" }).click();
 
   await expect(page.getByRole("button", { name: /Older Customer/ })).not.toHaveClass(/needs-reply/);
+});
+
+test("system relay and AI suggestion messages stay out of the chat timeline", async ({ page }) => {
+  await mockMayaRelayApi(page);
+
+  await page.goto("/app/");
+
+  await expect(page.getByRole("article").getByText("Hello")).toBeVisible();
+  await expect(page.getByRole("article").getByText("Please send size and deadline.")).toHaveCount(0);
+  await expect(page.getByRole("article").getByText(/Reply with #C0001/)).toHaveCount(0);
+  await expect(page.getByText("Please send size and deadline.")).toHaveCount(1);
 });
 
 test("Load more appends the next conversation page", async ({ page }) => {
