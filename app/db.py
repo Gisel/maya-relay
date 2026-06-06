@@ -382,32 +382,45 @@ class SupabaseRelayRepository:
             .limit(limit)
             .execute()
         )
+        if not result.data:
+            return []
+
+        conversation_ids = [conversation["id"] for conversation in result.data]
+        customer_phones = sorted({conversation["customer_phone"] for conversation in result.data})
+        messages = (
+            self.client.table("messages")
+            .select("conversation_id, body, direction, delivery_status, delivery_error_code, created_at, num_media")
+            .in_("conversation_id", conversation_ids)
+            .order("created_at", desc=True)
+            .limit(limit * 50)
+            .execute()
+        )
+        contacts = (
+            self.client.table("contacts")
+            .select("phone_number, display_name, lookup_name")
+            .in_("phone_number", customer_phones)
+            .execute()
+        )
+
+        messages_by_conversation: dict[str, list[dict[str, Any]]] = {conversation_id: [] for conversation_id in conversation_ids}
+        for message in messages.data:
+            conversation_messages = messages_by_conversation.get(message["conversation_id"])
+            if conversation_messages is not None and len(conversation_messages) < 50:
+                conversation_messages.append(message)
+
+        contacts_by_phone = {contact["phone_number"]: contact for contact in contacts.data}
         conversations: list[dict[str, Any]] = []
         for conversation in result.data:
-            messages = (
-                self.client.table("messages")
-                .select("body, direction, delivery_status, delivery_error_code, created_at, num_media")
-                .eq("conversation_id", conversation["id"])
-                .order("created_at", desc=True)
-                .limit(50)
-                .execute()
-            )
-            contacts = (
-                self.client.table("contacts")
-                .select("display_name, lookup_name")
-                .eq("phone_number", conversation["customer_phone"])
-                .limit(1)
-                .execute()
-            )
-            contact = contacts.data[0] if contacts.data else {}
+            conversation_messages = messages_by_conversation[conversation["id"]]
+            contact = contacts_by_phone.get(conversation["customer_phone"], {})
             conversations.append(
                 {
                     **conversation,
                     "customer_display_name": contact.get("display_name"),
                     "customer_lookup_name": contact.get("lookup_name"),
                     "customer_name": contact.get("display_name") or contact.get("lookup_name"),
-                    "last_message": messages.data[0] if messages.data else None,
-                    "message_search_text": _message_search_text(messages.data),
+                    "last_message": conversation_messages[0] if conversation_messages else None,
+                    "message_search_text": _message_search_text(conversation_messages),
                 }
             )
         return conversations

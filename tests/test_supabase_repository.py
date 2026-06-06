@@ -264,3 +264,69 @@ def test_update_message_status_updates_matching_message_only():
     other = next(row for row in rows if row["twilio_message_sid"] == "SMother")
     assert target["delivery_status"] == "delivered"
     assert other["delivery_status"] is None
+
+
+def test_list_conversations_batches_contacts_and_messages():
+    repository, client = build_repository()
+    client.seed(
+        "contacts",
+        [
+            {"phone_number": "+15550000001", "display_name": "Maria Lopez"},
+            {"phone_number": "+15550000002", "lookup_name": "Lookup Client"},
+        ],
+    )
+    client.seed(
+        "conversations",
+        [
+            {
+                "id": "conversation-1",
+                "customer_phone": "+15550000001",
+                "assigned_employee": "+15551234567",
+                "conversation_code": "C0001",
+                "updated_at": "2026-06-04T00:00:02+00:00",
+            },
+            {
+                "id": "conversation-2",
+                "customer_phone": "+15550000002",
+                "assigned_employee": "+15551234567",
+                "conversation_code": "C0002",
+                "updated_at": "2026-06-04T00:00:01+00:00",
+            },
+        ],
+    )
+    client.seed(
+        "messages",
+        [
+            {
+                "conversation_id": "conversation-1",
+                "body": "Older message",
+                "direction": "customer_to_employee",
+                "created_at": "2026-06-04T00:00:01+00:00",
+            },
+            {
+                "conversation_id": "conversation-1",
+                "body": "Latest message",
+                "direction": "employee_to_customer",
+                "delivery_status": "delivered",
+                "created_at": "2026-06-04T00:00:03+00:00",
+            },
+            {
+                "conversation_id": "conversation-2",
+                "body": "Second conversation",
+                "direction": "customer_to_employee",
+                "created_at": "2026-06-04T00:00:02+00:00",
+            },
+        ],
+    )
+    client.query_count = 0
+
+    conversations = repository.list_conversations()
+
+    assert client.query_count == 3
+    assert [conversation["id"] for conversation in conversations] == ["conversation-1", "conversation-2"]
+    assert conversations[0]["customer_display_name"] == "Maria Lopez"
+    assert conversations[0]["customer_name"] == "Maria Lopez"
+    assert conversations[0]["last_message"]["body"] == "Latest message"
+    assert "Older message" in conversations[0]["message_search_text"]
+    assert conversations[1]["customer_lookup_name"] == "Lookup Client"
+    assert conversations[1]["last_message"]["body"] == "Second conversation"

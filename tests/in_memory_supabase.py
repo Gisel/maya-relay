@@ -17,6 +17,7 @@ class InMemorySupabaseClient:
             for name in ("contacts", "conversations", "messages", "message_attachments")
         }
         self._clock = 0
+        self.query_count = 0
 
     def table(self, name: str) -> "InMemoryQuery":
         if name not in self.tables:
@@ -109,7 +110,7 @@ class InMemoryQuery:
     def __init__(self, client: InMemorySupabaseClient, table: InMemoryTable):
         self.client = client
         self.table = table
-        self.filters: list[tuple[str, Any]] = []
+        self.filters: list[tuple[str, str, Any]] = []
         self.order_by: tuple[str, bool] | None = None
         self.limit_count: int | None = None
         self.selected_columns: list[str] | None = None
@@ -122,7 +123,11 @@ class InMemoryQuery:
         return self
 
     def eq(self, column: str, value: Any) -> "InMemoryQuery":
-        self.filters.append((column, value))
+        self.filters.append(("eq", column, value))
+        return self
+
+    def in_(self, column: str, values: list[Any]) -> "InMemoryQuery":
+        self.filters.append(("in", column, values))
         return self
 
     def order(self, column: str, *, desc: bool = False) -> "InMemoryQuery":
@@ -150,6 +155,7 @@ class InMemoryQuery:
         return self
 
     def execute(self) -> Response:
+        self.client.query_count += 1
         if self.operation == "insert":
             assert self.payload is not None
             return Response([self.client._insert(self.table, self.payload)])
@@ -187,7 +193,12 @@ class InMemoryQuery:
         return [deepcopy(row) for row in self.table.rows if self._matches(row)]
 
     def _matches(self, row: dict[str, Any]) -> bool:
-        return all(row.get(column) == value for column, value in self.filters)
+        for operator, column, value in self.filters:
+            if operator == "eq" and row.get(column) != value:
+                return False
+            if operator == "in" and row.get(column) not in value:
+                return False
+        return True
 
     def _project(self, row: dict[str, Any]) -> dict[str, Any]:
         if self.selected_columns is None:
