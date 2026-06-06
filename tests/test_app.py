@@ -398,6 +398,32 @@ def test_api_conversation_contract_and_idempotent_reply():
     assert len(sender.sent_messages) == 1
 
 
+def test_api_search_checks_beyond_first_conversation_page():
+    client, repository, _ = make_client(admin_password="secret")
+    for index in range(55):
+        phone = f"+1555000{index:04d}"
+        repository.get_or_create_customer_conversation(
+            customer_phone=phone,
+            assigned_employee="+15551234567",
+        )
+        repository.create_message(
+            conversation_id=f"conversation-{index + 1}",
+            direction="customer_to_employee",
+            from_phone=phone,
+            to_phone="+13852208404",
+            body="General quote request",
+        )
+    repository.upsert_contact_display_name("+15550000054", "Legacy Client")
+
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    response = client.get("/api/conversations?q=legacy", headers={"cookie": cookie})
+
+    assert response.status_code == 200
+    assert [conversation["id"] for conversation in response.json()["conversations"]] == ["conversation-55"]
+
+
 def test_api_reply_uploads_image_as_media():
     client, repository, sender = make_client(admin_password="secret")
     repository.get_or_create_customer_conversation(

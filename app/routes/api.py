@@ -149,17 +149,26 @@ def api_conversations(
     require_admin(request, settings)
     safe_limit = min(max(limit, 1), 100)
     safe_offset = max(offset, 0)
-    conversations = repository.list_conversations(limit=safe_limit + 1, offset=safe_offset)
-    has_more = len(conversations) > safe_limit
-    page_conversations = conversations[:safe_limit]
-    filtered = [
-        conversation
-        for conversation in page_conversations
-        if _matches_filters(conversation, q=q, status=status, channel=channel)
-    ]
+    if q.strip():
+        search_pool = repository.list_conversations(limit=500, offset=0)
+        filtered = [
+            conversation
+            for conversation in search_pool
+            if _matches_filters(conversation, q=q, status=status, channel=channel)
+        ]
+        page_conversations = filtered[safe_offset: safe_offset + safe_limit]
+        has_more = len(filtered) > safe_offset + safe_limit
+    else:
+        conversations = repository.list_conversations(limit=safe_limit + 1, offset=safe_offset)
+        has_more = len(conversations) > safe_limit
+        page_conversations = [
+            conversation
+            for conversation in conversations[:safe_limit]
+            if _matches_filters(conversation, q=q, status=status, channel=channel)
+        ]
     return {
         "metrics": _conversation_metrics(page_conversations),
-        "conversations": [_serialize_conversation_list_item(conversation) for conversation in filtered],
+        "conversations": [_serialize_conversation_list_item(conversation) for conversation in page_conversations],
         "pagination": {
             "limit": safe_limit,
             "offset": safe_offset,

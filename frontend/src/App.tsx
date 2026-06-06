@@ -77,6 +77,36 @@ function previewBody(conversation: ConversationListItem) {
   return "No messages yet";
 }
 
+function conversationSearchText(conversation: ConversationListItem) {
+  return [
+    conversation.code || "",
+    displayCustomerName(conversation),
+    conversation.customer.displayName || "",
+    conversation.customer.lookupName || "",
+    cleanPhone(conversation.customer.phone),
+    previewBody(conversation),
+  ]
+    .join(" ")
+    .toLowerCase();
+}
+
+function conversationMatchesSearch(conversation: ConversationListItem, query: string) {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return true;
+  return conversationSearchText(conversation).includes(normalizedQuery);
+}
+
+function mergeConversationLists(...lists: (ConversationListItem[] | null | undefined)[]) {
+  const seen = new Set<string>();
+  const merged: ConversationListItem[] = [];
+  lists.flat().forEach((conversation) => {
+    if (!conversation || seen.has(conversation.id)) return;
+    seen.add(conversation.id);
+    merged.push(conversation);
+  });
+  return merged;
+}
+
 function deliveryStatus(conversation: ConversationListItem): DeliveryStatus {
   return conversation.lastMessage?.deliveryStatus || "pending";
 }
@@ -422,6 +452,7 @@ export function App() {
   const [files, setFiles] = useState<File[]>([]);
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isSearchingConversations, setIsSearchingConversations] = useState(false);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isCallingCustomer, setIsCallingCustomer] = useState(false);
@@ -431,22 +462,36 @@ export function App() {
   const [detailError, setDetailError] = useState("");
   const [nextConversationOffset, setNextConversationOffset] = useState<number | null>(null);
   const [hasMoreConversations, setHasMoreConversations] = useState(false);
+  const [searchResults, setSearchResults] = useState<ConversationListItem[] | null>(null);
   const [isContextOpen, setIsContextOpen] = useState(() => {
     if (typeof window === "undefined") return true;
     return !window.matchMedia("(max-width: 760px)").matches;
   });
   const didRunInitialSearchEffect = useRef(false);
+  const searchRequestId = useRef(0);
 
-  const selectedListItem = useMemo(
-    () => conversations.find((conversation) => conversation.id === selectedId) || null,
-    [conversations, selectedId],
+  const allKnownConversations = useMemo(
+    () => mergeConversationLists(conversations, searchResults),
+    [conversations, searchResults],
   );
 
-  const loadConversations = useCallback(async (query = "", fallbackSelectedId = "") => {
+  const visibleConversations = useMemo(() => {
+    const query = search.trim();
+    if (!query) return conversations;
+    const localMatches = conversations.filter((conversation) => conversationMatchesSearch(conversation, query));
+    return mergeConversationLists(localMatches, searchResults);
+  }, [conversations, search, searchResults]);
+
+  const selectedListItem = useMemo(
+    () => allKnownConversations.find((conversation) => conversation.id === selectedId) || null,
+    [allKnownConversations, selectedId],
+  );
+
+  const loadConversations = useCallback(async (fallbackSelectedId = "") => {
     setIsLoadingList(true);
     setAppError("");
     try {
-      const payload = await getConversations(query);
+      const payload = await getConversations();
       setConversations(payload.conversations);
       setMetrics(payload.metrics);
       setNextConversationOffset(payload.pagination?.nextOffset ?? null);
@@ -541,7 +586,7 @@ export function App() {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    loadConversations("");
+    loadConversations();
     getQuickResponses()
       .then((payload) => setQuickResponses(payload.quickResponses))
       .catch((error) => setAppError(error instanceof Error ? error.message : "Could not load quick responses."));
@@ -553,11 +598,39 @@ export function App() {
       didRunInitialSearchEffect.current = true;
       return;
     }
+    const query = search.trim();
+    if (!query) {
+      searchRequestId.current += 1;
+      setSearchResults(null);
+      setIsSearchingConversations(false);
+      return;
+    }
     const timeoutId = window.setTimeout(() => {
-      loadConversations(search);
+      const requestId = searchRequestId.current + 1;
+      searchRequestId.current = requestId;
+      setIsSearchingConversations(true);
+      getConversations(query)
+        .then((payload) => {
+          if (searchRequestId.current === requestId) {
+            setSearchResults(payload.conversations);
+          }
+        })
+        .catch((error) => {
+          if (searchRequestId.current !== requestId) return;
+          if (error instanceof ApiError && error.status === 401) {
+            setIsAuthenticated(false);
+          } else {
+            setAppError(error instanceof Error ? error.message : "Could not search conversations.");
+          }
+        })
+        .finally(() => {
+          if (searchRequestId.current === requestId) {
+            setIsSearchingConversations(false);
+          }
+        });
     }, 250);
     return () => window.clearTimeout(timeoutId);
-  }, [isAuthenticated, loadConversations, search]);
+  }, [isAuthenticated, search]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -584,6 +657,7 @@ export function App() {
     setIsAuthenticated(false);
     didRunInitialSearchEffect.current = false;
     setConversations([]);
+    setSearchResults(null);
     setNextConversationOffset(null);
     setHasMoreConversations(false);
     setSelectedConversation(null);
@@ -600,7 +674,7 @@ export function App() {
       const withoutDuplicate = current.filter((message) => message.id !== response.message.id);
       return [...withoutDuplicate, response.message];
     });
-    await loadConversations(search, selectedId);
+    await loadConversations(selectedId);
     setSuggestedReply("");
   }
 
@@ -617,7 +691,7 @@ export function App() {
           conversation.id === selectedId ? { ...conversation, status: response.conversation.status } : conversation,
         ),
       );
-      await loadConversations(search, selectedId);
+      await loadConversations(selectedId);
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         setIsAuthenticated(false);
@@ -662,7 +736,7 @@ export function App() {
       setDraft("");
       setFiles([]);
       setCallStatus(`Calling Francisco first, then ${response.to}.`);
-      await loadConversations(search, response.conversation.id);
+      await loadConversations(response.conversation.id);
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         setIsAuthenticated(false);
@@ -736,8 +810,8 @@ export function App() {
 
           <div className="conversation-list">
             {isLoadingList && <p className="panel-note">Loading conversations...</p>}
-            {!isLoadingList && conversations.length === 0 && <p className="panel-note">No conversations found.</p>}
-            {conversations.map((conversation) => (
+            {!isLoadingList && visibleConversations.length === 0 && <p className="panel-note">No conversations found.</p>}
+            {visibleConversations.map((conversation) => (
               (() => {
                 const listChannel = effectiveChannel(conversation.channel, conversation.customer.phone);
                 return (
@@ -779,6 +853,9 @@ export function App() {
                 );
               })()
             ))}
+            {search.trim() && isSearchingConversations && (
+              <p className="panel-note">Searching older conversations...</p>
+            )}
             {!search.trim() && hasMoreConversations && (
               <button
                 className="load-more-button"

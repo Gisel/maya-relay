@@ -59,8 +59,13 @@ async function mockMayaRelayApi(page: import("@playwright/test").Page) {
 
   await page.route(/\/api\/conversations(?:\?.*)?$/, async (route) => {
     const url = new URL(route.request().url());
+    const query = (url.searchParams.get("q") || "").toLowerCase();
     const offset = Number(url.searchParams.get("offset") || "0");
-    const pageConversations = offset > 0 ? [olderConversation] : [conversation];
+    const pageConversations = query
+      ? [conversation, olderConversation].filter((item) =>
+        [item.customer.name, item.customer.phone, item.lastMessage.body].join(" ").toLowerCase().includes(query),
+      )
+      : offset > 0 ? [olderConversation] : [conversation];
     requestCounts.conversations += 1;
     await route.fulfill({
       contentType: "application/json",
@@ -70,8 +75,8 @@ async function mockMayaRelayApi(page: import("@playwright/test").Page) {
         pagination: {
           limit: 50,
           offset,
-          nextOffset: offset > 0 ? null : 1,
-          hasMore: offset === 0,
+          nextOffset: query || offset > 0 ? null : 1,
+          hasMore: !query && offset === 0,
         },
       },
     });
@@ -190,6 +195,33 @@ test("Load more appends the next conversation page", async ({ page }) => {
   await page.getByRole("button", { name: "Load more" }).click();
 
   await expect(page.getByRole("button", { name: /Test Customer/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Older Customer/ })).toBeVisible();
+  await expect.poll(() => requestCounts.conversations).toBe(2);
+});
+
+test("conversation search filters loaded rows before server results", async ({ page }) => {
+  const requestCounts = await mockMayaRelayApi(page);
+
+  await page.goto("/app/");
+  await page.getByRole("button", { name: "Load more" }).click();
+  await expect(page.getByRole("button", { name: /Older Customer/ })).toBeVisible();
+
+  await page.getByPlaceholder("Search conversations...").fill("Older");
+
+  await expect(page.getByRole("button", { name: /Older Customer/ })).toBeVisible({ timeout: 100 });
+  await expect(page.getByRole("button", { name: /Test Customer/ })).toHaveCount(0);
+  expect(requestCounts.conversations).toBe(2);
+});
+
+test("conversation search includes unloaded server matches", async ({ page }) => {
+  const requestCounts = await mockMayaRelayApi(page);
+
+  await page.goto("/app/");
+  await expect(page.getByRole("button", { name: /Test Customer/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Older Customer/ })).toHaveCount(0);
+
+  await page.getByPlaceholder("Search conversations...").fill("Older");
+
   await expect(page.getByRole("button", { name: /Older Customer/ })).toBeVisible();
   await expect.poll(() => requestCounts.conversations).toBe(2);
 });
