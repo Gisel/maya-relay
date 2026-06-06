@@ -1230,6 +1230,10 @@ button {
     display: inline;
   }
 
+  .mobile-chat-label {
+    display: none;
+  }
+
   .conversation-meta-row .status-pill {
     display: none;
   }
@@ -1276,6 +1280,8 @@ button {
   }
 
   .message-thread {
+    display: flex;
+    flex-direction: column;
     gap: 14px;
     max-height: none;
     max-width: 100vw;
@@ -1292,23 +1298,28 @@ button {
   .message-bubble {
     max-width: min(88%, calc(100vw - 44px));
     min-width: 0;
-    overflow: hidden;
-    overflow-wrap: anywhere;
+    overflow-x: auto;
+    overflow-y: visible;
+    overflow-wrap: break-word;
     padding: 16px;
+    -webkit-overflow-scrolling: touch;
   }
 
   .message-bubble.inbound {
+    align-self: flex-start;
     border-radius: 14px 14px 14px 4px;
     justify-self: start;
   }
 
   .message-bubble.outbound {
+    align-self: flex-end;
     border-radius: 14px 14px 4px 14px;
     justify-self: end;
   }
 
   .message-bubble p {
     font-size: 14px;
+    max-width: 100%;
   }
 
   .composer {

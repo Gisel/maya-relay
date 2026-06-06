@@ -43,12 +43,32 @@ function channelLabel(channel: Channel) {
   return channel === "whatsapp" ? "WhatsApp" : "SMS";
 }
 
+function phoneIsWhatsapp(phone: string | null | undefined) {
+  return (phone || "").toLowerCase().startsWith("whatsapp:");
+}
+
+function cleanPhone(phone: string | null | undefined) {
+  return (phone || "").replace(/^whatsapp:/i, "");
+}
+
+function effectiveChannel(channel: Channel, phone: string | null | undefined): Channel {
+  return phoneIsWhatsapp(phone) ? "whatsapp" : channel;
+}
+
 function displayCustomerName(conversation: ConversationListItem | ConversationDetail) {
-  return conversation.customer.name || conversation.customer.phone || "Unknown customer";
+  return conversation.customer.name || cleanPhone(conversation.customer.phone) || "Unknown customer";
+}
+
+function cleanRelayBody(body: string) {
+  return body
+    .replace(/^From\s+.*?(?:\s+\[#?[A-Za-z0-9]+\])?:\s*/i, "")
+    .replace(/\s+Reply with\s+#[A-Za-z0-9]+\s+your message(?:\s+---[\s\S]*)?$/i, "")
+    .replace(/\s+---\s+AI note:[\s\S]*$/i, "")
+    .trim();
 }
 
 function previewBody(conversation: ConversationListItem) {
-  if (conversation.lastMessage?.body) return conversation.lastMessage.body;
+  if (conversation.lastMessage?.body) return cleanRelayBody(conversation.lastMessage.body);
   if (conversation.lastMessage?.hasAttachments) return "Attachment received";
   return "No messages yet";
 }
@@ -122,6 +142,7 @@ function DeliveryPill({ status }: { status: DeliveryStatus }) {
 
 function MessageBubble({ message }: { message: Message }) {
   const isOutbound = message.direction === "employee_to_customer";
+  const body = cleanRelayBody(message.body);
 
   return (
     <article className={`message-bubble ${isOutbound ? "outbound" : "inbound"}`}>
@@ -137,7 +158,7 @@ function MessageBubble({ message }: { message: Message }) {
           )}
         </a>
       ))}
-      <p>{message.body}</p>
+      {body && <p>{body}</p>}
       <footer>
         <span>{formatDate(message.createdAt)}</span>
         <span>{message.deliveryStatus}</span>
@@ -604,7 +625,8 @@ export function App() {
   const activeConversation = selectedConversation || selectedListItem;
   const customerName = activeConversation ? displayCustomerName(activeConversation) : "No conversation selected";
   const customerPhone = activeConversation?.customer.phone || "";
-  const channel = activeConversation?.channel || "sms";
+  const displayPhone = cleanPhone(customerPhone);
+  const channel = effectiveChannel(activeConversation?.channel || "sms", customerPhone);
   const status = activeConversation?.status || "open";
 
   return (
@@ -651,41 +673,46 @@ export function App() {
             {isLoadingList && <p className="panel-note">Loading conversations...</p>}
             {!isLoadingList && conversations.length === 0 && <p className="panel-note">No conversations found.</p>}
             {conversations.map((conversation) => (
-              <button
-                className={[
-                  "conversation-row",
-                  `channel-${conversation.channel}`,
-                  `delivery-${deliveryStatus(conversation)}`,
-                  conversation.id === selectedId ? "selected" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                key={conversation.id}
-                onClick={() => {
-                  setSelectedId(conversation.id);
-                  setDraft("");
-                  setFiles([]);
-                  setDetailError("");
-                  setSuggestedReply("");
-                  setCallStatus("");
-                  if (window.matchMedia("(max-width: 760px)").matches) {
-                    setIsContextOpen(false);
-                  }
-                }}
-                type="button"
-              >
-                <span className="conversation-row-heading">
-                  <span className="conversation-identity">
-                    <strong>{displayCustomerName(conversation)}</strong>
-                    <span className={`channel-pill ${conversation.channel}`}>{channelLabel(conversation.channel)}</span>
-                    {(deliveryStatus(conversation) === "failed" || deliveryStatus(conversation) === "undelivered") && (
-                      <DeliveryPill status={deliveryStatus(conversation)} />
-                    )}
-                  </span>
-                  <em>{relativeDate(conversation.updatedAt)}</em>
-                </span>
-                <p>{previewBody(conversation)}</p>
-              </button>
+              (() => {
+                const listChannel = effectiveChannel(conversation.channel, conversation.customer.phone);
+                return (
+                  <button
+                    className={[
+                      "conversation-row",
+                      `channel-${listChannel}`,
+                      `delivery-${deliveryStatus(conversation)}`,
+                      conversation.id === selectedId ? "selected" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    key={conversation.id}
+                    onClick={() => {
+                      setSelectedId(conversation.id);
+                      setDraft("");
+                      setFiles([]);
+                      setDetailError("");
+                      setSuggestedReply("");
+                      setCallStatus("");
+                      if (window.matchMedia("(max-width: 760px)").matches) {
+                        setIsContextOpen(false);
+                      }
+                    }}
+                    type="button"
+                  >
+                    <span className="conversation-row-heading">
+                      <span className="conversation-identity">
+                        <strong>{displayCustomerName(conversation)}</strong>
+                        <span className={`channel-pill ${listChannel}`}>{channelLabel(listChannel)}</span>
+                        {(deliveryStatus(conversation) === "failed" || deliveryStatus(conversation) === "undelivered") && (
+                          <DeliveryPill status={deliveryStatus(conversation)} />
+                        )}
+                      </span>
+                      <em>{relativeDate(conversation.updatedAt)}</em>
+                    </span>
+                    <p>{previewBody(conversation)}</p>
+                  </button>
+                );
+              })()
             ))}
           </div>
         </aside>
@@ -697,8 +724,7 @@ export function App() {
               <div className="conversation-meta-row">
                 <p>
                   <span className="desktop-channel-label">via {channelLabel(channel)} </span>
-                  <span className="mobile-chat-label">Chatting with</span>
-                  <span className="chat-phone">{customerPhone}</span>
+                  <span className="chat-phone">{displayPhone}</span>
                   <span className="mobile-channel-label">via {channelLabel(channel)}</span>
                 </p>
                 <div className="conversation-header-actions">
@@ -762,7 +788,7 @@ export function App() {
           <section className="context-section">
             <h2>Customer Profile</h2>
             <strong>{customerName}</strong>
-            <p>{customerPhone}</p>
+            <p>{displayPhone}</p>
             {activeConversation?.code && <em>Conversation code: #{activeConversation.code}</em>}
           </section>
 
