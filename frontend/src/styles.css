@@ -274,8 +274,10 @@ button {
 }
 
 .conversation-list {
-  display: grid;
-  overflow: hidden;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .panel-note {
@@ -303,11 +305,18 @@ button {
   box-shadow: inset 4px 0 0 #1688c9;
 }
 
-.conversation-row > span {
+.conversation-row-heading {
   align-items: center;
   display: flex;
   gap: 12px;
   justify-content: space-between;
+  min-width: 0;
+}
+
+.conversation-identity {
+  align-items: center;
+  display: flex;
+  gap: 7px;
   min-width: 0;
 }
 
@@ -329,7 +338,7 @@ button {
 .conversation-row p {
   color: #667085;
   font-size: 13px;
-  margin: 10px 0 14px;
+  margin: 10px 0 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -354,6 +363,13 @@ button {
   gap: 4px;
   min-height: 26px;
   padding: 0 12px;
+}
+
+.conversation-identity .channel-pill,
+.conversation-identity .delivery-pill {
+  font-size: 10px;
+  min-height: 20px;
+  padding: 0 8px;
 }
 
 .channel-pill.whatsapp {
@@ -903,7 +919,8 @@ button {
     margin: 8px 0 10px;
   }
 
-  .conversation-row footer {
+  .conversation-identity .channel-pill,
+  .conversation-identity .delivery-pill {
     display: none;
   }
 

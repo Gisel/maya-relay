@@ -499,17 +499,17 @@ export function App() {
                 }}
                 type="button"
               >
-                <span>
-                  <strong>{displayCustomerName(conversation)}</strong>
+                <span className="conversation-row-heading">
+                  <span className="conversation-identity">
+                    <strong>{displayCustomerName(conversation)}</strong>
+                    <span className={`channel-pill ${conversation.channel}`}>{channelLabel(conversation.channel)}</span>
+                    {(deliveryStatus(conversation) === "failed" || deliveryStatus(conversation) === "undelivered") && (
+                      <DeliveryPill status={deliveryStatus(conversation)} />
+                    )}
+                  </span>
                   <em>{relativeDate(conversation.updatedAt)}</em>
                 </span>
                 <p>{previewBody(conversation)}</p>
-                <footer>
-                  <span className={`channel-pill ${conversation.channel}`}>{channelLabel(conversation.channel)}</span>
-                  {(deliveryStatus(conversation) === "failed" || deliveryStatus(conversation) === "undelivered") && (
-                    <DeliveryPill status={deliveryStatus(conversation)} />
-                  )}
-                </footer>
               </button>
             ))}
           </div>
