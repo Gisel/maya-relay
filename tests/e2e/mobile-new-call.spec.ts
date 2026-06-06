@@ -270,6 +270,17 @@ test("selected conversation refreshes new messages automatically", async ({ page
   await expect.poll(() => requestCounts.detail).toBeGreaterThan(1);
 });
 
+test("manual inbox refresh pulls new selected messages", async ({ page }) => {
+  const requestCounts = await mockMayaRelayApi(page);
+
+  await page.goto("/app/");
+  await expect(page.getByRole("article").getByText("Hello")).toBeVisible();
+  await page.getByRole("button", { name: "Refresh inbox" }).click();
+
+  await expect(page.getByRole("article").getByText("New automatic customer message")).toBeVisible();
+  await expect.poll(() => requestCounts.detail).toBeGreaterThan(1);
+});
+
 test("Load more appends the next conversation page", async ({ page }) => {
   const requestCounts = await mockMayaRelayApi(page);
 

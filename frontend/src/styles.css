@@ -184,6 +184,7 @@ button {
 .logout-button,
 .send-button,
 .new-call-button,
+.refresh-button,
 .ghost-button {
   align-items: center;
   border: 0;
@@ -212,6 +213,20 @@ button {
   color: #ffffff;
   min-height: 44px;
   padding: 0 18px;
+}
+
+.refresh-button {
+  background: #ffffff;
+  border: 1px solid #c7d7e6;
+  color: #146a8f;
+  min-height: 44px;
+  padding: 0 16px;
+}
+
+.refresh-button:disabled {
+  background: #eef1f5;
+  color: #98a2b6;
+  cursor: not-allowed;
 }
 
 .ghost-button {
@@ -1270,18 +1285,21 @@ button {
   }
 
   .logout-button,
-  .new-call-button {
+  .new-call-button,
+  .refresh-button {
     background: #eef1f5;
     min-width: 48px;
     padding: 0;
   }
 
   .logout-button,
-  .new-call-button {
+  .new-call-button,
+  .refresh-button {
     font-size: 0;
   }
 
-  .new-call-button {
+  .new-call-button,
+  .refresh-button {
     color: #1688c9;
   }
 

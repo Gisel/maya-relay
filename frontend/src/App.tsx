@@ -464,6 +464,7 @@ export function App() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isSearchingConversations, setIsSearchingConversations] = useState(false);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+  const [isRefreshingInbox, setIsRefreshingInbox] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isCallingCustomer, setIsCallingCustomer] = useState(false);
   const [isNewCallOpen, setIsNewCallOpen] = useState(false);
@@ -706,6 +707,25 @@ export function App() {
   }, [draft, files.length, isAuthenticated, refreshConversationList, refreshDetail, search, selectedId]);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
+    function refreshWhenVisible() {
+      if (document.visibilityState !== "visible") return;
+      if (!search.trim()) {
+        void refreshConversationList();
+      }
+      if (selectedId && !draft.trim() && files.length === 0) {
+        void refreshDetail(selectedId);
+      }
+    }
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [draft, files.length, isAuthenticated, refreshConversationList, refreshDetail, search, selectedId]);
+
+  useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 760px)");
     setIsContextOpen(!mediaQuery.matches);
   }, []);
@@ -732,6 +752,19 @@ export function App() {
     setMessages([]);
     setSuggestedReply("");
     setCallStatus("");
+  }
+
+  async function handleRefreshInbox() {
+    setIsRefreshingInbox(true);
+    setAppError("");
+    try {
+      await Promise.all([
+        search.trim() ? Promise.resolve() : refreshConversationList(),
+        selectedId ? refreshDetail(selectedId) : Promise.resolve(),
+      ]);
+    } finally {
+      setIsRefreshingInbox(false);
+    }
   }
 
   async function handleSend(body: string, selectedFiles: File[]) {
@@ -847,6 +880,16 @@ export function App() {
           </div>
         </div>
         <div className="topbar-actions">
+          <button
+            aria-label="Refresh inbox"
+            className="refresh-button"
+            disabled={isRefreshingInbox}
+            onClick={handleRefreshInbox}
+            type="button"
+          >
+            <RefreshCw size={18} />
+            Refresh
+          </button>
           <button className="new-call-button" onClick={() => setIsNewCallOpen(true)} type="button">
             <Plus size={18} />
             New call
