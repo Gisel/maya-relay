@@ -847,6 +847,7 @@ button {
   display: flex;
   inset: 0;
   justify-content: center;
+  overflow: hidden;
   padding: 18px;
   position: fixed;
   z-index: 40;
@@ -860,9 +861,12 @@ button {
   box-sizing: border-box;
   display: grid;
   gap: 18px;
+  inline-size: min(460px, calc(100vw - 36px));
   max-width: 460px;
+  min-width: 0;
+  overflow-x: hidden;
   padding: 22px;
-  width: min(460px, 100%);
+  width: 100%;
 }
 
 .modal-header {
@@ -1645,9 +1649,13 @@ button {
     width: auto;
   }
 
-  .modal-panel {
+  .modal-panel.call-drawer {
     border-radius: 16px 16px 0 0;
     bottom: 0;
+    box-sizing: border-box;
+    box-shadow: 0 -14px 40px rgb(20 28 42 / 18%);
+    display: grid;
+    inline-size: auto;
     left: 0;
     max-height: min(76svh, 680px);
     max-width: none;
@@ -1657,18 +1665,25 @@ button {
     padding: 18px;
     position: fixed;
     right: 0;
-    width: 100%;
+    width: auto;
+  }
+
+  .modal-panel.call-drawer * {
+    box-sizing: border-box;
+    max-width: 100%;
   }
 
   .modal-header,
   .modal-form,
-  .modal-form label {
+  .modal-form label,
+  .modal-form input {
     min-width: 0;
+    width: 100%;
   }
 
   .modal-actions {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     min-width: 0;
   }
 

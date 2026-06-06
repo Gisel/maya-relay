@@ -254,7 +254,7 @@ function NewCallModal({
 
   return (
     <div className="modal-backdrop" role="presentation">
-      <section aria-labelledby="new-call-title" aria-modal="true" className="modal-panel" role="dialog">
+      <section aria-labelledby="new-call-title" aria-modal="true" className="modal-panel call-drawer" role="dialog">
         <div className="modal-header">
           <div>
             <h2 id="new-call-title">New call</h2>
