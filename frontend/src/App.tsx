@@ -184,7 +184,7 @@ function DeliveryPill({ status }: { status: DeliveryStatus }) {
   );
 }
 
-function MessageBubble({ message }: { message: Message }) {
+function MessageBubble({ message, onMediaLoad }: { message: Message; onMediaLoad: () => void }) {
   const isOutbound = message.direction === "employee_to_customer";
   const body = cleanRelayBody(message.body);
 
@@ -193,7 +193,7 @@ function MessageBubble({ message }: { message: Message }) {
       {message.attachments.map((attachment) => (
         <a className="attachment-preview" href={attachment.url} key={attachment.url} rel="noreferrer" target="_blank">
           {attachment.kind === "image" ? (
-            <img alt="Message attachment" src={attachment.url} />
+            <img alt="Message attachment" onLoad={onMediaLoad} src={attachment.url} />
           ) : (
             <span>
               <FileText size={18} />
@@ -386,7 +386,15 @@ function Composer({
   onSend: (body: string, files: File[]) => Promise<void>;
 }) {
   const [isSending, setIsSending] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const canSend = draft.trim().length > 0 || files.length > 0;
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 132)}px`;
+  }, [draft]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -422,6 +430,7 @@ function Composer({
           disabled={disabled || isSending}
           onChange={(event) => onDraftChange(event.target.value)}
           placeholder="Message"
+          ref={textareaRef}
           rows={1}
           value={draft}
         />
@@ -483,6 +492,7 @@ export function App() {
   const isRefreshingList = useRef(false);
   const isRefreshingDetail = useRef(false);
   const messageThreadRef = useRef<HTMLDivElement | null>(null);
+  const messageThreadEndRef = useRef<HTMLDivElement | null>(null);
 
   const allKnownConversations = useMemo(
     () => mergeConversationLists(conversations, searchResults),
@@ -506,6 +516,16 @@ export function App() {
     [messages],
   );
   const latestVisibleMessageId = visibleMessages[visibleMessages.length - 1]?.id || "";
+
+  const scrollMessagesToLatest = useCallback(() => {
+    const messageThread = messageThreadRef.current;
+    const messageThreadEnd = messageThreadEndRef.current;
+    if (!messageThread || !messageThreadEnd) return;
+    requestAnimationFrame(() => {
+      messageThreadEnd.scrollIntoView({ block: "end" });
+      messageThread.scrollTop = messageThread.scrollHeight;
+    });
+  }, []);
 
   const loadConversations = useCallback(async (fallbackSelectedId = "") => {
     setIsLoadingList(true);
@@ -695,12 +715,10 @@ export function App() {
   }, [isAuthenticated, loadDetail, selectedId]);
 
   useEffect(() => {
-    const messageThread = messageThreadRef.current;
-    if (!messageThread) return;
-    requestAnimationFrame(() => {
-      messageThread.scrollTop = messageThread.scrollHeight;
-    });
-  }, [latestVisibleMessageId, selectedId]);
+    scrollMessagesToLatest();
+    const timeoutId = window.setTimeout(scrollMessagesToLatest, 120);
+    return () => window.clearTimeout(timeoutId);
+  }, [latestVisibleMessageId, scrollMessagesToLatest, selectedId]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -1040,8 +1058,9 @@ export function App() {
             {isLoadingDetail && <p className="panel-note">Loading messages...</p>}
             {!isLoadingDetail && !detailError && visibleMessages.length === 0 && <p className="panel-note">No messages yet.</p>}
             {visibleMessages.map((message) => (
-              <MessageBubble key={message.id} message={message} />
+              <MessageBubble key={message.id} message={message} onMediaLoad={scrollMessagesToLatest} />
             ))}
+            <div aria-hidden="true" className="message-thread-end" ref={messageThreadEndRef} />
           </div>
 
           <Composer
