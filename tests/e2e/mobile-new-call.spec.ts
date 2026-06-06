@@ -22,8 +22,15 @@ async function mockMayaRelayApi(page: import("@playwright/test").Page) {
     },
     updatedAt: "2026-06-06T14:00:00Z",
   };
+  const requestCounts = {
+    conversations: 0,
+    detail: 0,
+    me: 0,
+    quickResponses: 0,
+  };
 
   await page.route("**/api/me", async (route) => {
+    requestCounts.me += 1;
     await route.fulfill({
       contentType: "application/json",
       json: {
@@ -34,6 +41,7 @@ async function mockMayaRelayApi(page: import("@playwright/test").Page) {
   });
 
   await page.route("**/api/conversations", async (route) => {
+    requestCounts.conversations += 1;
     await route.fulfill({
       contentType: "application/json",
       json: {
@@ -44,6 +52,7 @@ async function mockMayaRelayApi(page: import("@playwright/test").Page) {
   });
 
   await page.route("**/api/conversations/conversation-1", async (route) => {
+    requestCounts.detail += 1;
     await route.fulfill({
       contentType: "application/json",
       json: {
@@ -75,11 +84,14 @@ async function mockMayaRelayApi(page: import("@playwright/test").Page) {
   });
 
   await page.route("**/api/quick-responses", async (route) => {
+    requestCounts.quickResponses += 1;
     await route.fulfill({
       contentType: "application/json",
       json: { quickResponses: [] },
     });
   });
+
+  return requestCounts;
 }
 
 async function expectNoHorizontalOverflow(page: import("@playwright/test").Page) {
@@ -126,6 +138,20 @@ test("New Call drawer stays inside the mobile viewport", async ({ page }) => {
   ]) {
     await expectInsideViewport(control);
   }
+});
+
+test("authenticated boot loads each initial resource once", async ({ page }) => {
+  const requestCounts = await mockMayaRelayApi(page);
+
+  await page.goto("/app/");
+  await expect(page.getByRole("button", { name: /Test Customer/ })).toBeVisible();
+  await expect(page.getByRole("article").getByText("Hello")).toBeVisible();
+
+  await expect.poll(() => requestCounts.conversations).toBe(1);
+  await expect.poll(() => requestCounts.detail).toBe(1);
+  await expect.poll(() => requestCounts.quickResponses).toBe(1);
+  expect(requestCounts.me).toBeGreaterThanOrEqual(1);
+  expect(requestCounts.me).toBeLessThanOrEqual(2);
 });
 
 test("login input focus does not create mobile zoom risk", async ({ page }) => {

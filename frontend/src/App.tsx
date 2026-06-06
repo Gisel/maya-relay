@@ -15,7 +15,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ApiError,
   Channel,
@@ -432,36 +432,35 @@ export function App() {
     if (typeof window === "undefined") return true;
     return !window.matchMedia("(max-width: 760px)").matches;
   });
+  const didRunInitialSearchEffect = useRef(false);
 
   const selectedListItem = useMemo(
     () => conversations.find((conversation) => conversation.id === selectedId) || null,
     [conversations, selectedId],
   );
 
-  const loadConversations = useCallback(
-    async (query = search) => {
-      setIsLoadingList(true);
-      setAppError("");
-      try {
-        const payload = await getConversations(query);
-        setConversations(payload.conversations);
-        setMetrics(payload.metrics);
-        setSelectedId((current) => {
-          if (current && payload.conversations.some((conversation) => conversation.id === current)) return current;
-          return payload.conversations[0]?.id || "";
-        });
-      } catch (error) {
-        if (error instanceof ApiError && error.status === 401) {
-          setIsAuthenticated(false);
-        } else {
-          setAppError(error instanceof Error ? error.message : "Could not load conversations.");
-        }
-      } finally {
-        setIsLoadingList(false);
+  const loadConversations = useCallback(async (query = "", fallbackSelectedId = "") => {
+    setIsLoadingList(true);
+    setAppError("");
+    try {
+      const payload = await getConversations(query);
+      setConversations(payload.conversations);
+      setMetrics(payload.metrics);
+      setSelectedId((current) => {
+        if (current && payload.conversations.some((conversation) => conversation.id === current)) return current;
+        if (fallbackSelectedId) return fallbackSelectedId;
+        return payload.conversations[0]?.id || "";
+      });
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setIsAuthenticated(false);
+      } else {
+        setAppError(error instanceof Error ? error.message : "Could not load conversations.");
       }
-    },
-    [search],
-  );
+    } finally {
+      setIsLoadingList(false);
+    }
+  }, []);
 
   const loadDetail = useCallback(async (conversationId: string) => {
     if (!conversationId) {
@@ -519,6 +518,10 @@ export function App() {
 
   useEffect(() => {
     if (!isAuthenticated) return;
+    if (!didRunInitialSearchEffect.current) {
+      didRunInitialSearchEffect.current = true;
+      return;
+    }
     const timeoutId = window.setTimeout(() => {
       loadConversations(search);
     }, 250);
@@ -548,6 +551,7 @@ export function App() {
   async function handleLogout() {
     await logout().catch(() => undefined);
     setIsAuthenticated(false);
+    didRunInitialSearchEffect.current = false;
     setConversations([]);
     setSelectedConversation(null);
     setMessages([]);
@@ -563,8 +567,7 @@ export function App() {
       const withoutDuplicate = current.filter((message) => message.id !== response.message.id);
       return [...withoutDuplicate, response.message];
     });
-    await loadConversations(search);
-    await loadDetail(selectedId);
+    await loadConversations(search, selectedId);
     setSuggestedReply("");
   }
 
@@ -581,8 +584,7 @@ export function App() {
           conversation.id === selectedId ? { ...conversation, status: response.conversation.status } : conversation,
         ),
       );
-      await loadConversations(search);
-      await loadDetail(selectedId);
+      await loadConversations(search, selectedId);
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         setIsAuthenticated(false);
@@ -627,9 +629,7 @@ export function App() {
       setDraft("");
       setFiles([]);
       setCallStatus(`Calling Francisco first, then ${response.to}.`);
-      await loadConversations(search);
-      setSelectedId(response.conversation.id);
-      await loadDetail(response.conversation.id);
+      await loadConversations(search, response.conversation.id);
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         setIsAuthenticated(false);
