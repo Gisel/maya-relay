@@ -3,6 +3,8 @@ import {
   CheckCircle2,
   FileText,
   LogOut,
+  PanelRightClose,
+  PanelRightOpen,
   Paperclip,
   RefreshCw,
   Search,
@@ -272,6 +274,7 @@ export function App() {
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [appError, setAppError] = useState("");
   const [detailError, setDetailError] = useState("");
+  const [isContextOpen, setIsContextOpen] = useState(true);
 
   const selectedListItem = useMemo(
     () => conversations.find((conversation) => conversation.id === selectedId) || null,
@@ -367,6 +370,11 @@ export function App() {
     if (!isAuthenticated) return;
     loadDetail(selectedId);
   }, [isAuthenticated, loadDetail, selectedId]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 760px)");
+    setIsContextOpen(!mediaQuery.matches);
+  }, []);
 
   async function handleLogin(password: string) {
     setAuthError("");
@@ -492,7 +500,13 @@ export function App() {
                 via {channelLabel(channel)} {customerPhone}
               </p>
             </div>
-            <StatusPill status={status} />
+            <div className="conversation-header-actions">
+              <StatusPill status={status} />
+              <button className="context-toggle" onClick={() => setIsContextOpen((current) => !current)} type="button">
+                {isContextOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
+                <span>{isContextOpen ? "Hide details" : "Details"}</span>
+              </button>
+            </div>
           </header>
 
           <div className="message-thread">
@@ -515,7 +529,7 @@ export function App() {
           />
         </section>
 
-        <aside className="context-panel">
+        <aside className={`context-panel ${isContextOpen ? "is-open" : "is-collapsed"}`}>
           <section className="context-section">
             <h2>Customer Profile</h2>
             <strong>{customerName}</strong>
