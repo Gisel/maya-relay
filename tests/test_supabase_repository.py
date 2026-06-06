@@ -222,6 +222,31 @@ def test_create_message_stores_real_row_shape():
     assert client.rows("messages")[0]["twilio_message_sid"] == "SM123"
 
 
+def test_create_message_updates_parent_conversation_timestamp():
+    repository, client = build_repository()
+    client.seed(
+        "conversations",
+        [
+            {
+                "id": "conversation-1",
+                "customer_phone": "+15550000001",
+                "assigned_employee": "+15551234567",
+                "updated_at": "2026-06-01T00:00:00+00:00",
+            }
+        ],
+    )
+
+    repository.create_message(
+        conversation_id="conversation-1",
+        direction="customer_to_employee",
+        from_phone="+15550000001",
+        to_phone="+13852208404",
+        body="Fresh message",
+    )
+
+    assert client.rows("conversations")[0]["updated_at"] != "2026-06-01T00:00:00+00:00"
+
+
 def test_get_message_by_client_request_id_returns_existing_message():
     repository, _ = build_repository()
     created = repository.create_message(
@@ -369,3 +394,46 @@ def test_list_conversations_applies_offset_and_limit():
     conversations = repository.list_conversations(limit=1, offset=1)
 
     assert [conversation["id"] for conversation in conversations] == ["conversation-2"]
+
+
+def test_list_conversations_uses_latest_message_activity_for_display_order():
+    repository, client = build_repository()
+    client.seed(
+        "conversations",
+        [
+            {
+                "id": "conversation-1",
+                "customer_phone": "+15550000001",
+                "assigned_employee": "+15551234567",
+                "updated_at": "2026-06-01T00:00:00+00:00",
+            },
+            {
+                "id": "conversation-2",
+                "customer_phone": "+15550000002",
+                "assigned_employee": "+15551234567",
+                "updated_at": "2026-06-04T00:00:00+00:00",
+            },
+        ],
+    )
+    client.seed(
+        "messages",
+        [
+            {
+                "conversation_id": "conversation-1",
+                "body": "New customer activity",
+                "direction": "customer_to_employee",
+                "created_at": "2026-06-05T00:00:00+00:00",
+            },
+            {
+                "conversation_id": "conversation-2",
+                "body": "Older active conversation",
+                "direction": "customer_to_employee",
+                "created_at": "2026-06-04T00:00:00+00:00",
+            },
+        ],
+    )
+
+    conversations = repository.list_conversations()
+
+    assert [conversation["id"] for conversation in conversations] == ["conversation-1", "conversation-2"]
+    assert conversations[0]["updated_at"] == "2026-06-05T00:00:00+00:00"

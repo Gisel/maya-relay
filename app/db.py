@@ -298,6 +298,9 @@ class SupabaseRelayRepository:
             .insert(payload)
             .execute()
         )
+        self.client.table("conversations").update(
+            {"updated_at": datetime.now(UTC).isoformat()}
+        ).eq("id", conversation_id).execute()
         return result.data[0]
 
     def get_message_by_client_request_id(
@@ -412,17 +415,20 @@ class SupabaseRelayRepository:
         conversations: list[dict[str, Any]] = []
         for conversation in result.data:
             conversation_messages = messages_by_conversation[conversation["id"]]
+            last_message = _latest_customer_visible_message(conversation_messages)
             contact = contacts_by_phone.get(conversation["customer_phone"], {})
             conversations.append(
                 {
                     **conversation,
+                    "updated_at": _conversation_activity_at(conversation, last_message),
                     "customer_display_name": contact.get("display_name"),
                     "customer_lookup_name": contact.get("lookup_name"),
                     "customer_name": contact.get("display_name") or contact.get("lookup_name"),
-                    "last_message": _latest_customer_visible_message(conversation_messages),
+                    "last_message": last_message,
                     "message_search_text": _message_search_text(conversation_messages),
                 }
             )
+        conversations.sort(key=lambda conversation: conversation.get("updated_at") or "", reverse=True)
         return conversations
 
     def list_messages_for_conversation(self, conversation_id: str, limit: int = 100) -> list[dict[str, Any]]:
@@ -462,3 +468,11 @@ def _latest_customer_visible_message(messages: list[dict[str, Any]]) -> dict[str
         if message.get("direction") != "system":
             return message
     return None
+
+
+def _conversation_activity_at(conversation: dict[str, Any], last_message: dict[str, Any] | None) -> str | None:
+    conversation_updated_at = conversation.get("updated_at")
+    message_created_at = last_message.get("created_at") if last_message else None
+    if conversation_updated_at and message_created_at:
+        return max(str(conversation_updated_at), str(message_created_at))
+    return message_created_at or conversation_updated_at
