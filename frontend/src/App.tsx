@@ -690,16 +690,16 @@ export function App() {
           </div>
         </aside>
 
-        <section className="conversation-panel">
+        <section className={`conversation-panel channel-${channel}`}>
           <header className="conversation-header">
             <div className="conversation-title-block">
               <h1>{customerName}</h1>
               <div className="conversation-meta-row">
                 <p>
                   <span className="desktop-channel-label">via {channelLabel(channel)} </span>
-                  <span className="mobile-chat-label">Chatting with </span>
+                  <span className="mobile-chat-label">Chatting with</span>
                   <span className="chat-phone">{customerPhone}</span>
-                  <span className="mobile-channel-label"> via {channelLabel(channel)}</span>
+                  <span className="mobile-channel-label">via {channelLabel(channel)}</span>
                 </p>
                 <div className="conversation-header-actions">
                   <StatusPill status={status} />

@@ -27,6 +27,7 @@ body {
   margin: 0;
   min-width: 320px;
   overflow: hidden;
+  overscroll-behavior-x: none;
 }
 
 button,
@@ -44,6 +45,7 @@ button {
   height: 100vh;
   max-width: 100%;
   overflow: hidden;
+  overscroll-behavior-x: none;
   width: 100%;
 }
 
@@ -572,6 +574,11 @@ button {
   justify-self: end;
 }
 
+.conversation-panel.channel-whatsapp .message-bubble.outbound {
+  background: #22a95a;
+  border-color: #22a95a;
+}
+
 .message-bubble p {
   font-size: 15px;
   line-height: 1.45;
@@ -937,6 +944,17 @@ button {
 
   .topbar {
     padding: 10px 14px;
+    max-width: 100vw;
+    overflow: hidden;
+  }
+
+  .app-shell {
+    height: 100svh;
+    inset: 0;
+    max-width: 100vw;
+    overflow: hidden;
+    position: fixed;
+    width: 100vw;
   }
 
   .topbar-actions {
@@ -975,8 +993,10 @@ button {
     grid-template-rows: auto minmax(0, 1fr);
     height: calc(100svh - var(--topbar-height));
     max-width: 100vw;
+    min-width: 0;
     overflow-x: hidden;
     overflow-y: hidden;
+    overscroll-behavior-x: none;
     width: 100%;
   }
 
@@ -986,9 +1006,12 @@ button {
     border-right: 0;
     height: auto;
     max-height: none;
+    max-width: 100vw;
     min-height: 0;
+    min-width: 0;
     overflow: hidden;
     padding: 0 14px 12px;
+    width: 100%;
   }
 
   .search-box {
@@ -999,6 +1022,7 @@ button {
     position: sticky;
     top: 0;
     z-index: 3;
+    width: 100%;
   }
 
   .metrics-row {
@@ -1039,6 +1063,7 @@ button {
     height: auto;
     overflow-x: auto;
     overflow-y: hidden;
+    overscroll-behavior-x: contain;
     padding: 2px 0 4px;
     scroll-snap-type: x proximity;
     -webkit-overflow-scrolling: touch;
@@ -1064,6 +1089,12 @@ button {
     background: #eef8ff;
     border-color: #1688c9;
     box-shadow: inset 3px 0 0 #1688c9;
+  }
+
+  .conversation-row.channel-whatsapp.selected {
+    background: #effbf3;
+    border-color: #22a95a;
+    box-shadow: inset 3px 0 0 #22a95a;
   }
 
   .conversation-row-heading {
@@ -1117,8 +1148,11 @@ button {
     display: grid;
     grid-template-rows: auto minmax(0, 1fr) auto;
     height: 100%;
+    max-width: 100vw;
     min-height: 0;
+    min-width: 0;
     overflow: hidden;
+    width: 100%;
   }
 
   .conversation-header,
@@ -1131,7 +1165,9 @@ button {
   .conversation-header {
     align-items: center;
     background: #f4f7fb;
+    max-width: 100vw;
     min-height: auto;
+    overflow: hidden;
     padding-bottom: 10px;
     padding-top: 12px;
   }
@@ -1152,7 +1188,9 @@ button {
     justify-content: center;
     max-width: 100%;
     min-height: 28px;
+    overflow: hidden;
     padding: 0 12px;
+    white-space: nowrap;
   }
 
   .conversation-header-actions {
@@ -1178,6 +1216,7 @@ button {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .desktop-channel-label {
@@ -1217,6 +1256,10 @@ button {
     color: #1688c9;
   }
 
+  .conversation-panel.channel-whatsapp .conversation-call-action {
+    color: #16813a;
+  }
+
   .conversation-status-action {
     color: #475366;
   }
@@ -1233,15 +1276,22 @@ button {
   .message-thread {
     gap: 14px;
     max-height: none;
+    max-width: 100vw;
     min-height: 0;
+    min-width: 0;
     overflow: auto;
+    overflow-x: hidden;
     padding-bottom: 18px;
     padding-top: 18px;
+    overscroll-behavior-x: none;
+    width: 100%;
   }
 
   .message-bubble {
-    max-width: 88%;
+    max-width: min(88%, calc(100vw - 44px));
     min-width: 0;
+    overflow: hidden;
+    overflow-wrap: anywhere;
     padding: 16px;
   }
 
@@ -1262,24 +1312,36 @@ button {
   .composer {
     gap: 8px;
     max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
     padding-bottom: 10px;
     padding-top: 10px;
     position: relative;
     z-index: 4;
+    width: 100%;
   }
 
   .composer textarea {
+    font-size: 16px;
+    max-height: 92px;
     min-height: 42px;
-    padding: 11px 14px;
+    overflow-y: auto;
+    padding: 10px 14px;
+    field-sizing: content;
   }
 
   .composer-actions {
     gap: 8px;
     grid-template-columns: 42px minmax(0, 1fr) 42px;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    width: 100%;
   }
 
   .attach-control,
   .composer-send-button {
+    flex: 0 0 auto;
     height: 42px;
     min-height: 42px;
     min-width: 42px;
