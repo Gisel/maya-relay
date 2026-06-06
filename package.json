@@ -1,9 +1,13 @@
 {
   "private": true,
   "scripts": {
-    "build": "npm --workspace frontend run build"
+    "build": "npm --workspace frontend run build",
+    "test:e2e": "playwright test"
   },
   "workspaces": [
     "frontend"
-  ]
+  ],
+  "devDependencies": {
+    "@playwright/test": "^1.60.0"
+  }
 }
