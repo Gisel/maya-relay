@@ -754,6 +754,68 @@ button {
   padding: 12px 14px;
 }
 
+.confirmation-backdrop {
+  align-items: center;
+  background: rgb(12 18 32 / 54%);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 22px;
+  position: fixed;
+  z-index: 80;
+}
+
+.confirmation-dialog {
+  background: #ffffff;
+  border: 1px solid #d7dde8;
+  border-radius: 8px;
+  box-shadow: 0 22px 60px rgb(12 18 32 / 24%);
+  max-width: 430px;
+  padding: 22px;
+  width: min(100%, 430px);
+}
+
+.confirmation-dialog h2 {
+  color: #182233;
+  font-size: 20px;
+  line-height: 1.2;
+  margin: 0 0 10px;
+}
+
+.confirmation-dialog p {
+  color: #5a6578;
+  font-size: 14px;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.confirmation-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 22px;
+}
+
+.danger-button {
+  align-items: center;
+  background: #b42318;
+  border: 0;
+  border-radius: 8px;
+  color: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 800;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 16px;
+}
+
+.danger-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .message-bubble p {
   font-size: 15px;
   line-height: 1.45;

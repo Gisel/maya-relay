@@ -385,6 +385,58 @@ function NewCallDrawer({
   );
 }
 
+function CloseConversationModal({
+  customerName,
+  isSubmitting,
+  onCancel,
+  onConfirm,
+  open,
+}: {
+  customerName: string;
+  isSubmitting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+  open: boolean;
+}) {
+  useEffect(() => {
+    if (!open) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onCancel();
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onCancel, open]);
+
+  if (!open) return null;
+
+  return (
+    <div className="confirmation-backdrop" role="presentation">
+      <section
+        aria-describedby="close-conversation-description"
+        aria-labelledby="close-conversation-title"
+        aria-modal="true"
+        className="confirmation-dialog"
+        role="dialog"
+      >
+        <h2 id="close-conversation-title">Are you sure you want to close this conversation?</h2>
+        <p id="close-conversation-description">
+          {customerName} will move to Closed. You can reopen it later if you need to reply again.
+        </p>
+        <div className="confirmation-actions">
+          <button className="ghost-button" disabled={isSubmitting} onClick={onCancel} type="button">
+            Cancel
+          </button>
+          <button className="danger-button" disabled={isSubmitting} onClick={onConfirm} type="button">
+            {isSubmitting ? "Closing..." : "Close conversation"}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function Composer({
   disabled,
   draft,
@@ -526,6 +578,7 @@ export function App() {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isCallingCustomer, setIsCallingCustomer] = useState(false);
   const [isNewCallOpen, setIsNewCallOpen] = useState(false);
+  const [isCloseConfirmationOpen, setIsCloseConfirmationOpen] = useState(false);
   const [closedConversationUndo, setClosedConversationUndo] = useState<{ id: string; name: string } | null>(null);
   const [callStatus, setCallStatus] = useState("");
   const [appError, setAppError] = useState("");
@@ -865,6 +918,7 @@ export function App() {
     try {
       const response = await updateConversationStatus(selectedId, nextStatus);
       setSelectedConversation(response.conversation);
+      setIsCloseConfirmationOpen(false);
       if (nextStatus === "closed") {
         setClosedConversationUndo({ id: selectedId, name: displayCustomerName(activeConversation) });
       } else {
@@ -887,8 +941,16 @@ export function App() {
     }
   }
 
+  function handleRequestCloseConversation() {
+    setIsCloseConfirmationOpen(true);
+  }
+
+  function handleCancelCloseConversation() {
+    if (isUpdatingStatus) return;
+    setIsCloseConfirmationOpen(false);
+  }
+
   async function handleConfirmCloseConversation() {
-    if (!window.confirm("Are you sure you want to close this conversation?")) return;
     await updateActiveConversationStatus("closed");
   }
 
@@ -1145,7 +1207,7 @@ export function App() {
                     disabled={!selectedId || isUpdatingStatus}
                     onClick={() => {
                       if (status === "open") {
-                        void handleConfirmCloseConversation();
+                        handleRequestCloseConversation();
                       } else {
                         void handleReopenConversation();
                       }
@@ -1254,6 +1316,15 @@ export function App() {
         onClose={() => setIsNewCallOpen(false)}
         onStartCall={handleStartNewCall}
         open={isNewCallOpen}
+      />
+      <CloseConversationModal
+        customerName={activeConversation ? displayCustomerName(activeConversation) : "This conversation"}
+        isSubmitting={isUpdatingStatus}
+        onCancel={handleCancelCloseConversation}
+        onConfirm={() => {
+          void handleConfirmCloseConversation();
+        }}
+        open={isCloseConfirmationOpen}
       />
     </div>
   );
