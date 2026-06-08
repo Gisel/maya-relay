@@ -209,6 +209,16 @@ button {
   gap: 10px;
 }
 
+.topbar-actions .logout-button,
+.topbar-actions .new-call-button,
+.topbar-actions .refresh-button {
+  border-radius: 7px;
+  font-size: 14px;
+  font-weight: 500;
+  min-height: 38px;
+  padding: 0 15px;
+}
+
 .logout-button {
   background: #eef1f5;
   color: #475366;
@@ -225,8 +235,8 @@ button {
 
 .refresh-button {
   background: #ffffff;
-  border: 1px solid #bfd5f8;
-  color: var(--brand-blue-dark);
+  border: 1px solid #cbd8e6;
+  color: #36566f;
   min-height: 40px;
   padding: 0 16px;
 }
