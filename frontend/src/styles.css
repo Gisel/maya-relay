@@ -1118,63 +1118,6 @@ button {
   flex: 0 1 auto;
 }
 
-.confirmation-backdrop {
-  align-items: center;
-  background: rgb(20 28 42 / 50%);
-  display: flex;
-  inset: 0;
-  justify-content: center;
-  overflow: hidden;
-  padding: 18px;
-  position: fixed;
-  z-index: 100;
-}
-
-.confirmation-dialog {
-  background: #ffffff;
-  border: 1px solid #dfe4ec;
-  border-radius: 10px;
-  box-shadow: 0 24px 68px rgb(20 28 42 / 28%);
-  display: grid;
-  gap: 14px;
-  max-width: 460px;
-  min-width: 0;
-  padding: 22px;
-  width: min(460px, calc(100vw - 36px));
-}
-
-.confirmation-header {
-  align-items: flex-start;
-  display: flex;
-  gap: 14px;
-  justify-content: space-between;
-}
-
-.confirmation-header h2 {
-  font-size: 21px;
-  line-height: 1.18;
-  margin: 0;
-}
-
-.confirmation-dialog > p {
-  color: #667085;
-  font-size: 14px;
-  line-height: 1.45;
-  margin: 0;
-}
-
-.confirmation-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-  margin-top: 4px;
-}
-
-.confirmation-actions .send-button,
-.confirmation-actions .ghost-button {
-  flex: 0 1 auto;
-}
-
 @media (min-width: 761px) {
   .app-shell {
     background: #eef2f7;
@@ -2001,25 +1944,6 @@ button {
     z-index: 41;
   }
 
-  .confirmation-backdrop {
-    align-items: end;
-    padding: 0;
-  }
-
-  .confirmation-dialog {
-    border-radius: 16px 16px 0 0;
-    max-height: min(76svh, 680px);
-    overflow: auto;
-    padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
-    width: 100%;
-  }
-
-  .confirmation-header,
-  .confirmation-dialog,
-  .confirmation-dialog > p {
-    min-width: 0;
-  }
-
   .drawer-header,
   .drawer-form,
   .drawer-form label,
@@ -2034,16 +1958,8 @@ button {
     min-width: 0;
   }
 
-  .confirmation-actions {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    min-width: 0;
-  }
-
   .drawer-actions .ghost-button,
-  .drawer-actions .send-button,
-  .confirmation-actions .ghost-button,
-  .confirmation-actions .send-button {
+  .drawer-actions .send-button {
     font-size: 13px;
     min-width: 0;
     padding: 0 12px;
@@ -2051,16 +1967,13 @@ button {
   }
 
   .drawer-actions .send-button svg,
-  .drawer-actions .ghost-button svg,
-  .confirmation-actions .send-button svg,
-  .confirmation-actions .ghost-button svg {
+  .drawer-actions .ghost-button svg {
     flex: 0 0 auto;
   }
 }
 
 @media (max-width: 360px) {
-  .drawer-actions,
-  .confirmation-actions {
+  .drawer-actions {
     grid-template-columns: minmax(0, 1fr);
   }
 }

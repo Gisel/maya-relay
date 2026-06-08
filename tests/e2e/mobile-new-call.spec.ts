@@ -447,17 +447,21 @@ test("closing a conversation requires confirmation and can be undone", async ({ 
   await expect(page.getByRole("article").getByText("Hello")).toBeVisible();
   await expect.poll(() => requestCounts.statusUpdates).toBe(0);
 
+  let closePromptMessage = "";
+  page.once("dialog", async (dialog) => {
+    closePromptMessage = dialog.message();
+    await dialog.dismiss();
+  });
   await page.locator(".conversation-status-action").click();
-  const dialog = page.getByRole("dialog", { name: "Are you sure you want to close this conversation?" });
-  await expect(dialog).toBeVisible();
   await expect.poll(() => requestCounts.statusUpdates).toBe(0);
-  await dialog.getByRole("button", { exact: true, name: "Cancel" }).click();
-  await expect(dialog).toHaveCount(0);
+  await expect.poll(() => closePromptMessage).toBe("Are you sure you want to close this conversation?");
   await expect(page.getByLabel("Reply message")).toBeEnabled();
-  await expect.poll(() => requestCounts.statusUpdates).toBe(0);
 
+  page.once("dialog", async (dialog) => {
+    closePromptMessage = dialog.message();
+    await dialog.accept();
+  });
   await page.locator(".conversation-status-action").click();
-  await dialog.locator(".send-button").click();
 
   await expect.poll(() => requestCounts.statusUpdates).toBe(1);
   await expect(page.getByText("Test Customer was closed.")).toBeVisible();
@@ -479,11 +483,10 @@ test("closed conversation filter reveals closed rows", async ({ page }) => {
   await page.goto("/app/");
   await expect(page.getByRole("article").getByText("Hello")).toBeVisible();
 
+  page.once("dialog", async (dialog) => {
+    await dialog.accept();
+  });
   await page.locator(".conversation-status-action").click();
-  await page
-    .getByRole("dialog", { name: "Are you sure you want to close this conversation?" })
-    .locator(".send-button")
-    .click();
   await expect(page.locator(".conversation-list").getByRole("button", { name: /Test Customer/ })).toHaveCount(0);
 
   await page.getByRole("button", { name: "closed" }).click();

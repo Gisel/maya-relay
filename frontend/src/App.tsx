@@ -385,67 +385,6 @@ function NewCallDrawer({
   );
 }
 
-function CloseConversationDrawer({
-  conversationName,
-  disabled,
-  onClose,
-  onConfirm,
-  open,
-}: {
-  conversationName: string;
-  disabled: boolean;
-  onClose: () => void;
-  onConfirm: () => Promise<void>;
-  open: boolean;
-}) {
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (open) setError("");
-  }, [open]);
-
-  async function handleConfirm() {
-    setError("");
-    try {
-      await onConfirm();
-      onClose();
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Could not close this conversation.");
-    }
-  }
-
-  if (!open) return null;
-
-  return (
-    <div className="confirmation-backdrop" role="presentation">
-      <div
-        aria-labelledby="close-conversation-title"
-        aria-modal="true"
-        className="confirmation-dialog"
-        role="dialog"
-      >
-        <div className="confirmation-header">
-          <h2 id="close-conversation-title">Are you sure you want to close this conversation?</h2>
-          <button aria-label="Cancel close conversation" className="drawer-close" disabled={disabled} onClick={onClose} type="button">
-            <X size={18} />
-          </button>
-        </div>
-        <p>{conversationName} will move out of the Open inbox. You can reopen it from Closed or by using Undo.</p>
-        <div className="confirmation-actions">
-          <button className="ghost-button" disabled={disabled} onClick={onClose} type="button">
-            Cancel
-          </button>
-          <button className="send-button" disabled={disabled} onClick={handleConfirm} type="button">
-            <Archive size={17} />
-            {disabled ? "Closing..." : "Close"}
-          </button>
-        </div>
-        {error && <p className="form-error">{error}</p>}
-      </div>
-    </div>
-  );
-}
-
 function Composer({
   disabled,
   draft,
@@ -587,7 +526,6 @@ export function App() {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isCallingCustomer, setIsCallingCustomer] = useState(false);
   const [isNewCallOpen, setIsNewCallOpen] = useState(false);
-  const [isCloseConversationOpen, setIsCloseConversationOpen] = useState(false);
   const [closedConversationUndo, setClosedConversationUndo] = useState<{ id: string; name: string } | null>(null);
   const [callStatus, setCallStatus] = useState("");
   const [appError, setAppError] = useState("");
@@ -950,6 +888,7 @@ export function App() {
   }
 
   async function handleConfirmCloseConversation() {
+    if (!window.confirm("Are you sure you want to close this conversation?")) return;
     await updateActiveConversationStatus("closed");
   }
 
@@ -1206,7 +1145,7 @@ export function App() {
                     disabled={!selectedId || isUpdatingStatus}
                     onClick={() => {
                       if (status === "open") {
-                        setIsCloseConversationOpen(true);
+                        void handleConfirmCloseConversation();
                       } else {
                         void handleReopenConversation();
                       }
@@ -1315,13 +1254,6 @@ export function App() {
         onClose={() => setIsNewCallOpen(false)}
         onStartCall={handleStartNewCall}
         open={isNewCallOpen}
-      />
-      <CloseConversationDrawer
-        conversationName={customerName}
-        disabled={isUpdatingStatus}
-        onClose={() => setIsCloseConversationOpen(false)}
-        onConfirm={handleConfirmCloseConversation}
-        open={isCloseConversationOpen}
       />
     </div>
   );
