@@ -69,6 +69,7 @@ Visual direction to preserve:
 - Send message from dashboard.
 - Attach/upload media foundation.
 - Drag-and-drop attachments in composer.
+- Manual top Refresh reliability.
 - Public Supabase attachments bucket integration.
 - Twilio Lookup fallback and contact caching.
 - Click-to-call bridge: Francisco receives call first, then Twilio bridges to customer.
@@ -79,6 +80,7 @@ Visual direction to preserve:
   - undo after close
   - closed conversations hidden by default
   - Open / Closed / All filtering
+  - explicit red Close action styling and accessible Close/Reopen labels
 - Session ID exposed in UI.
 - Needs-reply visual state for customer messages.
 - Internal AI/system relay messages hidden from dashboard chat display.
@@ -93,7 +95,6 @@ Visual direction to preserve:
 
 ## Next
 
-- Fix manual top Refresh button reliability.
 - Add Call Logging:
   - save call attempts/statuses
   - show call history
