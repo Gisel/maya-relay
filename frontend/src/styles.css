@@ -1811,6 +1811,15 @@ button {
     width: 34px;
   }
 
+  .conversation-status-action {
+    font-size: 12px;
+    font-weight: 560;
+    gap: 5px;
+    min-width: 78px;
+    padding: 0 10px;
+    width: auto;
+  }
+
   .conversation-call-action {
     color: var(--brand-blue);
   }
@@ -1823,7 +1832,6 @@ button {
     color: #475366;
   }
 
-  .conversation-status-action,
   .conversation-call-action {
     font-size: 0;
   }

@@ -447,15 +447,16 @@ test("closing a conversation requires confirmation and can be undone", async ({ 
   await expect(page.getByRole("article").getByText("Hello")).toBeVisible();
   await expect.poll(() => requestCounts.statusUpdates).toBe(0);
 
-  await page.locator(".conversation-status-action").click();
-  await expect(page.getByRole("dialog", { name: "Are you sure you want to close this conversation?" })).toBeVisible();
+  await page.getByLabel("Close conversation").click();
+  const closeDialog = page.getByRole("dialog", { name: "Are you sure you want to close this conversation?" });
+  await expect(closeDialog).toBeVisible();
   await page.getByRole("button", { name: "Cancel" }).click();
 
   await expect.poll(() => requestCounts.statusUpdates).toBe(0);
   await expect(page.getByLabel("Reply message")).toBeEnabled();
 
-  await page.locator(".conversation-status-action").click();
-  await page.getByRole("button", { name: "Close conversation" }).click();
+  await page.getByLabel("Close conversation").click();
+  await closeDialog.getByRole("button", { name: "Close conversation" }).click();
 
   await expect.poll(() => requestCounts.statusUpdates).toBe(1);
   await expect(page.getByText("Test Customer was closed.")).toBeVisible();
@@ -477,8 +478,11 @@ test("closed conversation filter reveals closed rows", async ({ page }) => {
   await page.goto("/app/");
   await expect(page.getByRole("article").getByText("Hello")).toBeVisible();
 
-  await page.locator(".conversation-status-action").click();
-  await page.getByRole("button", { name: "Close conversation" }).click();
+  await page.getByLabel("Close conversation").click();
+  await page
+    .getByRole("dialog", { name: "Are you sure you want to close this conversation?" })
+    .getByRole("button", { name: "Close conversation" })
+    .click();
   await expect(page.locator(".conversation-list").getByRole("button", { name: /Test Customer/ })).toHaveCount(0);
 
   await page.getByRole("button", { name: "closed" }).click();

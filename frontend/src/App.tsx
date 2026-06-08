@@ -1293,6 +1293,7 @@ export function App() {
                     {isCallingCustomer ? "Calling" : "Call"}
                   </button>
                   <button
+                    aria-label={status === "open" ? "Close conversation" : "Reopen conversation"}
                     className="conversation-status-action"
                     disabled={!selectedId || isUpdatingStatus}
                     onClick={() => {
