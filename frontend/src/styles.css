@@ -1390,7 +1390,7 @@ button {
   grid-template-areas:
     "summary summary"
     "timeline editor";
-  grid-template-columns: minmax(230px, 0.42fr) minmax(0, 1fr);
+  grid-template-columns: minmax(210px, 3fr) minmax(0, 7fr);
   grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
   min-width: 0;
@@ -1417,6 +1417,7 @@ button {
 .call-summary-card {
   grid-area: summary;
   min-width: 0;
+  padding: 12px 14px;
 }
 
 .call-timeline-section {
@@ -1432,13 +1433,13 @@ button {
 }
 
 .call-summary-card .call-row-icon {
-  height: 30px;
-  width: 30px;
+  height: 28px;
+  width: 28px;
 }
 
 .call-summary-card h2 {
-  font-size: 15px;
-  font-weight: 620;
+  font-size: 14px;
+  font-weight: 600;
   margin: 0 0 2px;
 }
 
@@ -1451,37 +1452,43 @@ button {
 .call-summary-card p,
 .call-editor-heading p {
   color: #667085;
-  font-size: 13px;
+  font-size: 12px;
   margin: 0;
 }
 
 .call-summary-card dl {
   display: grid;
-  gap: 8px;
-  grid-template-columns: repeat(5, minmax(96px, 1fr));
-  margin: 12px 0 0;
+  gap: 0;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 10px 0 0;
 }
 
 .call-summary-card dl div {
-  background: #f8fafc;
-  border-radius: 8px;
-  min-height: 48px;
-  padding: 8px 10px;
+  background: transparent;
+  border-left: 1px solid #e8edf4;
+  border-radius: 0;
+  min-height: 34px;
+  padding: 2px 10px;
+}
+
+.call-summary-card dl div:first-child {
+  border-left: 0;
+  padding-left: 0;
 }
 
 .call-summary-card dt {
   color: #8a94a6;
-  font-size: 10px;
-  font-weight: 620;
+  font-size: 9px;
+  font-weight: 600;
   text-transform: uppercase;
 }
 
 .call-summary-card dd {
   color: #344054;
-  font-size: 14px;
-  font-weight: 560;
-  line-height: 1.25;
-  margin: 3px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  margin: 2px 0 0;
   overflow-wrap: anywhere;
   text-transform: capitalize;
 }
@@ -2065,41 +2072,15 @@ button {
   }
 }
 
-@media (max-width: 1300px) and (min-width: 761px) {
-  .call-workspace-grid {
-    grid-template-areas:
-      "summary"
-      "editor"
-      "timeline";
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1.15fr) minmax(220px, 0.85fr);
-    overflow-y: auto;
-  }
-
-  .call-timeline-section,
-  .call-editor-panel {
-    min-height: 240px;
-  }
-}
-
-@container (max-width: 980px) {
-  .call-workspace-grid {
-    grid-template-areas:
-      "summary"
-      "editor"
-      "timeline";
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1.15fr) minmax(220px, 0.85fr);
-    overflow-y: auto;
-  }
-
-  .call-editor-panel,
-  .call-timeline-section {
-    min-height: 240px;
-  }
-
+@container (max-width: 860px) {
   .call-summary-card dl {
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    row-gap: 8px;
+  }
+
+  .call-summary-card dl div:nth-child(4) {
+    border-left: 0;
+    padding-left: 0;
   }
 }
 
@@ -2440,6 +2421,15 @@ button {
   .call-workspace-main,
   .call-editor-panel {
     overflow: visible;
+  }
+
+  .call-editor-panel {
+    display: block;
+  }
+
+  .call-details-form.is-inline {
+    overflow: visible;
+    padding-right: 0;
   }
 
   .call-summary-card dl {
