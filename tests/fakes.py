@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from app.attachments import StoredAttachment
@@ -273,6 +273,26 @@ class FakeRepository:
             return call
         return None
 
+    def get_recent_active_call(
+        self,
+        *,
+        conversation_id: str,
+        max_age_seconds: int = 30,
+    ) -> dict[str, Any] | None:
+        active_statuses = {"initiated", "ringing", "in-progress", "queued"}
+        for call in reversed(self.calls):
+            if (
+                call["conversation_id"] == conversation_id
+                and call["status"] in active_statuses
+            ):
+                created_at = call.get("created_at")
+                if created_at:
+                    cutoff = datetime.now(UTC) - timedelta(seconds=max_age_seconds)
+                    if datetime.fromisoformat(created_at) < cutoff:
+                        continue
+                return call
+        return None
+
     def create_call(
         self,
         *,
@@ -300,6 +320,7 @@ class FakeRepository:
             "transcription": None,
             "answered_at": None,
             "completed_at": None,
+            "created_at": datetime.now(UTC).isoformat(),
         }
         self.calls.append(call)
         return call

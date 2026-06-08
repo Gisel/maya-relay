@@ -146,6 +146,10 @@ class InMemoryQuery:
         self.filters.append(("in", column, values))
         return self
 
+    def gte(self, column: str, value: Any) -> "InMemoryQuery":
+        self.filters.append(("gte", column, value))
+        return self
+
     def order(self, column: str, *, desc: bool = False) -> "InMemoryQuery":
         self.order_by = (column, desc)
         return self
@@ -220,6 +224,8 @@ class InMemoryQuery:
             if operator == "eq" and row.get(column) != value:
                 return False
             if operator == "in" and row.get(column) not in value:
+                return False
+            if operator == "gte" and (row.get(column) is None or str(row.get(column)) < str(value)):
                 return False
         return True
 

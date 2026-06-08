@@ -522,28 +522,22 @@ def test_api_conversation_detail_includes_call_history():
     response = client.get("/api/conversations/conversation-1", headers={"cookie": cookie})
 
     assert response.status_code == 200
-    assert response.json()["calls"] == [
-        {
-            "id": "call-1",
-            "conversationId": "conversation-1",
-            "direction": "outbound",
-            "callType": "conversation_call",
-            "customerPhone": "+15550000001",
-            "employeePhone": "+15551234567",
-            "twilioCallSid": "CAfake1",
-            "status": "completed",
-            "outcome": None,
-            "notes": None,
-            "followUpStatus": "none",
-            "recap": None,
-            "transcription": None,
-            "startedAt": "2026-06-08T20:08:45Z",
-            "answeredAt": "2026-06-08T20:08:49Z",
-            "completedAt": "2026-06-08T20:09:28Z",
-            "createdAt": None,
-            "updatedAt": None,
-        }
-    ]
+    calls = response.json()["calls"]
+    assert len(calls) == 1
+    call = calls[0]
+    assert call["id"] == "call-1"
+    assert call["conversationId"] == "conversation-1"
+    assert call["direction"] == "outbound"
+    assert call["callType"] == "conversation_call"
+    assert call["customerPhone"] == "+15550000001"
+    assert call["employeePhone"] == "+15551234567"
+    assert call["twilioCallSid"] == "CAfake1"
+    assert call["status"] == "completed"
+    assert call["outcome"] is None
+    assert call["followUpStatus"] == "none"
+    assert call["startedAt"] == "2026-06-08T20:08:45Z"
+    assert call["answeredAt"] == "2026-06-08T20:08:49Z"
+    assert call["completedAt"] == "2026-06-08T20:09:28Z"
 
 
 def test_api_updates_call_details():
@@ -608,25 +602,42 @@ def test_api_starts_click_to_call_bridge():
             "status_callback_url": "https://maya-relay.example/webhooks/twilio/voice/status",
         }
     ]
-    assert repository.calls == [
-        {
-            "id": "call-1",
-            "conversation_id": "conversation-1",
-            "direction": "outbound",
-            "call_type": "conversation_call",
-            "customer_phone": "+15550000001",
-            "employee_phone": "+15551234567",
-            "twilio_call_sid": "CAfake1",
-            "status": "initiated",
-            "outcome": None,
-            "notes": None,
-            "follow_up_status": "none",
-            "recap": None,
-            "transcription": None,
-            "answered_at": None,
-            "completed_at": None,
-        }
-    ]
+    assert len(repository.calls) == 1
+    call = repository.calls[0]
+    assert call["id"] == "call-1"
+    assert call["conversation_id"] == "conversation-1"
+    assert call["direction"] == "outbound"
+    assert call["call_type"] == "conversation_call"
+    assert call["customer_phone"] == "+15550000001"
+    assert call["employee_phone"] == "+15551234567"
+    assert call["twilio_call_sid"] == "CAfake1"
+    assert call["status"] == "initiated"
+
+
+def test_api_rejects_duplicate_active_click_to_call():
+    client, repository, _ = make_client(admin_password="secret")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    repository.create_call(
+        conversation_id="conversation-1",
+        direction="outbound",
+        call_type="conversation_call",
+        customer_phone="+15550000001",
+        employee_phone="+15551234567",
+        twilio_call_sid="CAactive",
+        status="ringing",
+    )
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    response = client.post("/api/conversations/conversation-1/call", headers={"cookie": cookie})
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "A call is already in progress for this conversation."
+    assert client.app.state.fake_voice_caller.calls == []
+    assert len(repository.calls) == 1
 
 
 def test_api_starts_new_call_and_creates_contact_conversation():

@@ -420,6 +420,10 @@ def _start_click_to_call(
     if not customer_phone:
         raise HTTPException(status_code=400, detail="Customer phone number is not callable.")
 
+    recent_call = repository.get_recent_active_call(conversation_id=conversation.id)
+    if recent_call is not None:
+        raise HTTPException(status_code=409, detail="A call is already in progress for this conversation.")
+
     base_url = _public_base_url(request, settings)
     call_sid = voice_caller.start_click_to_call(
         employee_phone=employee_phone,

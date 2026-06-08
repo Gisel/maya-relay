@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from secrets import token_hex
 from typing import Any, Protocol
 
@@ -137,6 +137,14 @@ class RelayRepository(Protocol):
         notes: str | None,
         recap: str | None,
         transcription: str | None,
+    ) -> dict[str, Any] | None:
+        ...
+
+    def get_recent_active_call(
+        self,
+        *,
+        conversation_id: str,
+        max_age_seconds: int = 30,
     ) -> dict[str, Any] | None:
         ...
 
@@ -544,6 +552,27 @@ class SupabaseRelayRepository:
                 }
             )
             .eq("id", call_id)
+            .execute()
+        )
+        if not result.data:
+            return None
+        return result.data[0]
+
+    def get_recent_active_call(
+        self,
+        *,
+        conversation_id: str,
+        max_age_seconds: int = 30,
+    ) -> dict[str, Any] | None:
+        cutoff = (datetime.now(UTC) - timedelta(seconds=max_age_seconds)).isoformat()
+        result = (
+            self.client.table("calls")
+            .select("id, conversation_id, status, twilio_call_sid, created_at")
+            .eq("conversation_id", conversation_id)
+            .in_("status", ["initiated", "ringing", "in-progress", "queued"])
+            .gte("created_at", cutoff)
+            .order("created_at", desc=True)
+            .limit(1)
             .execute()
         )
         if not result.data:

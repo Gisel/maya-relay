@@ -1180,13 +1180,23 @@ export function App() {
   async function handleSend(body: string, selectedFiles: File[]) {
     if (!selectedId) return;
     setSuggestedReply("");
-    const response = await sendReply(selectedId, body, selectedFiles, newClientRequestId());
-    setMessages((current) => {
-      const withoutDuplicate = current.filter((message) => message.id !== response.message.id);
-      return [...withoutDuplicate, response.message];
-    });
-    await loadConversations(selectedId);
-    setSuggestedReply("");
+    setAppError("");
+    try {
+      const response = await sendReply(selectedId, body, selectedFiles, newClientRequestId());
+      setMessages((current) => {
+        const withoutDuplicate = current.filter((message) => message.id !== response.message.id);
+        return [...withoutDuplicate, response.message];
+      });
+      await loadConversations(selectedId);
+      setSuggestedReply("");
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setIsAuthenticated(false);
+      } else {
+        setAppError(error instanceof Error ? error.message : "Could not send the message. Please try again.");
+      }
+      throw error;
+    }
   }
 
   async function updateActiveConversationStatus(nextStatus: ConversationStatus) {
