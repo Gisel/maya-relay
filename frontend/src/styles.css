@@ -1418,7 +1418,8 @@ button {
   align-items: center;
   display: grid;
   grid-area: summary;
-  grid-template-columns: minmax(210px, 1.25fr) repeat(5, minmax(82px, 1fr));
+  grid-template-columns: minmax(260px, max-content) minmax(0, 1fr);
+  gap: 14px;
   min-width: 0;
   padding: 10px 14px;
 }
@@ -1435,6 +1436,13 @@ button {
   min-width: 0;
 }
 
+.call-summary-card > div:first-child > div {
+  align-items: baseline;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
 .call-summary-card .call-row-icon {
   height: 28px;
   width: 28px;
@@ -1443,7 +1451,8 @@ button {
 .call-summary-card h2 {
   font-size: 14px;
   font-weight: 600;
-  margin: 0 0 2px;
+  margin: 0;
+  white-space: nowrap;
 }
 
 .call-timeline-section h2,
@@ -1459,11 +1468,18 @@ button {
   margin: 0;
 }
 
+.call-summary-card p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .call-summary-card dl {
   display: grid;
   gap: 0;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   margin: 0;
+  min-width: 0;
 }
 
 .call-summary-card dl div {
@@ -1471,12 +1487,12 @@ button {
   border-left: 1px solid #e8edf4;
   border-radius: 0;
   min-height: 30px;
-  padding: 2px 10px;
+  padding: 2px 8px;
 }
 
 .call-summary-card dl div:first-child {
   border-left: 1px solid #e8edf4;
-  padding-left: 10px;
+  padding-left: 8px;
 }
 
 .call-summary-card dt {
@@ -1965,10 +1981,6 @@ button {
     padding: 12px 18px 12px 12px;
   }
 
-  .call-summary-card dl {
-    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  }
-
   .conversation-identity .channel-pill,
   .conversation-identity .delivery-pill,
   .conversation-identity .closed-pill {
@@ -2101,10 +2113,16 @@ button {
   }
 }
 
-@container (max-width: 860px) {
+@container (max-width: 560px) {
   .call-summary-card {
     align-items: start;
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .call-summary-card > div:first-child > div {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
   }
 
   .call-summary-card dl {
