@@ -99,6 +99,7 @@ Visual direction to preserve:
   - save call attempts/statuses
   - show call history
   - add call outcomes: connected, voicemail, no answer, follow-up needed
+  - later: call recap/transcription after recording, consent, and storage rules are designed
 - Improve Manual Outbound Call:
   - create/update contact after calling a new number
   - add name
