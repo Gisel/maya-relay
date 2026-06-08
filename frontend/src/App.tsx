@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { DragEvent, FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   ApiError,
   Channel,
@@ -411,7 +412,7 @@ function CloseConversationModal({
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div className="confirmation-backdrop" role="presentation">
       <section
         aria-describedby="close-conversation-description"
@@ -433,7 +434,8 @@ function CloseConversationModal({
           </button>
         </div>
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
