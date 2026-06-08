@@ -21,6 +21,10 @@ function callTime(call: CallRecord) {
   return formatDate(call.startedAt || call.createdAt);
 }
 
+function timelineTitle(call: CallRecord) {
+  return `${callDirectionLabel(call.direction)} call`;
+}
+
 export function CallWorkspace({
   calls,
   isLoadingDetail,
@@ -71,7 +75,7 @@ export function CallWorkspace({
         <div className="call-workspace-main">
           <section className="call-summary-card">
             <div>
-              <span className="call-row-icon">
+              <span className={`call-row-icon direction-${latestCall.direction || "unknown"}`}>
                 <Phone size={17} />
               </span>
               <div>
@@ -111,17 +115,21 @@ export function CallWorkspace({
             <div className="call-timeline-list">
               {timeline.map((call) => (
                 <button
-                  className={`call-timeline-item ${editableCall?.id === call.id ? "selected" : ""}`}
+                  className={[
+                    "call-timeline-item",
+                    `direction-${call.direction || "unknown"}`,
+                    editableCall?.id === call.id ? "selected" : "",
+                  ].filter(Boolean).join(" ")}
                   key={call.id}
                   onClick={() => onSelectCall(call.id)}
                   type="button"
                 >
-                  <span className="call-row-icon">
+                  <span className={`call-row-icon direction-${call.direction || "unknown"}`}>
                     <Phone size={15} />
                   </span>
                   <span>
-                    <strong>{callTypeLabel(call)}</strong>
-                    <em>{callDirectionLabel(call.direction)} - {call.status || "unknown"}</em>
+                    <strong>{timelineTitle(call)}</strong>
+                    <em>{call.status || "unknown"}{call.outcome ? ` - ${outcomeLabel(call.outcome)}` : ""}</em>
                   </span>
                   <span className="call-timeline-meta">
                     {callTime(call)}

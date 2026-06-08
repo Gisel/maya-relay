@@ -1250,6 +1250,16 @@ button {
   width: 34px;
 }
 
+.call-row-icon.direction-inbound {
+  background: #edf8f0;
+  color: var(--brand-green-dark);
+}
+
+.call-row-icon.direction-outbound {
+  background: #eef4ff;
+  color: var(--brand-blue);
+}
+
 .call-row-content {
   display: grid;
   gap: 5px;
@@ -1375,23 +1385,22 @@ button {
 
 .call-workspace-grid {
   display: grid;
-  gap: 14px;
-  grid-template-columns: minmax(0, 0.9fr) minmax(300px, 0.8fr);
+  gap: 16px;
+  grid-template-columns: minmax(320px, 0.78fr) minmax(460px, 1.22fr);
   min-height: 0;
   overflow: hidden;
-  padding: 14px;
+  padding: 16px 22px 16px 16px;
 }
 
-.call-workspace-main,
-.call-editor-panel {
+.call-workspace-main {
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 .call-workspace-main {
   display: grid;
-  gap: 14px;
-  grid-auto-rows: max-content;
+  gap: 12px;
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .call-summary-card,
@@ -1401,17 +1410,27 @@ button {
   border: 1px solid #dce3ee;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgb(20 28 42 / 4%);
-  padding: 16px;
+  padding: 14px;
 }
 
 .call-summary-card > div:first-child {
   align-items: center;
   display: flex;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
 }
 
-.call-summary-card h2,
+.call-summary-card .call-row-icon {
+  height: 30px;
+  width: 30px;
+}
+
+.call-summary-card h2 {
+  font-size: 15px;
+  font-weight: 620;
+  margin: 0 0 2px;
+}
+
 .call-timeline-section h2,
 .call-editor-heading h2 {
   font-size: 16px;
@@ -1421,41 +1440,56 @@ button {
 .call-summary-card p,
 .call-editor-heading p {
   color: #667085;
+  font-size: 13px;
   margin: 0;
 }
 
 .call-summary-card dl {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin: 16px 0 0;
+  margin: 12px 0 0;
 }
 
 .call-summary-card dl div {
   background: #f8fafc;
   border-radius: 8px;
-  padding: 10px;
+  min-height: 52px;
+  padding: 8px 10px;
 }
 
 .call-summary-card dt {
   color: #8a94a6;
-  font-size: 11px;
-  font-weight: 650;
+  font-size: 10px;
+  font-weight: 620;
   text-transform: uppercase;
 }
 
 .call-summary-card dd {
   color: #344054;
-  font-weight: 620;
-  margin: 4px 0 0;
+  font-size: 14px;
+  font-weight: 560;
+  line-height: 1.25;
+  margin: 3px 0 0;
   overflow-wrap: anywhere;
   text-transform: capitalize;
+}
+
+.call-timeline-section {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
 }
 
 .call-timeline-list {
   display: grid;
   gap: 9px;
   margin-top: 12px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 8px;
+  scrollbar-gutter: stable;
 }
 
 .call-timeline-item {
@@ -1467,7 +1501,7 @@ button {
   display: grid;
   gap: 10px;
   grid-template-columns: 34px minmax(0, 1fr) auto;
-  min-height: 62px;
+  min-height: 58px;
   padding: 10px;
   text-align: left;
 }
@@ -1475,6 +1509,11 @@ button {
 .call-timeline-item.selected {
   background: var(--brand-blue-soft);
   border-color: #bfd5f8;
+}
+
+.call-timeline-item.direction-inbound.selected {
+  background: #effbf3;
+  border-color: #bde8c6;
 }
 
 .call-timeline-item strong,
@@ -1486,7 +1525,13 @@ button {
 }
 
 .call-timeline-item strong {
+  color: var(--brand-blue-dark);
+  font-size: 14px;
   font-weight: 620;
+}
+
+.call-timeline-item.direction-inbound strong {
+  color: var(--brand-green-dark);
 }
 
 .call-timeline-item em,
@@ -1515,6 +1560,9 @@ button {
   display: grid;
   gap: 14px;
   grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
+  padding: 18px 20px;
 }
 
 .call-editor-heading {
@@ -1528,7 +1576,8 @@ button {
 
 .call-details-form.is-inline {
   overflow-y: auto;
-  padding-right: 4px;
+  padding-right: 12px;
+  scrollbar-gutter: stable;
 }
 
 .quick-responses {
@@ -1857,7 +1906,7 @@ button {
   }
 
   .call-workspace-grid {
-    padding: 10px;
+    padding: 12px 18px 12px 12px;
   }
 
   .conversation-identity .channel-pill,
