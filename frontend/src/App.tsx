@@ -42,6 +42,14 @@ import {
 import logoMaya from "./assets/logo-maya.jpg";
 
 const INBOX_REFRESH_INTERVAL_MS = 15000;
+const CLOSE_AUDIT_LOG_PREFIX = "[Maya Relay Close Audit]";
+
+function closeAuditLog(event: string, details: Record<string, unknown> = {}) {
+  console.info(CLOSE_AUDIT_LOG_PREFIX, event, {
+    at: new Date().toISOString(),
+    ...details,
+  });
+}
 
 function channelLabel(channel: Channel) {
   return channel === "whatsapp" ? "WhatsApp" : "SMS";
@@ -401,6 +409,7 @@ function CloseConversationModal({
 }) {
   useEffect(() => {
     if (!open) return;
+    closeAuditLog("close confirmation modal mounted", { customerName, isSubmitting });
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") onCancel();
@@ -829,6 +838,13 @@ export function App() {
     if (!isAuthenticated) return;
     const intervalId = window.setInterval(() => {
       if (document.visibilityState !== "visible") return;
+      closeAuditLog("auto-refresh interval fired", {
+        selectedId,
+        search: search.trim(),
+        hasDraft: Boolean(draft.trim()),
+        fileCount: files.length,
+        isCloseConfirmationOpen,
+      });
       if (!search.trim()) {
         void refreshConversationList();
       }
@@ -837,12 +853,19 @@ export function App() {
       }
     }, INBOX_REFRESH_INTERVAL_MS);
     return () => window.clearInterval(intervalId);
-  }, [draft, files.length, isAuthenticated, refreshConversationList, refreshDetail, search, selectedId]);
+  }, [draft, files.length, isAuthenticated, isCloseConfirmationOpen, refreshConversationList, refreshDetail, search, selectedId]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
     function refreshWhenVisible() {
       if (document.visibilityState !== "visible") return;
+      closeAuditLog("focus/visibility refresh fired", {
+        selectedId,
+        search: search.trim(),
+        hasDraft: Boolean(draft.trim()),
+        fileCount: files.length,
+        isCloseConfirmationOpen,
+      });
       if (!search.trim()) {
         void refreshConversationList();
       }
@@ -856,7 +879,7 @@ export function App() {
       window.removeEventListener("focus", refreshWhenVisible);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
-  }, [draft, files.length, isAuthenticated, refreshConversationList, refreshDetail, search, selectedId]);
+  }, [draft, files.length, isAuthenticated, isCloseConfirmationOpen, refreshConversationList, refreshDetail, search, selectedId]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 760px)");
@@ -914,11 +937,29 @@ export function App() {
   }
 
   async function updateActiveConversationStatus(nextStatus: ConversationStatus) {
-    if (!selectedId || !activeConversation) return;
+    if (!selectedId || !activeConversation) {
+      closeAuditLog("status update aborted", {
+        nextStatus,
+        selectedId,
+        hasActiveConversation: Boolean(activeConversation),
+      });
+      return;
+    }
+    closeAuditLog("status update starting", {
+      selectedId,
+      currentStatus: activeConversation.status,
+      nextStatus,
+      isCloseConfirmationOpen,
+    });
     setIsUpdatingStatus(true);
     setAppError("");
     try {
       const response = await updateConversationStatus(selectedId, nextStatus);
+      closeAuditLog("status update succeeded", {
+        selectedId,
+        nextStatus,
+        responseStatus: response.conversation.status,
+      });
       setSelectedConversation(response.conversation);
       setIsCloseConfirmationOpen(false);
       if (nextStatus === "closed") {
@@ -933,6 +974,11 @@ export function App() {
       );
       await loadConversations(selectedId);
     } catch (error) {
+      closeAuditLog("status update failed", {
+        selectedId,
+        nextStatus,
+        error: error instanceof Error ? error.message : String(error),
+      });
       if (error instanceof ApiError && error.status === 401) {
         setIsAuthenticated(false);
       } else {
@@ -944,15 +990,34 @@ export function App() {
   }
 
   function handleRequestCloseConversation() {
+    closeAuditLog("close requested", {
+      selectedId,
+      status: activeConversation?.status,
+      hasActiveConversation: Boolean(activeConversation),
+      isUpdatingStatus,
+      isCloseConfirmationOpen,
+    });
     setIsCloseConfirmationOpen(true);
   }
 
   function handleCancelCloseConversation() {
+    closeAuditLog("close confirmation cancel clicked", {
+      selectedId,
+      isUpdatingStatus,
+      isCloseConfirmationOpen,
+    });
     if (isUpdatingStatus) return;
     setIsCloseConfirmationOpen(false);
   }
 
   async function handleConfirmCloseConversation() {
+    closeAuditLog("close confirmation confirm clicked", {
+      selectedId,
+      status: activeConversation?.status,
+      hasActiveConversation: Boolean(activeConversation),
+      isUpdatingStatus,
+      isCloseConfirmationOpen,
+    });
     await updateActiveConversationStatus("closed");
   }
 
@@ -1208,6 +1273,12 @@ export function App() {
                     className="conversation-status-action"
                     disabled={!selectedId || isUpdatingStatus}
                     onClick={() => {
+                      closeAuditLog("status action button clicked", {
+                        selectedId,
+                        status,
+                        isUpdatingStatus,
+                        isCloseConfirmationOpen,
+                      });
                       if (status === "open") {
                         handleRequestCloseConversation();
                       } else {
