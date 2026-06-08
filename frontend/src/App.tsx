@@ -1294,7 +1294,7 @@ export function App() {
                   </button>
                   <button
                     aria-label={status === "open" ? "Close conversation" : "Reopen conversation"}
-                    className="conversation-status-action"
+                    className={`conversation-status-action ${status === "open" ? "is-close-action" : "is-reopen-action"}`}
                     disabled={!selectedId || isUpdatingStatus}
                     onClick={() => {
                       closeAuditLog("status action button clicked", {

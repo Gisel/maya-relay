@@ -699,6 +699,11 @@ button {
   color: var(--brand-blue-dark);
 }
 
+.conversation-status-action.is-close-action {
+  border-color: #f4b4ad;
+  color: #b42318;
+}
+
 .conversation-status-action:disabled,
 .conversation-call-action:disabled {
   background: #eef1f5;
