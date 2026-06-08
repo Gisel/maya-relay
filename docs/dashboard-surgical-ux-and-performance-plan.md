@@ -68,6 +68,7 @@ Visual direction to preserve:
 - Conversation pagination and Load More.
 - Send message from dashboard.
 - Attach/upload media foundation.
+- Drag-and-drop attachments in composer.
 - Public Supabase attachments bucket integration.
 - Twilio Lookup fallback and contact caching.
 - Click-to-call bridge: Francisco receives call first, then Twilio bridges to customer.
@@ -76,6 +77,7 @@ Visual direction to preserve:
 - Session ID exposed in UI.
 - Needs-reply visual state for customer messages.
 - Internal AI/system relay messages hidden from dashboard chat display.
+- Remaining relay/display cleanup done enough for current operations.
 - New Call mobile drawer overflow fixed.
 - Login mobile overflow fixed.
 - Mobile dashboard improvements: compact composer, safer drawer behavior, improved mobile layout.
@@ -120,8 +122,7 @@ Visual direction to preserve:
   - blank values do not erase existing names
   - use uploaded contacts before paid Twilio Lookup
 - Continue small operational polish:
-  - attachment preview polish
-  - remaining display cleanup
+  - attachment preview polish only if needed
   - mobile/header/customer action polish only if needed
 
 ## Pending

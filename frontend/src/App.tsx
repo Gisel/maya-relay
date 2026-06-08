@@ -15,7 +15,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { DragEvent, FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ApiError,
   Channel,
@@ -400,6 +400,7 @@ function Composer({
   onSend: (body: string, files: File[]) => Promise<void>;
 }) {
   const [isSending, setIsSending] = useState(false);
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const canSend = draft.trim().length > 0 || files.length > 0;
 
@@ -423,8 +424,37 @@ function Composer({
     }
   }
 
+  function appendFiles(nextFiles: File[]) {
+    if (disabled || isSending || nextFiles.length === 0) return;
+    onFilesChange([...files, ...nextFiles]);
+  }
+
+  function handleDragOver(event: DragEvent<HTMLFormElement>) {
+    if (disabled || isSending) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    setIsDraggingFiles(true);
+  }
+
+  function handleDragLeave(event: DragEvent<HTMLFormElement>) {
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+    setIsDraggingFiles(false);
+  }
+
+  function handleDrop(event: DragEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsDraggingFiles(false);
+    appendFiles(Array.from(event.dataTransfer.files ?? []));
+  }
+
   return (
-    <form className="composer" onSubmit={handleSubmit}>
+    <form
+      className={`composer ${isDraggingFiles ? "is-dragging-files" : ""}`}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+      onSubmit={handleSubmit}
+    >
       <div className="composer-actions">
         <label
           aria-label="Attach files or imagery"
@@ -435,7 +465,10 @@ function Composer({
           <input
             disabled={disabled || isSending}
             multiple
-            onChange={(event) => onFilesChange(Array.from(event.target.files ?? []))}
+            onChange={(event) => {
+              appendFiles(Array.from(event.target.files ?? []));
+              event.currentTarget.value = "";
+            }}
             type="file"
           />
         </label>
@@ -623,8 +656,8 @@ export function App() {
     }
   }, []);
 
-  const refreshConversationList = useCallback(async () => {
-    if (isRefreshingList.current) return;
+  const refreshConversationList = useCallback(async ({ force = false }: { force?: boolean } = {}) => {
+    if (isRefreshingList.current && !force) return;
     isRefreshingList.current = true;
     try {
       const payload = await getConversations();
@@ -642,8 +675,8 @@ export function App() {
     }
   }, []);
 
-  const refreshDetail = useCallback(async (conversationId: string) => {
-    if (!conversationId || isRefreshingDetail.current) return;
+  const refreshDetail = useCallback(async (conversationId: string, { force = false }: { force?: boolean } = {}) => {
+    if (!conversationId || (isRefreshingDetail.current && !force)) return;
     isRefreshingDetail.current = true;
     try {
       const payload = await getConversationDetail(conversationId);
@@ -801,8 +834,8 @@ export function App() {
     setAppError("");
     try {
       await Promise.all([
-        search.trim() ? Promise.resolve() : refreshConversationList(),
-        selectedId ? refreshDetail(selectedId) : Promise.resolve(),
+        search.trim() ? Promise.resolve() : refreshConversationList({ force: true }),
+        selectedId ? refreshDetail(selectedId, { force: true }) : Promise.resolve(),
       ]);
     } finally {
       setIsRefreshingInbox(false);

@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-async function mockMayaRelayApi(page: import("@playwright/test").Page) {
+async function mockMayaRelayApi(
+  page: import("@playwright/test").Page,
+  options: { holdSecondDetailRequest?: boolean } = {},
+) {
   const conversation = {
     id: "conversation-1",
     code: "C0001",
@@ -46,6 +49,7 @@ async function mockMayaRelayApi(page: import("@playwright/test").Page) {
     me: 0,
     quickResponses: 0,
   };
+  let releaseHeldDetailRequest: (() => void) | null = null;
 
   await page.route("**/api/me", async (route) => {
     requestCounts.me += 1;
@@ -85,6 +89,11 @@ async function mockMayaRelayApi(page: import("@playwright/test").Page) {
 
   await page.route("**/api/conversations/conversation-1", async (route) => {
     requestCounts.detail += 1;
+    if (options.holdSecondDetailRequest && requestCounts.detail === 2) {
+      await new Promise<void>((resolve) => {
+        releaseHeldDetailRequest = resolve;
+      });
+    }
     const messages = [
       {
         id: "message-1",
@@ -192,7 +201,24 @@ async function mockMayaRelayApi(page: import("@playwright/test").Page) {
     });
   });
 
-  return requestCounts;
+  return {
+    ...requestCounts,
+    get conversations() {
+      return requestCounts.conversations;
+    },
+    get detail() {
+      return requestCounts.detail;
+    },
+    get me() {
+      return requestCounts.me;
+    },
+    get quickResponses() {
+      return requestCounts.quickResponses;
+    },
+    releaseHeldDetailRequest() {
+      releaseHeldDetailRequest?.();
+    },
+  };
 }
 
 async function expectNoHorizontalOverflow(page: import("@playwright/test").Page) {
@@ -319,6 +345,72 @@ test("manual inbox refresh pulls new selected messages", async ({ page }) => {
 
   await expect(page.getByRole("article").getByText("New automatic customer message")).toBeVisible();
   await expect.poll(() => requestCounts.detail).toBeGreaterThan(1);
+});
+
+test("manual inbox refresh forces a fresh detail request while polling is already running", async ({ page }) => {
+  await page.addInitScript(() => {
+    const originalSetInterval = window.setInterval;
+    window.setInterval = ((handler: TimerHandler, timeout?: number, ...args: unknown[]) =>
+      originalSetInterval(handler, timeout === 15000 ? 100 : timeout, ...args)) as typeof window.setInterval;
+  });
+  const requestCounts = await mockMayaRelayApi(page, { holdSecondDetailRequest: true });
+
+  await page.goto("/app/");
+  await expect(page.getByRole("article").getByText("Hello")).toBeVisible();
+  await expect.poll(() => requestCounts.detail).toBe(2);
+
+  await page.getByRole("button", { name: "Refresh inbox" }).click();
+
+  await expect.poll(() => requestCounts.detail).toBeGreaterThan(2);
+  requestCounts.releaseHeldDetailRequest();
+});
+
+test("composer accepts dropped files and sends them as reply attachments", async ({ page }) => {
+  await mockMayaRelayApi(page);
+  let replyRequestBody = "";
+  await page.route("**/api/conversations/conversation-1/reply", async (route) => {
+    replyRequestBody = route.request().postData() || "";
+    await route.fulfill({
+      contentType: "application/json",
+      json: {
+        status: "sent",
+        message: {
+          id: "message-dropped-file",
+          conversationId: "conversation-1",
+          direction: "employee_to_customer",
+          body: "Uploaded from drag and drop",
+          fromPhone: "+13852208404",
+          toPhone: "+15550000001",
+          twilioMessageSid: "SMdropped",
+          deliveryStatus: "pending",
+          deliveryErrorCode: null,
+          deliveryErrorMessage: null,
+          clientRequestId: "drag-drop-request",
+          createdAt: "2026-06-06T14:01:00Z",
+          attachments: [
+            {
+              url: "https://files.example/dropped-proof.png",
+              contentType: "image/png",
+              kind: "image",
+            },
+          ],
+        },
+      },
+    });
+  });
+
+  await page.goto("/app/");
+  await expect(page.getByRole("article").getByText("Hello")).toBeVisible();
+  await page.locator(".composer").evaluate((element) => {
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(new File(["fake image"], "dropped-proof.png", { type: "image/png" }));
+    element.dispatchEvent(new DragEvent("drop", { bubbles: true, dataTransfer }));
+  });
+
+  await expect(page.getByText("dropped-proof.png")).toBeVisible();
+  await page.getByRole("button", { name: "Send message" }).click();
+
+  await expect.poll(() => replyRequestBody).toContain("dropped-proof.png");
 });
 
 test("Load more appends the next conversation page", async ({ page }) => {
