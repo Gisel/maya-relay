@@ -451,7 +451,7 @@ test("closing a conversation requires confirmation and can be undone", async ({ 
   const dialog = page.getByRole("dialog", { name: "Are you sure you want to close this conversation?" });
   await expect(dialog).toBeVisible();
   await expect.poll(() => requestCounts.statusUpdates).toBe(0);
-  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await dialog.getByRole("button", { exact: true, name: "Cancel" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(page.getByLabel("Reply message")).toBeEnabled();
   await expect.poll(() => requestCounts.statusUpdates).toBe(0);

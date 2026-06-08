@@ -414,25 +414,35 @@ function CloseConversationDrawer({
     }
   }
 
+  if (!open) return null;
+
   return (
-    <Drawer
-      description={`${conversationName} will move out of the Open inbox. You can reopen it from Closed or by using Undo.`}
-      labelledBy="close-conversation-title"
-      onClose={onClose}
-      open={open}
-      title="Are you sure you want to close this conversation?"
-    >
-      <div className="drawer-actions">
-        <button className="ghost-button" disabled={disabled} onClick={onClose} type="button">
-          Cancel
-        </button>
-        <button className="send-button" disabled={disabled} onClick={handleConfirm} type="button">
-          <Archive size={17} />
-          {disabled ? "Closing..." : "Close"}
-        </button>
+    <div className="confirmation-backdrop" role="presentation">
+      <div
+        aria-labelledby="close-conversation-title"
+        aria-modal="true"
+        className="confirmation-dialog"
+        role="dialog"
+      >
+        <div className="confirmation-header">
+          <h2 id="close-conversation-title">Are you sure you want to close this conversation?</h2>
+          <button aria-label="Cancel close conversation" className="drawer-close" disabled={disabled} onClick={onClose} type="button">
+            <X size={18} />
+          </button>
+        </div>
+        <p>{conversationName} will move out of the Open inbox. You can reopen it from Closed or by using Undo.</p>
+        <div className="confirmation-actions">
+          <button className="ghost-button" disabled={disabled} onClick={onClose} type="button">
+            Cancel
+          </button>
+          <button className="send-button" disabled={disabled} onClick={handleConfirm} type="button">
+            <Archive size={17} />
+            {disabled ? "Closing..." : "Close"}
+          </button>
+        </div>
+        {error && <p className="form-error">{error}</p>}
       </div>
-      {error && <p className="form-error">{error}</p>}
-    </Drawer>
+    </div>
   );
 }
 
