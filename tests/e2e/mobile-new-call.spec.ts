@@ -48,6 +48,7 @@ async function mockMayaRelayApi(
     conversations: 0,
     detail: 0,
     me: 0,
+    statusUpdates: 0,
     quickResponses: 0,
   };
   let releaseHeldDetailRequest: (() => void) | null = null;
@@ -93,6 +94,7 @@ async function mockMayaRelayApi(
 
   await page.route("**/api/conversations/conversation-1", async (route) => {
     if (route.request().method() === "PATCH") {
+      requestCounts.statusUpdates += 1;
       const payload = JSON.parse(route.request().postData() || "{}") as { status?: "open" | "closed" };
       conversationStatus = payload.status || conversationStatus;
       await route.fulfill({
@@ -233,6 +235,9 @@ async function mockMayaRelayApi(
     },
     get me() {
       return requestCounts.me;
+    },
+    get statusUpdates() {
+      return requestCounts.statusUpdates;
     },
     get quickResponses() {
       return requestCounts.quickResponses;
@@ -436,21 +441,25 @@ test("composer accepts dropped files and sends them as reply attachments", async
 });
 
 test("closing a conversation requires confirmation and can be undone", async ({ page }) => {
-  await mockMayaRelayApi(page);
+  const requestCounts = await mockMayaRelayApi(page);
 
   await page.goto("/app/");
   await expect(page.getByRole("article").getByText("Hello")).toBeVisible();
+  await expect.poll(() => requestCounts.statusUpdates).toBe(0);
 
   await page.locator(".conversation-status-action").click();
   const dialog = page.getByRole("dialog", { name: "Are you sure you want to close this conversation?" });
   await expect(dialog).toBeVisible();
+  await expect.poll(() => requestCounts.statusUpdates).toBe(0);
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(page.getByLabel("Reply message")).toBeEnabled();
+  await expect.poll(() => requestCounts.statusUpdates).toBe(0);
 
   await page.locator(".conversation-status-action").click();
   await dialog.locator(".send-button").click();
 
+  await expect.poll(() => requestCounts.statusUpdates).toBe(1);
   await expect(page.getByText("Test Customer was closed.")).toBeVisible();
   await expect(page.getByText("This conversation is closed. Reopen it to send a reply.")).toBeVisible();
   await expect(page.getByLabel("Reply message")).toBeDisabled();
@@ -458,6 +467,7 @@ test("closing a conversation requires confirmation and can be undone", async ({ 
 
   await page.getByRole("button", { name: "Undo" }).click();
 
+  await expect.poll(() => requestCounts.statusUpdates).toBe(2);
   await expect(page.getByText("Test Customer was closed.")).toHaveCount(0);
   await expect(page.getByLabel("Reply message")).toBeEnabled();
   await expect(page.locator(".conversation-list").getByRole("button", { name: /Test Customer/ })).toBeVisible();

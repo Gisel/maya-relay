@@ -910,9 +910,8 @@ export function App() {
     setSuggestedReply("");
   }
 
-  async function handleToggleConversationStatus() {
+  async function updateActiveConversationStatus(nextStatus: ConversationStatus) {
     if (!selectedId || !activeConversation) return;
-    const nextStatus: ConversationStatus = activeConversation.status === "open" ? "closed" : "open";
     setIsUpdatingStatus(true);
     setAppError("");
     try {
@@ -938,6 +937,14 @@ export function App() {
     } finally {
       setIsUpdatingStatus(false);
     }
+  }
+
+  async function handleConfirmCloseConversation() {
+    await updateActiveConversationStatus("closed");
+  }
+
+  async function handleReopenConversation() {
+    await updateActiveConversationStatus("open");
   }
 
   async function handleUndoCloseConversation() {
@@ -1191,7 +1198,7 @@ export function App() {
                       if (status === "open") {
                         setIsCloseConversationOpen(true);
                       } else {
-                        void handleToggleConversationStatus();
+                        void handleReopenConversation();
                       }
                     }}
                     type="button"
@@ -1303,7 +1310,7 @@ export function App() {
         conversationName={customerName}
         disabled={isUpdatingStatus}
         onClose={() => setIsCloseConversationOpen(false)}
-        onConfirm={handleToggleConversationStatus}
+        onConfirm={handleConfirmCloseConversation}
         open={isCloseConversationOpen}
       />
     </div>
