@@ -50,6 +50,37 @@ create table if not exists public.message_attachments (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.calls (
+  id uuid primary key default gen_random_uuid(),
+  conversation_id uuid references public.conversations(id) on delete set null,
+  direction text not null default 'outbound' check (direction in ('outbound', 'inbound')),
+  call_type text not null check (call_type in ('conversation_call', 'manual_outbound', 'inbound')),
+  customer_phone text not null,
+  employee_phone text,
+  twilio_call_sid text,
+  status text not null default 'initiated',
+  outcome text check (
+    outcome is null
+    or outcome in ('connected', 'voicemail', 'no_answer', 'follow_up_needed', 'wrong_number', 'cancelled')
+  ),
+  notes text,
+  started_at timestamptz not null default now(),
+  answered_at timestamptz,
+  completed_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.call_events (
+  id uuid primary key default gen_random_uuid(),
+  call_id uuid references public.calls(id) on delete set null,
+  twilio_call_sid text,
+  event_type text not null,
+  call_status text,
+  payload jsonb not null default '{}'::jsonb,
+  received_at timestamptz not null default now()
+);
+
 create index if not exists conversations_customer_open_idx
   on public.conversations (customer_phone, assigned_employee, status, updated_at desc);
 
@@ -72,6 +103,23 @@ create unique index if not exists messages_client_request_idx
 
 create index if not exists message_attachments_message_idx
   on public.message_attachments (message_id, created_at);
+
+create unique index if not exists calls_twilio_call_sid_idx
+  on public.calls (twilio_call_sid)
+  where twilio_call_sid is not null;
+
+create index if not exists calls_conversation_started_idx
+  on public.calls (conversation_id, started_at desc);
+
+create index if not exists calls_customer_started_idx
+  on public.calls (customer_phone, started_at desc);
+
+create index if not exists call_events_call_received_idx
+  on public.call_events (call_id, received_at desc);
+
+create index if not exists call_events_twilio_sid_received_idx
+  on public.call_events (twilio_call_sid, received_at desc)
+  where twilio_call_sid is not null;
 
 alter table public.messages
   add column if not exists num_media integer not null default 0,
@@ -129,14 +177,25 @@ before update on public.conversations
 for each row
 execute function public.set_updated_at();
 
+drop trigger if exists calls_set_updated_at on public.calls;
+
+create trigger calls_set_updated_at
+before update on public.calls
+for each row
+execute function public.set_updated_at();
+
 alter table public.contacts enable row level security;
 alter table public.conversations enable row level security;
 alter table public.messages enable row level security;
+alter table public.calls enable row level security;
+alter table public.call_events enable row level security;
 
 grant all on public.contacts to service_role;
 grant all on public.conversations to service_role;
 grant all on public.messages to service_role;
 grant all on public.message_attachments to service_role;
+grant all on public.calls to service_role;
+grant all on public.call_events to service_role;
 grant usage on schema public to service_role;
 grant all on all tables in schema public to service_role;
 grant usage, select on all sequences in schema public to service_role;
