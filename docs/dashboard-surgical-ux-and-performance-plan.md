@@ -74,6 +74,11 @@ Visual direction to preserve:
 - Click-to-call bridge: Francisco receives call first, then Twilio bridges to customer.
 - Manual outbound call to a new number.
 - Basic close/reopen conversation functionality.
+- Close Conversation UX:
+  - confirmation before closing
+  - undo after close
+  - closed conversations hidden by default
+  - Open / Closed / All filtering
 - Session ID exposed in UI.
 - Needs-reply visual state for customer messages.
 - Internal AI/system relay messages hidden from dashboard chat display.
@@ -89,10 +94,6 @@ Visual direction to preserve:
 ## Next
 
 - Fix manual top Refresh button reliability.
-- Improve Close Conversation UX:
-  - confirmation or undo when closing
-  - decide whether closed conversations hide by default
-  - add closed/open filtering
 - Add Call Logging:
   - save call attempts/statuses
   - show call history

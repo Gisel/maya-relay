@@ -4,10 +4,11 @@ async function mockMayaRelayApi(
   page: import("@playwright/test").Page,
   options: { holdSecondDetailRequest?: boolean } = {},
 ) {
+  let conversationStatus: "open" | "closed" = "open";
   const conversation = {
     id: "conversation-1",
     code: "C0001",
-    status: "open",
+    status: conversationStatus,
     channel: "sms",
     customer: {
       phone: "+15550000001",
@@ -65,12 +66,15 @@ async function mockMayaRelayApi(
   await page.route(/\/api\/conversations(?:\?.*)?$/, async (route) => {
     const url = new URL(route.request().url());
     const query = (url.searchParams.get("q") || "").toLowerCase();
+    const status = url.searchParams.get("status");
     const offset = Number(url.searchParams.get("offset") || "0");
+    const currentConversation = { ...conversation, status: conversationStatus };
+    const candidates = [currentConversation, olderConversation].filter((item) => !status || item.status === status);
     const pageConversations = query
-      ? [conversation, olderConversation].filter((item) =>
+      ? candidates.filter((item) =>
         [item.customer.name, item.customer.phone, item.lastMessage.body].join(" ").toLowerCase().includes(query),
       )
-      : offset > 0 ? [olderConversation] : [conversation];
+      : offset > 0 ? candidates.filter((item) => item.id === "conversation-2") : candidates.filter((item) => item.id === "conversation-1");
     requestCounts.conversations += 1;
     await route.fulfill({
       contentType: "application/json",
@@ -88,6 +92,23 @@ async function mockMayaRelayApi(
   });
 
   await page.route("**/api/conversations/conversation-1", async (route) => {
+    if (route.request().method() === "PATCH") {
+      const payload = JSON.parse(route.request().postData() || "{}") as { status?: "open" | "closed" };
+      conversationStatus = payload.status || conversationStatus;
+      await route.fulfill({
+        contentType: "application/json",
+        json: {
+          conversation: {
+            ...conversation,
+            status: conversationStatus,
+            assignedEmployee: "+15551234567",
+            createdAt: "2026-06-06T14:00:00Z",
+          },
+        },
+      });
+      return;
+    }
+
     requestCounts.detail += 1;
     if (options.holdSecondDetailRequest && requestCounts.detail === 2) {
       await new Promise<void>((resolve) => {
@@ -184,6 +205,7 @@ async function mockMayaRelayApi(
       json: {
         conversation: {
           ...conversation,
+          status: conversationStatus,
           assignedEmployee: "+15551234567",
           createdAt: "2026-06-06T14:00:00Z",
         },
@@ -411,6 +433,49 @@ test("composer accepts dropped files and sends them as reply attachments", async
   await page.getByRole("button", { name: "Send message" }).click();
 
   await expect.poll(() => replyRequestBody).toContain("dropped-proof.png");
+});
+
+test("closing a conversation requires confirmation and can be undone", async ({ page }) => {
+  await mockMayaRelayApi(page);
+
+  await page.goto("/app/");
+  await expect(page.getByRole("article").getByText("Hello")).toBeVisible();
+
+  await page.locator(".conversation-status-action").click();
+  const dialog = page.getByRole("dialog", { name: "Close conversation?" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByLabel("Reply message")).toBeEnabled();
+
+  await page.locator(".conversation-status-action").click();
+  await dialog.locator(".send-button").click();
+
+  await expect(page.getByText("Test Customer was closed.")).toBeVisible();
+  await expect(page.getByText("This conversation is closed. Reopen it to send a reply.")).toBeVisible();
+  await expect(page.getByLabel("Reply message")).toBeDisabled();
+  await expect(page.locator(".conversation-list").getByRole("button", { name: /Test Customer/ })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Undo" }).click();
+
+  await expect(page.getByText("Test Customer was closed.")).toHaveCount(0);
+  await expect(page.getByLabel("Reply message")).toBeEnabled();
+  await expect(page.locator(".conversation-list").getByRole("button", { name: /Test Customer/ })).toBeVisible();
+});
+
+test("closed conversation filter reveals closed rows", async ({ page }) => {
+  await mockMayaRelayApi(page);
+
+  await page.goto("/app/");
+  await expect(page.getByRole("article").getByText("Hello")).toBeVisible();
+
+  await page.locator(".conversation-status-action").click();
+  await page.getByRole("dialog", { name: "Close conversation?" }).locator(".send-button").click();
+  await expect(page.locator(".conversation-list").getByRole("button", { name: /Test Customer/ })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "closed" }).click();
+
+  await expect(page.locator(".conversation-row.status-closed", { hasText: "Test Customer" })).toBeVisible();
 });
 
 test("Load more appends the next conversation page", async ({ page }) => {

@@ -139,6 +139,30 @@ button {
   color: #146a3a;
 }
 
+.action-notice {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.action-notice button {
+  background: #ffffff;
+  border: 1px solid rgb(20 106 58 / 28%);
+  border-radius: 999px;
+  color: #146a3a;
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 600;
+  min-height: 30px;
+  padding: 0 12px;
+}
+
+.action-notice button:disabled {
+  color: #7aa68e;
+  cursor: not-allowed;
+}
+
 .topbar {
   align-items: center;
   background: #fbfcfe;
@@ -356,6 +380,32 @@ button {
   width: 100%;
 }
 
+.conversation-filter {
+  border-bottom: 1px solid #e7ebf1;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 12px 18px;
+}
+
+.conversation-filter button {
+  background: #ffffff;
+  border: 1px solid #d7dde7;
+  border-radius: 999px;
+  color: #667085;
+  font-size: 12px;
+  font-weight: 560;
+  min-height: 32px;
+  padding: 0 10px;
+  text-transform: capitalize;
+}
+
+.conversation-filter button.is-active {
+  background: var(--brand-blue-soft);
+  border-color: #bfd5f8;
+  color: var(--brand-blue-dark);
+}
+
 .conversation-list {
   flex: 1 1 auto;
   min-height: 0;
@@ -396,6 +446,16 @@ button {
 .conversation-row.needs-reply.selected {
   background: #fff7e6;
   box-shadow: inset 4px 0 0 #d98500;
+}
+
+.conversation-row.status-closed {
+  background: #fbfcfe;
+}
+
+.conversation-row.status-closed.selected {
+  background: #eef1f5;
+  border-color: #cbd3df;
+  box-shadow: inset 4px 0 0 #7b8799;
 }
 
 .conversation-row-heading {
@@ -468,6 +528,7 @@ button {
 .channel-pill,
 .delivery-pill,
 .attention-pill,
+.closed-pill,
 .status-pill {
   align-items: center;
   border-radius: 999px;
@@ -481,7 +542,8 @@ button {
 
 .conversation-identity .channel-pill,
 .conversation-identity .delivery-pill,
-.conversation-identity .attention-pill {
+.conversation-identity .attention-pill,
+.conversation-identity .closed-pill {
   font-size: 10px;
   min-height: 20px;
   padding: 0 8px;
@@ -490,6 +552,11 @@ button {
 .attention-pill {
   background: #fff1d6;
   color: #9a5600;
+}
+
+.closed-pill {
+  background: #eef1f5;
+  color: #667085;
 }
 
 .channel-pill.whatsapp {
@@ -677,6 +744,14 @@ button {
 .conversation-panel.channel-whatsapp .message-bubble.outbound {
   background: var(--brand-green);
   border-color: var(--brand-green);
+}
+
+.closed-note {
+  background: #eef1f5;
+  border-radius: 8px;
+  color: #475366;
+  margin: 0;
+  padding: 12px 14px;
 }
 
 .message-bubble p {
@@ -1080,6 +1155,7 @@ button {
 
   .metrics-row,
   .search-box,
+  .conversation-filter,
   .conversation-row,
   .conversation-header,
   .composer {
@@ -1111,6 +1187,11 @@ button {
 
   .search-box {
     padding: 10px 12px;
+  }
+
+  .conversation-filter {
+    gap: 6px;
+    padding: 9px 10px;
   }
 
   .conversation-list {
@@ -1151,7 +1232,8 @@ button {
   }
 
   .conversation-identity .channel-pill,
-  .conversation-identity .delivery-pill {
+  .conversation-identity .delivery-pill,
+  .conversation-identity .closed-pill {
     font-size: 9px;
     min-height: 18px;
     padding: 0 7px;
@@ -1380,6 +1462,19 @@ button {
     width: 100%;
   }
 
+  .conversation-filter {
+    border: 0;
+    gap: 6px;
+    order: -1;
+    padding: 0 0 10px;
+    width: 100%;
+  }
+
+  .conversation-filter button {
+    min-height: 34px;
+    padding: 0 8px;
+  }
+
   .metrics-row {
     display: none;
   }
@@ -1474,6 +1569,17 @@ button {
     box-shadow: inset 3px 0 0 #d98500;
   }
 
+  .conversation-row.status-closed {
+    background: #ffffff;
+    border-color: #dfe4ec;
+  }
+
+  .conversation-row.status-closed.selected {
+    background: #eef1f5;
+    border-color: #98a2b6;
+    box-shadow: inset 3px 0 0 #98a2b6;
+  }
+
   .conversation-row-heading {
     gap: 0;
   }
@@ -1512,6 +1618,10 @@ button {
     background: #d98500;
   }
 
+  .conversation-row.status-closed strong::before {
+    background: #98a2b6;
+  }
+
   .conversation-row p {
     display: none;
   }
@@ -1522,7 +1632,8 @@ button {
 
   .conversation-identity .channel-pill,
   .conversation-identity .delivery-pill,
-  .conversation-identity .attention-pill {
+  .conversation-identity .attention-pill,
+  .conversation-identity .closed-pill {
     display: none;
   }
 

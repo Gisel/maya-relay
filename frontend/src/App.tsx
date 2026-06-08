@@ -22,6 +22,7 @@ import {
   ConversationDetail,
   ConversationListItem,
   ConversationStatus,
+  ConversationStatusFilter,
   DeliveryStatus,
   Message,
   Metrics,
@@ -384,6 +385,57 @@ function NewCallDrawer({
   );
 }
 
+function CloseConversationDrawer({
+  conversationName,
+  disabled,
+  onClose,
+  onConfirm,
+  open,
+}: {
+  conversationName: string;
+  disabled: boolean;
+  onClose: () => void;
+  onConfirm: () => Promise<void>;
+  open: boolean;
+}) {
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (open) setError("");
+  }, [open]);
+
+  async function handleConfirm() {
+    setError("");
+    try {
+      await onConfirm();
+      onClose();
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Could not close this conversation.");
+    }
+  }
+
+  return (
+    <Drawer
+      description={`${conversationName} will move out of the Open inbox. You can reopen it from Closed or by using Undo.`}
+      labelledBy="close-conversation-title"
+      onClose={onClose}
+      open={open}
+      title="Close conversation?"
+    >
+      <div className="drawer-actions">
+        <button className="ghost-button" disabled={disabled} onClick={onClose} type="button">
+          Cancel
+        </button>
+        <button className="send-button" disabled={disabled} onClick={handleConfirm} type="button">
+          <Archive size={17} />
+          {disabled ? "Closing..." : "Close"}
+        </button>
+      </div>
+      {error && <p className="form-error">{error}</p>}
+    </Drawer>
+  );
+}
+
 function Composer({
   disabled,
   draft,
@@ -514,6 +566,7 @@ export function App() {
   const [quickResponses, setQuickResponses] = useState<QuickResponse[]>([]);
   const [suggestedReply, setSuggestedReply] = useState("");
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<ConversationStatusFilter>("open");
   const [draft, setDraft] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [isLoadingList, setIsLoadingList] = useState(false);
@@ -524,6 +577,8 @@ export function App() {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isCallingCustomer, setIsCallingCustomer] = useState(false);
   const [isNewCallOpen, setIsNewCallOpen] = useState(false);
+  const [isCloseConversationOpen, setIsCloseConversationOpen] = useState(false);
+  const [closedConversationUndo, setClosedConversationUndo] = useState<{ id: string; name: string } | null>(null);
   const [callStatus, setCallStatus] = useState("");
   const [appError, setAppError] = useState("");
   const [detailError, setDetailError] = useState("");
@@ -578,7 +633,7 @@ export function App() {
     setIsLoadingList(true);
     setAppError("");
     try {
-      const payload = await getConversations();
+      const payload = await getConversations("", 0, 50, statusFilter);
       setConversations(payload.conversations);
       setMetrics(payload.metrics);
       setNextConversationOffset(payload.pagination?.nextOffset ?? null);
@@ -597,14 +652,14 @@ export function App() {
     } finally {
       setIsLoadingList(false);
     }
-  }, []);
+  }, [statusFilter]);
 
   const loadMoreConversations = useCallback(async () => {
     if (nextConversationOffset === null || search.trim()) return;
     setIsLoadingMore(true);
     setAppError("");
     try {
-      const payload = await getConversations("", nextConversationOffset);
+      const payload = await getConversations("", nextConversationOffset, 50, statusFilter);
       setConversations((current) => {
         const seen = new Set(current.map((conversation) => conversation.id));
         return [
@@ -623,7 +678,7 @@ export function App() {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [nextConversationOffset, search]);
+  }, [nextConversationOffset, search, statusFilter]);
 
   const loadDetail = useCallback(async (conversationId: string) => {
     if (!conversationId) {
@@ -660,7 +715,7 @@ export function App() {
     if (isRefreshingList.current && !force) return;
     isRefreshingList.current = true;
     try {
-      const payload = await getConversations();
+      const payload = await getConversations("", 0, 50, statusFilter);
       setConversations((current) => mergeConversationLists(payload.conversations, current));
       setMetrics(payload.metrics);
       setNextConversationOffset(payload.pagination?.nextOffset ?? null);
@@ -673,7 +728,7 @@ export function App() {
     } finally {
       isRefreshingList.current = false;
     }
-  }, []);
+  }, [statusFilter]);
 
   const refreshDetail = useCallback(async (conversationId: string, { force = false }: { force?: boolean } = {}) => {
     if (!conversationId || (isRefreshingDetail.current && !force)) return;
@@ -733,7 +788,7 @@ export function App() {
       const requestId = searchRequestId.current + 1;
       searchRequestId.current = requestId;
       setIsSearchingConversations(true);
-      getConversations(query)
+      getConversations(query, 0, 50, statusFilter)
         .then((payload) => {
           if (searchRequestId.current === requestId) {
             setSearchResults(payload.conversations);
@@ -754,7 +809,7 @@ export function App() {
         });
     }, 250);
     return () => window.clearTimeout(timeoutId);
-  }, [isAuthenticated, search]);
+  }, [isAuthenticated, search, statusFilter]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -827,6 +882,7 @@ export function App() {
     setMessages([]);
     setSuggestedReply("");
     setCallStatus("");
+    setClosedConversationUndo(null);
   }
 
   async function handleRefreshInbox() {
@@ -862,6 +918,11 @@ export function App() {
     try {
       const response = await updateConversationStatus(selectedId, nextStatus);
       setSelectedConversation(response.conversation);
+      if (nextStatus === "closed") {
+        setClosedConversationUndo({ id: selectedId, name: displayCustomerName(activeConversation) });
+      } else {
+        setClosedConversationUndo(null);
+      }
       setConversations((current) =>
         current.map((conversation) =>
           conversation.id === selectedId ? { ...conversation, status: response.conversation.status } : conversation,
@@ -873,6 +934,28 @@ export function App() {
         setIsAuthenticated(false);
       } else {
         setAppError(error instanceof Error ? error.message : "Could not update conversation.");
+      }
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  }
+
+  async function handleUndoCloseConversation() {
+    if (!closedConversationUndo) return;
+    setIsUpdatingStatus(true);
+    setAppError("");
+    try {
+      const response = await updateConversationStatus(closedConversationUndo.id, "open");
+      setSelectedConversation(response.conversation);
+      setSelectedId(response.conversation.id);
+      setClosedConversationUndo(null);
+      setStatusFilter("open");
+      await loadConversations(response.conversation.id);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setIsAuthenticated(false);
+      } else {
+        setAppError(error instanceof Error ? error.message : "Could not reopen conversation.");
       }
     } finally {
       setIsUpdatingStatus(false);
@@ -994,6 +1077,25 @@ export function App() {
             />
           </label>
 
+          <div className="conversation-filter" role="group" aria-label="Conversation status filter">
+            {(["open", "closed", "all"] as ConversationStatusFilter[]).map((filter) => (
+              <button
+                className={statusFilter === filter ? "is-active" : ""}
+                key={filter}
+                onClick={() => {
+                  setStatusFilter(filter);
+                  setSearchResults(null);
+                  setNextConversationOffset(null);
+                  setHasMoreConversations(false);
+                  setClosedConversationUndo(null);
+                }}
+                type="button"
+              >
+                {filter === "all" ? "All" : filter}
+              </button>
+            ))}
+          </div>
+
           <div className="conversation-list">
             {isLoadingList && <p className="panel-note">Loading conversations...</p>}
             {!isLoadingList && visibleConversations.length === 0 && <p className="panel-note">No conversations found.</p>}
@@ -1007,6 +1109,7 @@ export function App() {
                       "conversation-row",
                       `channel-${listChannel}`,
                       `delivery-${deliveryStatus(conversation)}`,
+                      `status-${conversation.status}`,
                       requiresReply ? "needs-reply" : "",
                       conversation.id === selectedId ? "selected" : "",
                     ]
@@ -1030,6 +1133,7 @@ export function App() {
                       <span className="conversation-identity">
                         <strong>{displayCustomerName(conversation)}</strong>
                         <span className={`channel-pill ${listChannel}`}>{channelLabel(listChannel)}</span>
+                        {conversation.status === "closed" && <span className="closed-pill">Closed</span>}
                         {requiresReply && <span className="attention-pill">Needs reply</span>}
                         {(deliveryStatus(conversation) === "failed" || deliveryStatus(conversation) === "undelivered") && (
                           <DeliveryPill status={deliveryStatus(conversation)} />
@@ -1083,7 +1187,13 @@ export function App() {
                   <button
                     className="conversation-status-action"
                     disabled={!selectedId || isUpdatingStatus}
-                    onClick={handleToggleConversationStatus}
+                    onClick={() => {
+                      if (status === "open") {
+                        setIsCloseConversationOpen(true);
+                      } else {
+                        void handleToggleConversationStatus();
+                      }
+                    }}
                     type="button"
                   >
                     <Archive size={15} />
@@ -1101,6 +1211,17 @@ export function App() {
           <div className="message-thread" ref={messageThreadRef}>
             {appError && <p className="app-error">{appError}</p>}
             {callStatus && <p className="app-success">{callStatus}</p>}
+            {closedConversationUndo && (
+              <div className="app-success action-notice">
+                <span>{closedConversationUndo.name} was closed.</span>
+                <button disabled={isUpdatingStatus} onClick={handleUndoCloseConversation} type="button">
+                  Undo
+                </button>
+              </div>
+            )}
+            {status === "closed" && (
+              <p className="panel-note closed-note">This conversation is closed. Reopen it to send a reply.</p>
+            )}
             {detailError && <p className="app-error">Could not load this conversation. Try selecting it again.</p>}
             {isLoadingDetail && <p className="panel-note">Loading messages...</p>}
             {!isLoadingDetail && !detailError && visibleMessages.length === 0 && <p className="panel-note">No messages yet.</p>}
@@ -1111,7 +1232,7 @@ export function App() {
           </div>
 
           <Composer
-            disabled={!selectedId}
+            disabled={!selectedId || status === "closed"}
             draft={draft}
             files={files}
             onDraftChange={setDraft}
@@ -1177,6 +1298,13 @@ export function App() {
         onClose={() => setIsNewCallOpen(false)}
         onStartCall={handleStartNewCall}
         open={isNewCallOpen}
+      />
+      <CloseConversationDrawer
+        conversationName={customerName}
+        disabled={isUpdatingStatus}
+        onClose={() => setIsCloseConversationOpen(false)}
+        onConfirm={handleToggleConversationStatus}
+        open={isCloseConversationOpen}
       />
     </div>
   );

@@ -1,5 +1,6 @@
 export type Channel = "sms" | "whatsapp";
 export type ConversationStatus = "open" | "closed";
+export type ConversationStatusFilter = ConversationStatus | "all";
 export type DeliveryStatus = "delivered" | "failed" | "pending" | "queued" | "undelivered" | string;
 export type MessageDirection = "customer_to_employee" | "employee_to_customer" | "system" | string;
 
@@ -158,11 +159,12 @@ export function logout() {
   return request<{ authenticated: false }>("/api/auth/logout", { method: "POST" });
 }
 
-export function getConversations(query = "", offset = 0, limit = 50) {
+export function getConversations(query = "", offset = 0, limit = 50, status: ConversationStatusFilter = "all") {
   const params = new URLSearchParams();
   if (query.trim()) params.set("q", query.trim());
   if (offset > 0) params.set("offset", String(offset));
   if (limit !== 50) params.set("limit", String(limit));
+  if (status !== "all") params.set("status", status);
   const suffix = params.toString() ? `?${params.toString()}` : "";
   return request<ConversationsResponse>(`/api/conversations${suffix}`);
 }
