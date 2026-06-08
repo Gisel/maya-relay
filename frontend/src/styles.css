@@ -1016,15 +1016,35 @@ button {
   overflow-wrap: anywhere;
 }
 
+.context-scroll-area {
+  display: grid;
+  gap: 0;
+  max-height: min(670px, calc(100vh - 300px));
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-gutter: stable;
+}
+
+.context-scroll-area::-webkit-scrollbar {
+  width: 8px;
+}
+
+.context-scroll-area::-webkit-scrollbar-thumb {
+  background: #cfd7e5;
+  border-radius: 999px;
+}
+
+.context-scroll-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 .intent-box {
   border: 1px solid #f7c7d8;
   border-radius: 8px;
   display: grid;
   gap: 10px;
-  max-height: 190px;
-  overflow-y: auto;
   padding: 14px;
-  scrollbar-gutter: stable;
 }
 
 .intent-box > span {
@@ -1063,26 +1083,6 @@ button {
 .call-history-list {
   display: grid;
   gap: 10px;
-  max-height: 310px;
-  overflow-y: auto;
-  padding-right: 4px;
-  scrollbar-gutter: stable;
-}
-
-.intent-box::-webkit-scrollbar,
-.call-history-list::-webkit-scrollbar {
-  width: 8px;
-}
-
-.intent-box::-webkit-scrollbar-thumb,
-.call-history-list::-webkit-scrollbar-thumb {
-  background: #cfd7e5;
-  border-radius: 999px;
-}
-
-.intent-box::-webkit-scrollbar-track,
-.call-history-list::-webkit-scrollbar-track {
-  background: transparent;
 }
 
 .call-history-item {
@@ -1570,12 +1570,11 @@ button {
 
   .intent-box {
     background: #fffafd;
-    max-height: 160px;
     padding: 12px;
   }
 
-  .call-history-list {
-    max-height: 240px;
+  .context-scroll-area {
+    max-height: min(560px, calc(100vh - 260px));
   }
 
   .context-section {

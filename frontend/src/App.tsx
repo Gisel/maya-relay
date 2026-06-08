@@ -1641,44 +1641,46 @@ export function App() {
             {activeConversation?.code && <em>Session ID: #{activeConversation.code}</em>}
           </section>
 
-          <CallHistory calls={calls} onSelectCall={(call) => setSelectedCallId(call.id)} />
+          <div className="context-scroll-area">
+            <CallHistory calls={calls} onSelectCall={(call) => setSelectedCallId(call.id)} />
 
-          <section className="context-section">
-            <h2>
-              <Sparkles size={18} />
-              AI Suggested Reply
-            </h2>
-            <div className="intent-box">
-              <span>{suggestedReply ? "Ready" : "No suggestion"}</span>
-              <p>{suggestedReply || "No AI suggestion is available for this conversation yet."}</p>
-              {suggestedReply && (
-                <button
-                  className="secondary-action"
-                  onClick={() => {
-                    setDraft(suggestedReply);
-                    setSuggestedReply("");
-                  }}
-                  type="button"
-                >
-                  Use suggested reply
-                </button>
-              )}
-            </div>
-          </section>
+            <section className="context-section">
+              <h2>
+                <Sparkles size={18} />
+                AI Suggested Reply
+              </h2>
+              <div className="intent-box">
+                <span>{suggestedReply ? "Ready" : "No suggestion"}</span>
+                <p>{suggestedReply || "No AI suggestion is available for this conversation yet."}</p>
+                {suggestedReply && (
+                  <button
+                    className="secondary-action"
+                    onClick={() => {
+                      setDraft(suggestedReply);
+                      setSuggestedReply("");
+                    }}
+                    type="button"
+                  >
+                    Use suggested reply
+                  </button>
+                )}
+              </div>
+            </section>
 
-          <section className="context-section">
-            <h2>Quick Responses</h2>
-            <div className="quick-responses">
-              {quickResponses.map((response, index) => (
-                <button key={response.id} onClick={() => setDraft(response.body)} type="button">
-                  {index === 0 && "?"}
-                  {index === 1 && <CheckCircle2 size={16} />}
-                  {index === 2 && <Sparkles size={16} />}
-                  <span>{response.label}</span>
-                </button>
-              ))}
-            </div>
-          </section>
+            <section className="context-section">
+              <h2>Quick Responses</h2>
+              <div className="quick-responses">
+                {quickResponses.map((response, index) => (
+                  <button key={response.id} onClick={() => setDraft(response.body)} type="button">
+                    {index === 0 && "?"}
+                    {index === 1 && <CheckCircle2 size={16} />}
+                    {index === 2 && <Sparkles size={16} />}
+                    <span>{response.label}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          </div>
         </aside>
       </main>
       <NewCallDrawer
