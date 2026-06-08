@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Any
 
 from app.attachments import StoredAttachment
@@ -11,6 +12,8 @@ class FakeRepository:
         self.messages: list[dict[str, Any]] = []
         self.attachments: list[dict[str, Any]] = []
         self.status_updates: list[dict[str, Any]] = []
+        self.calls: list[dict[str, Any]] = []
+        self.call_events: list[dict[str, Any]] = []
 
     def get_contact(self, phone_number: str) -> Contact | None:
         for contact in self.contacts:
@@ -241,6 +244,69 @@ class FakeRepository:
 
     def list_messages_for_conversation(self, conversation_id: str, limit: int = 100) -> list[dict[str, Any]]:
         return [message for message in self.messages if message["conversation_id"] == conversation_id][:limit]
+
+    def create_call(
+        self,
+        *,
+        conversation_id: str | None,
+        direction: str,
+        call_type: str,
+        customer_phone: str,
+        employee_phone: str | None,
+        twilio_call_sid: str | None,
+        status: str,
+    ) -> dict[str, Any]:
+        call = {
+            "id": f"call-{len(self.calls) + 1}",
+            "conversation_id": conversation_id,
+            "direction": direction,
+            "call_type": call_type,
+            "customer_phone": customer_phone,
+            "employee_phone": employee_phone,
+            "twilio_call_sid": twilio_call_sid,
+            "status": status,
+            "answered_at": None,
+            "completed_at": None,
+        }
+        self.calls.append(call)
+        return call
+
+    def update_call_status_by_sid(
+        self,
+        *,
+        twilio_call_sid: str,
+        status: str,
+    ) -> dict[str, Any] | None:
+        for call in self.calls:
+            if call["twilio_call_sid"] != twilio_call_sid:
+                continue
+            call["status"] = status
+            if status in {"answered", "in-progress"}:
+                call["answered_at"] = datetime.now(UTC).isoformat()
+            if status == "completed":
+                call["completed_at"] = datetime.now(UTC).isoformat()
+            return call
+        return None
+
+    def create_call_event(
+        self,
+        *,
+        call_id: str | None,
+        twilio_call_sid: str | None,
+        event_type: str,
+        call_status: str | None,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        event = {
+            "id": f"call-event-{len(self.call_events) + 1}",
+            "call_id": call_id,
+            "twilio_call_sid": twilio_call_sid,
+            "event_type": event_type,
+            "call_status": call_status,
+            "payload": payload,
+        }
+        self.call_events.append(event)
+        return event
 
 
 class FakeSender:

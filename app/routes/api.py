@@ -1,4 +1,5 @@
 import hmac
+import logging
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
@@ -16,6 +17,7 @@ from app.twilio_client import MessageSender, VoiceCaller
 
 
 router = APIRouter(prefix="/api", tags=["api"])
+logger = logging.getLogger(__name__)
 
 
 class ConversationUpdate(BaseModel):
@@ -316,7 +318,14 @@ def api_call_conversation_customer(
     if conversation is None:
         raise HTTPException(status_code=404)
 
-    return _start_click_to_call(request=request, settings=settings, conversation=conversation, voice_caller=voice_caller)
+    return _start_click_to_call(
+        request=request,
+        settings=settings,
+        repository=repository,
+        conversation=conversation,
+        voice_caller=voice_caller,
+        call_type="conversation_call",
+    )
 
 
 @router.post("/calls")
@@ -350,8 +359,10 @@ def api_start_new_call(
     call_response = _start_click_to_call(
         request=request,
         settings=settings,
+        repository=repository,
         conversation=conversation,
         voice_caller=voice_caller,
+        call_type="manual_outbound",
     )
     return {
         **call_response,
@@ -363,8 +374,10 @@ def _start_click_to_call(
     *,
     request: Request,
     settings: Settings,
+    repository: RelayRepository,
     conversation: Conversation,
     voice_caller: VoiceCaller,
+    call_type: Literal["conversation_call", "manual_outbound"],
 ) -> dict[str, str]:
     employee_phone = settings.francisco_phone_e164
     customer_phone = _voice_phone_number(conversation.customer_phone)
@@ -381,6 +394,19 @@ def _start_click_to_call(
         bridge_url=f"{base_url}/webhooks/twilio/voice/bridge/{conversation.id}",
         status_callback_url=f"{base_url}/webhooks/twilio/voice/status",
     )
+    try:
+        repository.create_call(
+            conversation_id=conversation.id,
+            direction="outbound",
+            call_type=call_type,
+            customer_phone=customer_phone,
+            employee_phone=employee_phone,
+            twilio_call_sid=call_sid,
+            status="initiated",
+        )
+    except Exception:
+        logger.exception("Failed to persist outbound call log for conversation %s", conversation.id)
+
     return {
         "status": "calling",
         "callSid": call_sid,

@@ -524,6 +524,20 @@ def test_api_starts_click_to_call_bridge():
             "status_callback_url": "https://maya-relay.example/webhooks/twilio/voice/status",
         }
     ]
+    assert repository.calls == [
+        {
+            "id": "call-1",
+            "conversation_id": "conversation-1",
+            "direction": "outbound",
+            "call_type": "conversation_call",
+            "customer_phone": "+15550000001",
+            "employee_phone": "+15551234567",
+            "twilio_call_sid": "CAfake1",
+            "status": "initiated",
+            "answered_at": None,
+            "completed_at": None,
+        }
+    ]
 
 
 def test_api_starts_new_call_and_creates_contact_conversation():
@@ -556,6 +570,10 @@ def test_api_starts_new_call_and_creates_contact_conversation():
             "status_callback_url": "https://maya-relay.example/webhooks/twilio/voice/status",
         }
     ]
+    assert repository.calls[0]["call_type"] == "manual_outbound"
+    assert repository.calls[0]["customer_phone"] == "+15550000003"
+    assert repository.calls[0]["employee_phone"] == "+15551234567"
+    assert repository.calls[0]["twilio_call_sid"] == "CAfake1"
 
 
 def test_api_new_call_rejects_maya_business_number():
@@ -589,6 +607,48 @@ def test_twilio_voice_bridge_dials_customer():
     assert "<Dial" in response.text
     assert "+15550000001" in response.text
     assert "+13852208404" in response.text
+
+
+def test_twilio_voice_status_updates_call_log_and_records_event():
+    client, repository, _ = make_client()
+    repository.create_call(
+        conversation_id="conversation-1",
+        direction="outbound",
+        call_type="conversation_call",
+        customer_phone="+15550000001",
+        employee_phone="+15551234567",
+        twilio_call_sid="CAfake1",
+        status="initiated",
+    )
+
+    response = client.post(
+        "/webhooks/twilio/voice/status",
+        data={
+            "CallSid": "CAfake1",
+            "CallStatus": "answered",
+            "From": "+13852208404",
+            "To": "+15551234567",
+        },
+    )
+
+    assert response.status_code == 204
+    assert repository.calls[0]["status"] == "answered"
+    assert repository.calls[0]["answered_at"] is not None
+    assert repository.call_events == [
+        {
+            "id": "call-event-1",
+            "call_id": "call-1",
+            "twilio_call_sid": "CAfake1",
+            "event_type": "answered",
+            "call_status": "answered",
+            "payload": {
+                "CallSid": "CAfake1",
+                "CallStatus": "answered",
+                "From": "+13852208404",
+                "To": "+15551234567",
+            },
+        }
+    ]
 
 
 def test_twilio_sms_webhook_acknowledges_with_empty_twiml():

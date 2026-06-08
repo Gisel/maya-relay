@@ -125,6 +125,38 @@ class RelayRepository(Protocol):
     def list_messages_for_conversation(self, conversation_id: str, limit: int = 100) -> list[dict[str, Any]]:
         ...
 
+    def create_call(
+        self,
+        *,
+        conversation_id: str | None,
+        direction: str,
+        call_type: str,
+        customer_phone: str,
+        employee_phone: str | None,
+        twilio_call_sid: str | None,
+        status: str,
+    ) -> dict[str, Any]:
+        ...
+
+    def update_call_status_by_sid(
+        self,
+        *,
+        twilio_call_sid: str,
+        status: str,
+    ) -> dict[str, Any] | None:
+        ...
+
+    def create_call_event(
+        self,
+        *,
+        call_id: str | None,
+        twilio_call_sid: str | None,
+        event_type: str,
+        call_status: str | None,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        ...
+
 
 class SupabaseRelayRepository:
     def __init__(self, client: Client):
@@ -459,6 +491,84 @@ class SupabaseRelayRepository:
             .execute()
         )
         return result.data
+
+    def create_call(
+        self,
+        *,
+        conversation_id: str | None,
+        direction: str,
+        call_type: str,
+        customer_phone: str,
+        employee_phone: str | None,
+        twilio_call_sid: str | None,
+        status: str,
+    ) -> dict[str, Any]:
+        result = (
+            self.client.table("calls")
+            .insert(
+                {
+                    "conversation_id": conversation_id,
+                    "direction": direction,
+                    "call_type": call_type,
+                    "customer_phone": customer_phone,
+                    "employee_phone": employee_phone,
+                    "twilio_call_sid": twilio_call_sid,
+                    "status": status,
+                }
+            )
+            .execute()
+        )
+        return result.data[0]
+
+    def update_call_status_by_sid(
+        self,
+        *,
+        twilio_call_sid: str,
+        status: str,
+    ) -> dict[str, Any] | None:
+        if not twilio_call_sid:
+            return None
+
+        timestamp_updates: dict[str, Any] = {}
+        now = datetime.now(UTC).isoformat()
+        if status in {"answered", "in-progress"}:
+            timestamp_updates["answered_at"] = now
+        if status == "completed":
+            timestamp_updates["completed_at"] = now
+
+        result = (
+            self.client.table("calls")
+            .update({"status": status, **timestamp_updates})
+            .eq("twilio_call_sid", twilio_call_sid)
+            .execute()
+        )
+        if not result.data:
+            return None
+        return result.data[0]
+
+    def create_call_event(
+        self,
+        *,
+        call_id: str | None,
+        twilio_call_sid: str | None,
+        event_type: str,
+        call_status: str | None,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        result = (
+            self.client.table("call_events")
+            .insert(
+                {
+                    "call_id": call_id,
+                    "twilio_call_sid": twilio_call_sid,
+                    "event_type": event_type,
+                    "call_status": call_status,
+                    "payload": payload,
+                }
+            )
+            .execute()
+        )
+        return result.data[0]
 
 
 def _message_search_text(messages: list[dict[str, Any]]) -> str:

@@ -291,6 +291,75 @@ def test_update_message_status_updates_matching_message_only():
     assert other["delivery_status"] is None
 
 
+def test_create_call_stores_outbound_call_log():
+    repository, client = build_repository()
+
+    call = repository.create_call(
+        conversation_id="conversation-1",
+        direction="outbound",
+        call_type="conversation_call",
+        customer_phone="+15550000001",
+        employee_phone="+15551234567",
+        twilio_call_sid="CA123",
+        status="initiated",
+    )
+
+    stored = client.rows("calls")[0]
+    assert call["id"] == "call-1"
+    assert stored["conversation_id"] == "conversation-1"
+    assert stored["direction"] == "outbound"
+    assert stored["call_type"] == "conversation_call"
+    assert stored["customer_phone"] == "+15550000001"
+    assert stored["employee_phone"] == "+15551234567"
+    assert stored["twilio_call_sid"] == "CA123"
+    assert stored["status"] == "initiated"
+
+
+def test_update_call_status_by_sid_sets_status_timestamps():
+    repository, client = build_repository()
+    repository.create_call(
+        conversation_id="conversation-1",
+        direction="outbound",
+        call_type="manual_outbound",
+        customer_phone="+15550000001",
+        employee_phone="+15551234567",
+        twilio_call_sid="CA123",
+        status="initiated",
+    )
+
+    answered = repository.update_call_status_by_sid(twilio_call_sid="CA123", status="answered")
+    completed = repository.update_call_status_by_sid(twilio_call_sid="CA123", status="completed")
+    missing = repository.update_call_status_by_sid(twilio_call_sid="CAmissing", status="completed")
+
+    stored = client.rows("calls")[0]
+    assert answered is not None
+    assert completed is not None
+    assert missing is None
+    assert stored["status"] == "completed"
+    assert stored["answered_at"] is not None
+    assert stored["completed_at"] is not None
+
+
+def test_create_call_event_stores_payload_even_without_matched_call():
+    repository, client = build_repository()
+
+    event = repository.create_call_event(
+        call_id=None,
+        twilio_call_sid="CAunmatched",
+        event_type="ringing",
+        call_status="ringing",
+        payload={"CallSid": "CAunmatched", "CallStatus": "ringing"},
+    )
+
+    stored = client.rows("call_events")[0]
+    assert event["id"] == "call_event-1"
+    assert stored["call_id"] is None
+    assert stored["twilio_call_sid"] == "CAunmatched"
+    assert stored["event_type"] == "ringing"
+    assert stored["call_status"] == "ringing"
+    assert stored["payload"] == {"CallSid": "CAunmatched", "CallStatus": "ringing"}
+
+
 def test_list_conversations_batches_contacts_and_messages():
     repository, client = build_repository()
     client.seed(
