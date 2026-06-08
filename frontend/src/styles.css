@@ -1415,9 +1415,12 @@ button {
 }
 
 .call-summary-card {
+  align-items: center;
+  display: grid;
   grid-area: summary;
+  grid-template-columns: minmax(210px, 1.25fr) repeat(5, minmax(82px, 1fr));
   min-width: 0;
-  padding: 12px 14px;
+  padding: 10px 14px;
 }
 
 .call-timeline-section {
@@ -1460,32 +1463,32 @@ button {
   display: grid;
   gap: 0;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  margin: 10px 0 0;
+  margin: 0;
 }
 
 .call-summary-card dl div {
   background: transparent;
   border-left: 1px solid #e8edf4;
   border-radius: 0;
-  min-height: 34px;
+  min-height: 30px;
   padding: 2px 10px;
 }
 
 .call-summary-card dl div:first-child {
-  border-left: 0;
-  padding-left: 0;
+  border-left: 1px solid #e8edf4;
+  padding-left: 10px;
 }
 
 .call-summary-card dt {
   color: #8a94a6;
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 600;
   text-transform: uppercase;
 }
 
 .call-summary-card dd {
   color: #344054;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   line-height: 1.2;
   margin: 2px 0 0;
@@ -1601,6 +1604,32 @@ button {
   overflow-y: auto;
   padding-right: 12px;
   scrollbar-gutter: stable;
+}
+
+.call-detail-select-row {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.drawer-form select {
+  appearance: none;
+  background:
+    linear-gradient(45deg, transparent 50%, #667085 50%) calc(100% - 18px) 50% / 6px 6px no-repeat,
+    linear-gradient(135deg, #667085 50%, transparent 50%) calc(100% - 13px) 50% / 6px 6px no-repeat,
+    #ffffff;
+  border: 1px solid #cdd5e1;
+  border-radius: 8px;
+  color: #172033;
+  min-height: 40px;
+  min-width: 0;
+  padding: 0 34px 0 12px;
+  width: 100%;
+}
+
+.drawer-form select:disabled {
+  background-color: #f3f5f8;
+  color: #98a2b6;
 }
 
 .call-editor-panel .button-grid {
@@ -2073,11 +2102,18 @@ button {
 }
 
 @container (max-width: 860px) {
+  .call-summary-card {
+    align-items: start;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .call-summary-card dl {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: 10px;
     row-gap: 8px;
   }
 
+  .call-summary-card dl div:first-child,
   .call-summary-card dl div:nth-child(4) {
     border-left: 0;
     padding-left: 0;
@@ -2434,6 +2470,10 @@ button {
 
   .call-summary-card dl {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .call-detail-select-row {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .call-timeline-item {

@@ -55,37 +55,34 @@ export function CallDetailsForm({
 
   return (
     <form className={`drawer-form call-details-form ${compactActions ? "is-inline" : ""}`} onSubmit={handleSubmit}>
-      <fieldset disabled={!call || isSaving}>
-        <legend>Outcome</legend>
-        <div className="button-grid outcome-grid">
-          {CALL_OUTCOMES.map((item) => (
-            <button
-              className={outcome === item.value ? "is-active" : ""}
-              key={item.value}
-              onClick={() => setOutcome(item.value)}
-              type="button"
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-      </fieldset>
+      <div className="call-detail-select-row">
+        <label>
+          <span>Outcome</span>
+          <select
+            disabled={!call || isSaving}
+            onChange={(event) => setOutcome(event.target.value ? (event.target.value as CallOutcome) : null)}
+            value={outcome || ""}
+          >
+            <option value="">No outcome</option>
+            {CALL_OUTCOMES.map((item) => (
+              <option key={item.value} value={item.value}>{item.label}</option>
+            ))}
+          </select>
+        </label>
 
-      <fieldset disabled={!call || isSaving}>
-        <legend>Follow-up status</legend>
-        <div className="button-grid follow-up-grid">
-          {FOLLOW_UP_STATUSES.map((item) => (
-            <button
-              className={followUpStatus === item.value ? "is-active" : ""}
-              key={item.value}
-              onClick={() => setFollowUpStatus(item.value)}
-              type="button"
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-      </fieldset>
+        <label>
+          <span>Follow-up status</span>
+          <select
+            disabled={!call || isSaving}
+            onChange={(event) => setFollowUpStatus(event.target.value as FollowUpStatus)}
+            value={followUpStatus}
+          >
+            {FOLLOW_UP_STATUSES.map((item) => (
+              <option key={item.value} value={item.value}>{item.label}</option>
+            ))}
+          </select>
+        </label>
+      </div>
 
       <label>
         <span>Notes</span>

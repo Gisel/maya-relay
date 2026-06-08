@@ -481,8 +481,8 @@ test("calls workspace saves outcome follow-up notes recap and transcription", as
 
   const workspace = page.locator(".call-workspace");
   await expect(workspace.getByRole("heading", { name: "Call details" })).toBeVisible();
-  await workspace.getByRole("button", { name: "Connected" }).click();
-  await workspace.getByRole("button", { name: "Pending follow-up" }).click();
+  await workspace.getByLabel("Outcome").selectOption("connected");
+  await workspace.getByLabel("Follow-up status").selectOption("needed");
   await workspace.getByLabel("Notes").fill("Customer asked for pricing.");
   await workspace.getByLabel("Recap").fill("Reviewed timing and next steps.");
   await workspace.getByLabel("Transcription").fill("Placeholder transcript.");
