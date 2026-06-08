@@ -48,9 +48,29 @@ async function mockMayaRelayApi(
     conversations: 0,
     detail: 0,
     me: 0,
+    callStarts: 0,
     statusUpdates: 0,
     quickResponses: 0,
   };
+  const calls = [
+    {
+      id: "call-existing",
+      conversationId: "conversation-1",
+      direction: "outbound",
+      callType: "conversation_call",
+      customerPhone: "+15550000001",
+      employeePhone: "+15551234567",
+      twilioCallSid: "CAexisting",
+      status: "completed",
+      outcome: null,
+      notes: null,
+      startedAt: "2026-06-06T14:05:00Z",
+      answeredAt: "2026-06-06T14:05:04Z",
+      completedAt: "2026-06-06T14:05:49Z",
+      createdAt: "2026-06-06T14:05:00Z",
+      updatedAt: "2026-06-06T14:05:49Z",
+    },
+  ];
   let releaseHeldDetailRequest: (() => void) | null = null;
 
   await page.route("**/api/me", async (route) => {
@@ -212,7 +232,38 @@ async function mockMayaRelayApi(
           createdAt: "2026-06-06T14:00:00Z",
         },
         messages,
+        calls,
         suggestedReply: "Please send size and deadline.",
+      },
+    });
+  });
+
+  await page.route("**/api/conversations/conversation-1/call", async (route) => {
+    requestCounts.callStarts += 1;
+    calls.unshift({
+      id: "call-new",
+      conversationId: "conversation-1",
+      direction: "outbound",
+      callType: "conversation_call",
+      customerPhone: "+15550000001",
+      employeePhone: "+15551234567",
+      twilioCallSid: "CAnew",
+      status: "initiated",
+      outcome: null,
+      notes: null,
+      startedAt: "2026-06-06T14:06:00Z",
+      answeredAt: null,
+      completedAt: null,
+      createdAt: "2026-06-06T14:06:00Z",
+      updatedAt: "2026-06-06T14:06:00Z",
+    });
+    await route.fulfill({
+      contentType: "application/json",
+      json: {
+        status: "calling",
+        callSid: "CAnew",
+        to: "+15550000001",
+        employeePhone: "+15551234567",
       },
     });
   });
@@ -235,6 +286,9 @@ async function mockMayaRelayApi(
     },
     get me() {
       return requestCounts.me;
+    },
+    get callStarts() {
+      return requestCounts.callStarts;
     },
     get statusUpdates() {
       return requestCounts.statusUpdates;
@@ -306,6 +360,29 @@ test("authenticated boot loads each initial resource once", async ({ page }) => 
   await expect.poll(() => requestCounts.quickResponses).toBe(1);
   expect(requestCounts.me).toBeGreaterThanOrEqual(1);
   expect(requestCounts.me).toBeLessThanOrEqual(2);
+});
+
+test("call history shows logged calls and refreshes after starting a call", async ({ page }) => {
+  const requestCounts = await mockMayaRelayApi(page);
+
+  await page.goto("/app/");
+  const detailsButton = page.getByRole("button", { name: "Details" });
+  if (await detailsButton.count()) {
+    await detailsButton.click();
+  }
+
+  await expect(page.getByRole("heading", { name: "Call History" })).toBeVisible();
+  await expect(page.getByText("Conversation call")).toBeVisible();
+  await expect(page.getByText("completed")).toBeVisible();
+  await expect(page.getByText("45s")).toBeVisible();
+
+  await page.getByLabel("Close details panel").click();
+  await page.getByRole("button", { name: "Call", exact: true }).click();
+
+  await expect.poll(() => requestCounts.callStarts).toBe(1);
+  await expect(page.getByText("Calling Francisco first, then +15550000001.")).toBeVisible();
+  await page.getByRole("button", { name: "Details" }).click();
+  await expect(page.locator(".call-history-item.status-initiated")).toBeVisible();
 });
 
 test("customer messages mark conversations as needing reply", async ({ page }) => {

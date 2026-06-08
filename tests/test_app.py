@@ -498,6 +498,51 @@ def test_api_updates_conversation_status():
     assert repository.conversations[0].status == "closed"
 
 
+def test_api_conversation_detail_includes_call_history():
+    client, repository, _ = make_client(admin_password="secret")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    repository.create_call(
+        conversation_id="conversation-1",
+        direction="outbound",
+        call_type="conversation_call",
+        customer_phone="+15550000001",
+        employee_phone="+15551234567",
+        twilio_call_sid="CAfake1",
+        status="completed",
+    )
+    repository.calls[0]["started_at"] = "2026-06-08T20:08:45Z"
+    repository.calls[0]["answered_at"] = "2026-06-08T20:08:49Z"
+    repository.calls[0]["completed_at"] = "2026-06-08T20:09:28Z"
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    response = client.get("/api/conversations/conversation-1", headers={"cookie": cookie})
+
+    assert response.status_code == 200
+    assert response.json()["calls"] == [
+        {
+            "id": "call-1",
+            "conversationId": "conversation-1",
+            "direction": "outbound",
+            "callType": "conversation_call",
+            "customerPhone": "+15550000001",
+            "employeePhone": "+15551234567",
+            "twilioCallSid": "CAfake1",
+            "status": "completed",
+            "outcome": None,
+            "notes": None,
+            "startedAt": "2026-06-08T20:08:45Z",
+            "answeredAt": "2026-06-08T20:08:49Z",
+            "completedAt": "2026-06-08T20:09:28Z",
+            "createdAt": None,
+            "updatedAt": None,
+        }
+    ]
+
+
 def test_api_starts_click_to_call_bridge():
     client, repository, _ = make_client(admin_password="secret")
     repository.get_or_create_customer_conversation(

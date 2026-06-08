@@ -360,6 +360,52 @@ def test_create_call_event_stores_payload_even_without_matched_call():
     assert stored["payload"] == {"CallSid": "CAunmatched", "CallStatus": "ringing"}
 
 
+def test_list_calls_for_conversation_returns_newest_first():
+    repository, client = build_repository()
+    client.seed(
+        "calls",
+        [
+            {
+                "id": "call-old",
+                "conversation_id": "conversation-1",
+                "direction": "outbound",
+                "call_type": "conversation_call",
+                "customer_phone": "+15550000001",
+                "employee_phone": "+15551234567",
+                "twilio_call_sid": "CAold",
+                "status": "completed",
+                "created_at": "2026-06-08T20:00:00+00:00",
+            },
+            {
+                "id": "call-new",
+                "conversation_id": "conversation-1",
+                "direction": "outbound",
+                "call_type": "manual_outbound",
+                "customer_phone": "+15550000001",
+                "employee_phone": "+15551234567",
+                "twilio_call_sid": "CAnew",
+                "status": "ringing",
+                "created_at": "2026-06-08T20:05:00+00:00",
+            },
+            {
+                "id": "call-other",
+                "conversation_id": "conversation-2",
+                "direction": "outbound",
+                "call_type": "conversation_call",
+                "customer_phone": "+15550000002",
+                "employee_phone": "+15551234567",
+                "twilio_call_sid": "CAother",
+                "status": "completed",
+                "created_at": "2026-06-08T20:10:00+00:00",
+            },
+        ],
+    )
+
+    calls = repository.list_calls_for_conversation("conversation-1")
+
+    assert [call["id"] for call in calls] == ["call-new", "call-old"]
+
+
 def test_list_conversations_batches_contacts_and_messages():
     repository, client = build_repository()
     client.seed(

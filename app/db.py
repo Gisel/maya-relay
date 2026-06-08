@@ -125,6 +125,9 @@ class RelayRepository(Protocol):
     def list_messages_for_conversation(self, conversation_id: str, limit: int = 100) -> list[dict[str, Any]]:
         ...
 
+    def list_calls_for_conversation(self, conversation_id: str, limit: int = 20) -> list[dict[str, Any]]:
+        ...
+
     def create_call(
         self,
         *,
@@ -487,6 +490,20 @@ class SupabaseRelayRepository:
             )
             .eq("conversation_id", conversation_id)
             .order("created_at", desc=False)
+            .limit(limit)
+            .execute()
+        )
+        return result.data
+
+    def list_calls_for_conversation(self, conversation_id: str, limit: int = 20) -> list[dict[str, Any]]:
+        result = (
+            self.client.table("calls")
+            .select(
+                "id, conversation_id, direction, call_type, customer_phone, employee_phone, twilio_call_sid, "
+                "status, outcome, notes, started_at, answered_at, completed_at, created_at, updated_at"
+            )
+            .eq("conversation_id", conversation_id)
+            .order("created_at", desc=True)
             .limit(limit)
             .execute()
         )

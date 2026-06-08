@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   Archive,
   CheckCircle2,
+  Clock,
   FileText,
   LogOut,
   PanelRightClose,
@@ -19,6 +20,7 @@ import { DragEvent, FormEvent, ReactNode, useCallback, useEffect, useMemo, useRe
 import { createPortal } from "react-dom";
 import {
   ApiError,
+  CallRecord,
   Channel,
   ConversationDetail,
   ConversationListItem,
@@ -171,6 +173,25 @@ function relativeDate(value: string | null | undefined) {
   return `${Math.round(hours / 24)}d ago`;
 }
 
+function callTypeLabel(call: CallRecord) {
+  if (call.callType === "manual_outbound") return "New outbound call";
+  if (call.callType === "conversation_call") return "Conversation call";
+  if (call.direction === "inbound") return "Incoming call";
+  return "Call";
+}
+
+function callDuration(call: CallRecord) {
+  if (!call.answeredAt || !call.completedAt) return "";
+  const answeredAt = new Date(call.answeredAt);
+  const completedAt = new Date(call.completedAt);
+  if (Number.isNaN(answeredAt.getTime()) || Number.isNaN(completedAt.getTime())) return "";
+  const durationSeconds = Math.max(0, Math.round((completedAt.getTime() - answeredAt.getTime()) / 1000));
+  if (durationSeconds < 60) return `${durationSeconds}s`;
+  const minutes = Math.floor(durationSeconds / 60);
+  const seconds = durationSeconds % 60;
+  return seconds ? `${minutes}m ${seconds}s` : `${minutes}m`;
+}
+
 function newClientRequestId() {
   if (crypto.randomUUID) return crypto.randomUUID();
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -232,6 +253,49 @@ function MessageBubble({ message, onMediaLoad }: { message: Message; onMediaLoad
         <span>{message.deliveryStatus}</span>
       </footer>
     </article>
+  );
+}
+
+function CallHistory({ calls }: { calls: CallRecord[] }) {
+  return (
+    <section className="context-section">
+      <h2>
+        <Phone size={18} />
+        Call History
+      </h2>
+      {calls.length === 0 ? (
+        <p className="empty-call-history">No calls logged for this conversation yet.</p>
+      ) : (
+        <div className="call-history-list">
+          {calls.map((call) => {
+            const duration = callDuration(call);
+            return (
+              <article className={`call-history-item status-${call.status || "unknown"}`} key={call.id}>
+                <div className="call-history-main">
+                  <span className="call-history-icon">
+                    <Phone size={16} />
+                  </span>
+                  <div>
+                    <strong>{callTypeLabel(call)}</strong>
+                    <p>{cleanPhone(call.customerPhone)}</p>
+                  </div>
+                </div>
+                <div className="call-history-meta">
+                  <span className="call-status-pill">{call.status || "unknown"}</span>
+                  <span>{formatDate(call.startedAt || call.createdAt)}</span>
+                  {duration && (
+                    <span>
+                      <Clock size={13} />
+                      {duration}
+                    </span>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -575,6 +639,7 @@ export function App() {
   const [selectedId, setSelectedId] = useState("");
   const [selectedConversation, setSelectedConversation] = useState<ConversationDetail | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [calls, setCalls] = useState<CallRecord[]>([]);
   const [quickResponses, setQuickResponses] = useState<QuickResponse[]>([]);
   const [suggestedReply, setSuggestedReply] = useState("");
   const [search, setSearch] = useState("");
@@ -696,6 +761,7 @@ export function App() {
     if (!conversationId) {
       setSelectedConversation(null);
       setMessages([]);
+      setCalls([]);
       setSuggestedReply("");
       setCallStatus("");
       return;
@@ -705,12 +771,14 @@ export function App() {
     setDetailError("");
     setSelectedConversation(null);
     setMessages([]);
+    setCalls([]);
     setSuggestedReply("");
     setCallStatus("");
     try {
       const payload = await getConversationDetail(conversationId);
       setSelectedConversation(payload.conversation);
       setMessages(payload.messages);
+      setCalls(payload.calls || []);
       setSuggestedReply(payload.suggestedReply || "");
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
@@ -749,6 +817,7 @@ export function App() {
       const payload = await getConversationDetail(conversationId);
       setSelectedConversation(payload.conversation);
       setMessages(payload.messages);
+      setCalls(payload.calls || []);
       setSuggestedReply(payload.suggestedReply || "");
       setDetailError("");
     } catch (error) {
@@ -929,6 +998,7 @@ export function App() {
     setHasMoreConversations(false);
     setSelectedConversation(null);
     setMessages([]);
+    setCalls([]);
     setSuggestedReply("");
     setCallStatus("");
     setClosedConversationUndo(null);
@@ -1078,6 +1148,7 @@ export function App() {
     try {
       const response = await callConversationCustomer(selectedId);
       setCallStatus(`Calling Francisco first, then ${response.to}.`);
+      await refreshDetail(selectedId, { force: true });
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         setIsAuthenticated(false);
@@ -1099,11 +1170,13 @@ export function App() {
       setSelectedConversation(response.conversation);
       setSelectedId(response.conversation.id);
       setMessages([]);
+      setCalls([]);
       setSuggestedReply("");
       setDraft("");
       setFiles([]);
       setCallStatus(`Calling Francisco first, then ${response.to}.`);
       await loadConversations(response.conversation.id);
+      await refreshDetail(response.conversation.id, { force: true });
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         setIsAuthenticated(false);
@@ -1314,7 +1387,12 @@ export function App() {
                     <Archive size={15} />
                     {status === "open" ? "Close" : "Reopen"}
                   </button>
-                  <button className="context-toggle" onClick={() => setIsContextOpen((current) => !current)} type="button">
+                  <button
+                    aria-label={isContextOpen ? "Hide details" : "Details"}
+                    className="context-toggle"
+                    onClick={() => setIsContextOpen((current) => !current)}
+                    type="button"
+                  >
                     {isContextOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
                     <span>{isContextOpen ? "Hide details" : "Details"}</span>
                   </button>
@@ -1370,6 +1448,8 @@ export function App() {
             <p>{displayPhone}</p>
             {activeConversation?.code && <em>Session ID: #{activeConversation.code}</em>}
           </section>
+
+          <CallHistory calls={calls} />
 
           <section className="context-section">
             <h2>

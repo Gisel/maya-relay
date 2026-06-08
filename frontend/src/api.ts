@@ -46,6 +46,24 @@ export type ConversationDetail = {
   updatedAt: string | null;
 };
 
+export type CallRecord = {
+  id: string;
+  conversationId: string | null;
+  direction: "outbound" | "inbound" | string;
+  callType: "conversation_call" | "manual_outbound" | "inbound" | string;
+  customerPhone: string;
+  employeePhone: string | null;
+  twilioCallSid: string | null;
+  status: string;
+  outcome: string | null;
+  notes: string | null;
+  startedAt: string | null;
+  answeredAt: string | null;
+  completedAt: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
 export type Attachment = {
   url: string;
   contentType: string;
@@ -88,6 +106,7 @@ export type ConversationsResponse = {
 export type ConversationDetailResponse = {
   conversation: ConversationDetail;
   messages: Message[];
+  calls: CallRecord[];
   suggestedReply: string;
 };
 

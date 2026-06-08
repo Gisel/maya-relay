@@ -1051,6 +1051,106 @@ button {
   width: 18px;
 }
 
+.empty-call-history {
+  color: #667085;
+  font-size: 14px;
+  margin: 0;
+}
+
+.call-history-list {
+  display: grid;
+  gap: 10px;
+}
+
+.call-history-item {
+  background: #ffffff;
+  border: 1px solid #dfe4ec;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.call-history-main {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+
+.call-history-icon {
+  align-items: center;
+  background: #eef4ff;
+  border-radius: 999px;
+  color: var(--brand-blue);
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+
+.call-history-main strong {
+  color: #1d2433;
+  display: block;
+  font-size: 14px;
+  font-weight: 620;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.call-history-main p {
+  color: #667085;
+  font-size: 13px;
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.call-history-meta {
+  align-items: center;
+  color: #667085;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 12px;
+  font-weight: 560;
+  gap: 8px;
+}
+
+.call-history-meta span {
+  align-items: center;
+  display: inline-flex;
+  gap: 4px;
+}
+
+.call-status-pill {
+  background: #eef1f5;
+  border-radius: 999px;
+  color: #344054;
+  padding: 4px 8px;
+  text-transform: capitalize;
+}
+
+.call-history-item.status-completed .call-status-pill {
+  background: #e7f7ed;
+  color: #177245;
+}
+
+.call-history-item.status-failed .call-status-pill,
+.call-history-item.status-busy .call-status-pill,
+.call-history-item.status-no-answer .call-status-pill,
+.call-history-item.status-canceled .call-status-pill {
+  background: #fff1f0;
+  color: #c0342b;
+}
+
+.call-history-item.status-ringing .call-status-pill,
+.call-history-item.status-initiated .call-status-pill,
+.call-history-item.status-in-progress .call-status-pill {
+  background: #fff7db;
+  color: #9a6700;
+}
+
 .quick-responses {
   display: grid;
   gap: 10px;

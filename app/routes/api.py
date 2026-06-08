@@ -195,9 +195,11 @@ def api_conversation_detail(
 
     conversation_row = _conversation_metadata(repository, conversation)
     messages = repository.list_messages_for_conversation(conversation_id)
+    calls = repository.list_calls_for_conversation(conversation_id)
     return {
         "conversation": _serialize_conversation_detail(conversation, conversation_row),
         "messages": [_serialize_message(message) for message in messages],
+        "calls": [_serialize_call(call) for call in calls],
         "suggestedReply": _suggested_reply(messages, conversation.conversation_code),
     }
 
@@ -495,6 +497,26 @@ def _serialize_message(message: dict[str, Any]) -> dict[str, Any]:
             message.get("media_urls") or (),
             message.get("media_content_types") or (),
         ),
+    }
+
+
+def _serialize_call(call: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": call.get("id"),
+        "conversationId": call.get("conversation_id"),
+        "direction": call.get("direction"),
+        "callType": call.get("call_type"),
+        "customerPhone": call.get("customer_phone"),
+        "employeePhone": call.get("employee_phone"),
+        "twilioCallSid": call.get("twilio_call_sid"),
+        "status": call.get("status"),
+        "outcome": call.get("outcome"),
+        "notes": call.get("notes"),
+        "startedAt": call.get("started_at"),
+        "answeredAt": call.get("answered_at"),
+        "completedAt": call.get("completed_at"),
+        "createdAt": call.get("created_at"),
+        "updatedAt": call.get("updated_at"),
     }
 
 

@@ -14,7 +14,7 @@ class InMemorySupabaseClient:
     def __init__(self):
         self.tables: dict[str, InMemoryTable] = {
             name: InMemoryTable(name)
-            for name in ("contacts", "conversations", "messages", "message_attachments")
+            for name in ("contacts", "conversations", "messages", "message_attachments", "calls", "call_events")
         }
         self._clock = 0
         self.query_count = 0
@@ -75,6 +75,18 @@ class InMemorySupabaseClient:
             row.setdefault("media_urls", [])
             row.setdefault("media_content_types", [])
             row.setdefault("client_request_id", None)
+
+        if table_name == "calls":
+            row.setdefault("outcome", None)
+            row.setdefault("notes", None)
+            row.setdefault("started_at", now)
+            row.setdefault("answered_at", None)
+            row.setdefault("completed_at", None)
+            row.setdefault("updated_at", now)
+
+        if table_name == "call_events":
+            row.setdefault("payload", {})
+            row.setdefault("received_at", now)
 
         return row
 

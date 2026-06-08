@@ -245,6 +245,13 @@ class FakeRepository:
     def list_messages_for_conversation(self, conversation_id: str, limit: int = 100) -> list[dict[str, Any]]:
         return [message for message in self.messages if message["conversation_id"] == conversation_id][:limit]
 
+    def list_calls_for_conversation(self, conversation_id: str, limit: int = 20) -> list[dict[str, Any]]:
+        return [
+            call
+            for call in reversed(self.calls)
+            if call["conversation_id"] == conversation_id
+        ][:limit]
+
     def create_call(
         self,
         *,
