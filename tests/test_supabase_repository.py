@@ -340,6 +340,36 @@ def test_update_call_status_by_sid_sets_status_timestamps():
     assert stored["completed_at"] is not None
 
 
+def test_update_call_details_stores_outcome_notes_and_follow_up_fields():
+    repository, client = build_repository()
+    repository.create_call(
+        conversation_id="conversation-1",
+        direction="outbound",
+        call_type="manual_outbound",
+        customer_phone="+15550000001",
+        employee_phone="+15551234567",
+        twilio_call_sid="CA123",
+        status="completed",
+    )
+
+    call = repository.update_call_details(
+        call_id="call-1",
+        outcome="voicemail",
+        follow_up_status="scheduled",
+        notes="Left a message.",
+        recap="Customer did not answer.",
+        transcription="Voicemail greeting.",
+    )
+
+    stored = client.rows("calls")[0]
+    assert call is not None
+    assert stored["outcome"] == "voicemail"
+    assert stored["follow_up_status"] == "scheduled"
+    assert stored["notes"] == "Left a message."
+    assert stored["recap"] == "Customer did not answer."
+    assert stored["transcription"] == "Voicemail greeting."
+
+
 def test_create_call_event_stores_payload_even_without_matched_call():
     repository, client = build_repository()
 

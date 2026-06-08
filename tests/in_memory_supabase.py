@@ -79,6 +79,9 @@ class InMemorySupabaseClient:
         if table_name == "calls":
             row.setdefault("outcome", None)
             row.setdefault("notes", None)
+            row.setdefault("follow_up_status", "none")
+            row.setdefault("recap", None)
+            row.setdefault("transcription", None)
             row.setdefault("started_at", now)
             row.setdefault("answered_at", None)
             row.setdefault("completed_at", None)

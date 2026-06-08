@@ -20,6 +20,7 @@ import { DragEvent, FormEvent, ReactNode, useCallback, useEffect, useMemo, useRe
 import { createPortal } from "react-dom";
 import {
   ApiError,
+  CallOutcome,
   CallRecord,
   Channel,
   ConversationDetail,
@@ -27,6 +28,7 @@ import {
   ConversationStatus,
   ConversationStatusFilter,
   DeliveryStatus,
+  FollowUpStatus,
   Message,
   Metrics,
   QuickResponse,
@@ -39,12 +41,27 @@ import {
   logout,
   sendReply,
   startNewCall,
+  updateCallDetails,
   updateConversationStatus,
 } from "./api";
 import logoMaya from "./assets/logo-maya.jpg";
 
 const INBOX_REFRESH_INTERVAL_MS = 15000;
 const CLOSE_AUDIT_LOG_PREFIX = "[Maya Relay Close Audit]";
+const CALL_OUTCOMES: { value: CallOutcome; label: string }[] = [
+  { value: "connected", label: "Connected" },
+  { value: "voicemail", label: "Voicemail" },
+  { value: "no_answer", label: "No answer" },
+  { value: "follow_up_needed", label: "Follow-up" },
+  { value: "wrong_number", label: "Wrong number" },
+  { value: "cancelled", label: "Cancelled" },
+];
+const FOLLOW_UP_STATUSES: { value: FollowUpStatus; label: string }[] = [
+  { value: "none", label: "None" },
+  { value: "needed", label: "Needed" },
+  { value: "scheduled", label: "Scheduled" },
+  { value: "done", label: "Done" },
+];
 
 function closeAuditLog(event: string, details: Record<string, unknown> = {}) {
   console.info(CLOSE_AUDIT_LOG_PREFIX, event, {
@@ -192,6 +209,11 @@ function callDuration(call: CallRecord) {
   return seconds ? `${minutes}m ${seconds}s` : `${minutes}m`;
 }
 
+function outcomeLabel(outcome: string | null | undefined) {
+  if (!outcome) return "No outcome";
+  return CALL_OUTCOMES.find((item) => item.value === outcome)?.label || outcome;
+}
+
 function newClientRequestId() {
   if (crypto.randomUUID) return crypto.randomUUID();
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -256,7 +278,7 @@ function MessageBubble({ message, onMediaLoad }: { message: Message; onMediaLoad
   );
 }
 
-function CallHistory({ calls }: { calls: CallRecord[] }) {
+function CallHistory({ calls, onSelectCall }: { calls: CallRecord[]; onSelectCall: (call: CallRecord) => void }) {
   return (
     <section className="context-section">
       <h2>
@@ -270,7 +292,12 @@ function CallHistory({ calls }: { calls: CallRecord[] }) {
           {calls.map((call) => {
             const duration = callDuration(call);
             return (
-              <article className={`call-history-item status-${call.status || "unknown"}`} key={call.id}>
+              <button
+                className={`call-history-item status-${call.status || "unknown"}`}
+                key={call.id}
+                onClick={() => onSelectCall(call)}
+                type="button"
+              >
                 <div className="call-history-main">
                   <span className="call-history-icon">
                     <Phone size={16} />
@@ -282,6 +309,8 @@ function CallHistory({ calls }: { calls: CallRecord[] }) {
                 </div>
                 <div className="call-history-meta">
                   <span className="call-status-pill">{call.status || "unknown"}</span>
+                  {call.outcome && <span>{outcomeLabel(call.outcome)}</span>}
+                  {call.followUpStatus !== "none" && <span>Follow-up {call.followUpStatus}</span>}
                   <span>{formatDate(call.startedAt || call.createdAt)}</span>
                   {duration && (
                     <span>
@@ -290,7 +319,7 @@ function CallHistory({ calls }: { calls: CallRecord[] }) {
                     </span>
                   )}
                 </div>
-              </article>
+              </button>
             );
           })}
         </div>
@@ -512,6 +541,129 @@ function CloseConversationModal({
   );
 }
 
+function CallDetailsDrawer({
+  call,
+  open,
+  onClose,
+  onSave,
+}: {
+  call: CallRecord | null;
+  open: boolean;
+  onClose: () => void;
+  onSave: (
+    callId: string,
+    payload: {
+      outcome: CallOutcome | null;
+      followUpStatus: FollowUpStatus;
+      notes: string;
+      recap: string;
+      transcription: string;
+    },
+  ) => Promise<void>;
+}) {
+  const [outcome, setOutcome] = useState<CallOutcome | null>(null);
+  const [followUpStatus, setFollowUpStatus] = useState<FollowUpStatus>("none");
+  const [notes, setNotes] = useState("");
+  const [recap, setRecap] = useState("");
+  const [transcription, setTranscription] = useState("");
+  const [error, setError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (!call || !open) return;
+    setOutcome((call.outcome as CallOutcome | null) || null);
+    setFollowUpStatus(call.followUpStatus || "none");
+    setNotes(call.notes || "");
+    setRecap(call.recap || "");
+    setTranscription(call.transcription || "");
+    setError("");
+  }, [call, open]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!call) return;
+    setIsSaving(true);
+    setError("");
+    try {
+      await onSave(call.id, { outcome, followUpStatus, notes, recap, transcription });
+      onClose();
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Could not save call details.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <Drawer
+      description={call ? `${callTypeLabel(call)} - ${cleanPhone(call.customerPhone)}` : undefined}
+      labelledBy="call-details-title"
+      onClose={onClose}
+      open={open && Boolean(call)}
+      title="Call details"
+    >
+      <form className="drawer-form call-details-form" onSubmit={handleSubmit}>
+        <fieldset>
+          <legend>Outcome</legend>
+          <div className="button-grid outcome-grid">
+            {CALL_OUTCOMES.map((item) => (
+              <button
+                className={outcome === item.value ? "is-active" : ""}
+                key={item.value}
+                onClick={() => setOutcome(item.value)}
+                type="button"
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Follow-up status</legend>
+          <div className="button-grid follow-up-grid">
+            {FOLLOW_UP_STATUSES.map((item) => (
+              <button
+                className={followUpStatus === item.value ? "is-active" : ""}
+                key={item.value}
+                onClick={() => setFollowUpStatus(item.value)}
+                type="button"
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+
+        <label>
+          <span>Notes</span>
+          <textarea onChange={(event) => setNotes(event.target.value)} rows={4} value={notes} />
+        </label>
+
+        <label>
+          <span>Recap</span>
+          <textarea onChange={(event) => setRecap(event.target.value)} rows={4} value={recap} />
+        </label>
+
+        <label>
+          <span>Transcription</span>
+          <textarea onChange={(event) => setTranscription(event.target.value)} rows={6} value={transcription} />
+        </label>
+
+        {error && <p className="form-error">{error}</p>}
+        <div className="drawer-actions">
+          <button className="ghost-button" disabled={isSaving} onClick={onClose} type="button">
+            Cancel
+          </button>
+          <button className="send-button" disabled={isSaving} type="submit">
+            {isSaving ? "Saving..." : "Save call"}
+          </button>
+        </div>
+      </form>
+    </Drawer>
+  );
+}
+
 function Composer({
   disabled,
   draft,
@@ -640,6 +792,7 @@ export function App() {
   const [selectedConversation, setSelectedConversation] = useState<ConversationDetail | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [calls, setCalls] = useState<CallRecord[]>([]);
+  const [selectedCallId, setSelectedCallId] = useState("");
   const [quickResponses, setQuickResponses] = useState<QuickResponse[]>([]);
   const [suggestedReply, setSuggestedReply] = useState("");
   const [search, setSearch] = useState("");
@@ -688,6 +841,10 @@ export function App() {
   const selectedListItem = useMemo(
     () => allKnownConversations.find((conversation) => conversation.id === selectedId) || null,
     [allKnownConversations, selectedId],
+  );
+  const selectedCall = useMemo(
+    () => calls.find((call) => call.id === selectedCallId) || null,
+    [calls, selectedCallId],
   );
 
   const visibleMessages = useMemo(
@@ -762,6 +919,7 @@ export function App() {
       setSelectedConversation(null);
       setMessages([]);
       setCalls([]);
+      setSelectedCallId("");
       setSuggestedReply("");
       setCallStatus("");
       return;
@@ -772,6 +930,7 @@ export function App() {
     setSelectedConversation(null);
     setMessages([]);
     setCalls([]);
+    setSelectedCallId("");
     setSuggestedReply("");
     setCallStatus("");
     try {
@@ -999,6 +1158,7 @@ export function App() {
     setSelectedConversation(null);
     setMessages([]);
     setCalls([]);
+    setSelectedCallId("");
     setSuggestedReply("");
     setCallStatus("");
     setClosedConversationUndo(null);
@@ -1171,6 +1331,7 @@ export function App() {
       setSelectedId(response.conversation.id);
       setMessages([]);
       setCalls([]);
+      setSelectedCallId("");
       setSuggestedReply("");
       setDraft("");
       setFiles([]);
@@ -1187,6 +1348,27 @@ export function App() {
     } finally {
       setIsCallingCustomer(false);
     }
+  }
+
+  async function handleSaveCallDetails(
+    callId: string,
+    payload: {
+      outcome: CallOutcome | null;
+      followUpStatus: FollowUpStatus;
+      notes: string;
+      recap: string;
+      transcription: string;
+    },
+  ) {
+    setAppError("");
+    const response = await updateCallDetails(callId, {
+      outcome: payload.outcome,
+      follow_up_status: payload.followUpStatus,
+      notes: payload.notes.trim() || null,
+      recap: payload.recap.trim() || null,
+      transcription: payload.transcription.trim() || null,
+    });
+    setCalls((current) => current.map((call) => (call.id === callId ? response.call : call)));
   }
 
   if (isCheckingSession) {
@@ -1449,7 +1631,7 @@ export function App() {
             {activeConversation?.code && <em>Session ID: #{activeConversation.code}</em>}
           </section>
 
-          <CallHistory calls={calls} />
+          <CallHistory calls={calls} onSelectCall={(call) => setSelectedCallId(call.id)} />
 
           <section className="context-section">
             <h2>
@@ -1502,6 +1684,12 @@ export function App() {
           void handleConfirmCloseConversation();
         }}
         open={isCloseConfirmationOpen}
+      />
+      <CallDetailsDrawer
+        call={selectedCall}
+        onClose={() => setSelectedCallId("")}
+        onSave={handleSaveCallDetails}
+        open={Boolean(selectedCall)}
       />
     </div>
   );

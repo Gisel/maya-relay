@@ -49,6 +49,7 @@ async function mockMayaRelayApi(
     detail: 0,
     me: 0,
     callStarts: 0,
+    callUpdates: 0,
     statusUpdates: 0,
     quickResponses: 0,
   };
@@ -64,6 +65,9 @@ async function mockMayaRelayApi(
       status: "completed",
       outcome: null,
       notes: null,
+      followUpStatus: "none",
+      recap: null,
+      transcription: null,
       startedAt: "2026-06-06T14:05:00Z",
       answeredAt: "2026-06-06T14:05:04Z",
       completedAt: "2026-06-06T14:05:49Z",
@@ -251,6 +255,9 @@ async function mockMayaRelayApi(
       status: "initiated",
       outcome: null,
       notes: null,
+      followUpStatus: "none",
+      recap: null,
+      transcription: null,
       startedAt: "2026-06-06T14:06:00Z",
       answeredAt: null,
       completedAt: null,
@@ -265,6 +272,32 @@ async function mockMayaRelayApi(
         to: "+15550000001",
         employeePhone: "+15551234567",
       },
+    });
+  });
+
+  await page.route("**/api/calls/*", async (route) => {
+    requestCounts.callUpdates += 1;
+    const callId = route.request().url().split("/api/calls/")[1];
+    const payload = JSON.parse(route.request().postData() || "{}") as {
+      outcome: string | null;
+      follow_up_status: string;
+      notes: string | null;
+      recap: string | null;
+      transcription: string | null;
+    };
+    const callIndex = calls.findIndex((call) => call.id === callId);
+    const updatedCall = {
+      ...calls[callIndex],
+      outcome: payload.outcome,
+      followUpStatus: payload.follow_up_status,
+      notes: payload.notes,
+      recap: payload.recap,
+      transcription: payload.transcription,
+    };
+    calls[callIndex] = updatedCall;
+    await route.fulfill({
+      contentType: "application/json",
+      json: { call: updatedCall },
     });
   });
 
@@ -289,6 +322,9 @@ async function mockMayaRelayApi(
     },
     get callStarts() {
       return requestCounts.callStarts;
+    },
+    get callUpdates() {
+      return requestCounts.callUpdates;
     },
     get statusUpdates() {
       return requestCounts.statusUpdates;
@@ -383,6 +419,31 @@ test("call history shows logged calls and refreshes after starting a call", asyn
   await expect(page.getByText("Calling Francisco first, then +15550000001.")).toBeVisible();
   await page.getByRole("button", { name: "Details" }).click();
   await expect(page.locator(".call-history-item.status-initiated")).toBeVisible();
+});
+
+test("call details drawer saves outcome follow-up notes recap and transcription", async ({ page }) => {
+  const requestCounts = await mockMayaRelayApi(page);
+
+  await page.goto("/app/");
+  const detailsButton = page.getByRole("button", { name: "Details" });
+  if (await detailsButton.count()) {
+    await detailsButton.click();
+  }
+  await page.getByRole("button", { name: /Conversation call/ }).click();
+
+  const drawer = page.getByRole("dialog", { name: "Call details" });
+  await expect(drawer).toBeVisible();
+  await drawer.getByRole("button", { name: "Connected" }).click();
+  await drawer.getByRole("button", { name: "Needed" }).click();
+  await drawer.getByLabel("Notes").fill("Customer asked for pricing.");
+  await drawer.getByLabel("Recap").fill("Reviewed timing and next steps.");
+  await drawer.getByLabel("Transcription").fill("Placeholder transcript.");
+  await drawer.getByRole("button", { name: "Save call" }).click();
+
+  await expect.poll(() => requestCounts.callUpdates).toBe(1);
+  await expect(drawer).toHaveCount(0);
+  await expect(page.getByText("Connected")).toBeVisible();
+  await expect(page.getByText("Follow-up needed")).toBeVisible();
 });
 
 test("customer messages mark conversations as needing reply", async ({ page }) => {

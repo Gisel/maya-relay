@@ -1089,9 +1089,18 @@ button {
   background: #ffffff;
   border: 1px solid #dfe4ec;
   border-radius: 8px;
+  color: inherit;
+  cursor: pointer;
   display: grid;
   gap: 10px;
   padding: 12px;
+  text-align: left;
+  width: 100%;
+}
+
+.call-history-item:hover {
+  border-color: #bfd5f8;
+  box-shadow: 0 8px 22px rgb(43 95 150 / 10%);
 }
 
 .call-history-main {
@@ -1294,6 +1303,65 @@ button {
   min-height: 44px;
   padding: 0 13px;
   width: 100%;
+}
+
+.drawer-form textarea {
+  border: 1px solid #cdd5e1;
+  border-radius: 8px;
+  color: #172033;
+  font-size: 14px;
+  line-height: 1.4;
+  min-width: 0;
+  padding: 11px 13px;
+  resize: vertical;
+  width: 100%;
+}
+
+.drawer-form fieldset {
+  border: 0;
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+.drawer-form legend {
+  color: #475366;
+  font-size: 13px;
+  font-weight: 560;
+  margin-bottom: 7px;
+  padding: 0;
+}
+
+.button-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.button-grid button {
+  background: #ffffff;
+  border: 1px solid #dfe4ec;
+  border-radius: 8px;
+  color: #344054;
+  font-size: 13px;
+  font-weight: 560;
+  min-height: 38px;
+  padding: 0 10px;
+}
+
+.button-grid button.is-active {
+  background: #eef4ff;
+  border-color: #bfd5f8;
+  color: var(--brand-blue);
+}
+
+.call-details-form {
+  max-height: min(680px, calc(100vh - 172px));
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-gutter: stable;
 }
 
 .drawer-actions {

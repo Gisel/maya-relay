@@ -57,12 +57,18 @@ export type CallRecord = {
   status: string;
   outcome: string | null;
   notes: string | null;
+  followUpStatus: "none" | "needed" | "scheduled" | "done";
+  recap: string | null;
+  transcription: string | null;
   startedAt: string | null;
   answeredAt: string | null;
   completedAt: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 };
+
+export type CallOutcome = "connected" | "voicemail" | "no_answer" | "follow_up_needed" | "wrong_number" | "cancelled";
+export type FollowUpStatus = "none" | "needed" | "scheduled" | "done";
 
 export type Attachment = {
   url: string;
@@ -128,6 +134,10 @@ export type CallConversationResponse = {
 
 export type StartNewCallResponse = CallConversationResponse & {
   conversation: ConversationDetail;
+};
+
+export type UpdateCallDetailsResponse = {
+  call: CallRecord;
 };
 
 export class ApiError extends Error {
@@ -228,5 +238,21 @@ export function startNewCall(phoneNumber: string, displayName: string) {
       phone_number: phoneNumber,
       display_name: displayName.trim() || null,
     }),
+  });
+}
+
+export function updateCallDetails(
+  callId: string,
+  payload: {
+    outcome: CallOutcome | null;
+    follow_up_status: FollowUpStatus;
+    notes: string | null;
+    recap: string | null;
+    transcription: string | null;
+  },
+) {
+  return request<UpdateCallDetailsResponse>(`/api/calls/${callId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
   });
 }

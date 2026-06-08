@@ -252,6 +252,27 @@ class FakeRepository:
             if call["conversation_id"] == conversation_id
         ][:limit]
 
+    def update_call_details(
+        self,
+        *,
+        call_id: str,
+        outcome: str | None,
+        follow_up_status: str,
+        notes: str | None,
+        recap: str | None,
+        transcription: str | None,
+    ) -> dict[str, Any] | None:
+        for call in self.calls:
+            if call["id"] != call_id:
+                continue
+            call["outcome"] = outcome
+            call["follow_up_status"] = follow_up_status
+            call["notes"] = notes
+            call["recap"] = recap
+            call["transcription"] = transcription
+            return call
+        return None
+
     def create_call(
         self,
         *,
@@ -272,6 +293,11 @@ class FakeRepository:
             "employee_phone": employee_phone,
             "twilio_call_sid": twilio_call_sid,
             "status": status,
+            "outcome": None,
+            "notes": None,
+            "follow_up_status": "none",
+            "recap": None,
+            "transcription": None,
             "answered_at": None,
             "completed_at": None,
         }

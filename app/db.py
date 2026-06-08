@@ -128,6 +128,18 @@ class RelayRepository(Protocol):
     def list_calls_for_conversation(self, conversation_id: str, limit: int = 20) -> list[dict[str, Any]]:
         ...
 
+    def update_call_details(
+        self,
+        *,
+        call_id: str,
+        outcome: str | None,
+        follow_up_status: str,
+        notes: str | None,
+        recap: str | None,
+        transcription: str | None,
+    ) -> dict[str, Any] | None:
+        ...
+
     def create_call(
         self,
         *,
@@ -500,7 +512,8 @@ class SupabaseRelayRepository:
             self.client.table("calls")
             .select(
                 "id, conversation_id, direction, call_type, customer_phone, employee_phone, twilio_call_sid, "
-                "status, outcome, notes, started_at, answered_at, completed_at, created_at, updated_at"
+                "status, outcome, notes, follow_up_status, recap, transcription, "
+                "started_at, answered_at, completed_at, created_at, updated_at"
             )
             .eq("conversation_id", conversation_id)
             .order("created_at", desc=True)
@@ -508,6 +521,34 @@ class SupabaseRelayRepository:
             .execute()
         )
         return result.data
+
+    def update_call_details(
+        self,
+        *,
+        call_id: str,
+        outcome: str | None,
+        follow_up_status: str,
+        notes: str | None,
+        recap: str | None,
+        transcription: str | None,
+    ) -> dict[str, Any] | None:
+        result = (
+            self.client.table("calls")
+            .update(
+                {
+                    "outcome": outcome,
+                    "follow_up_status": follow_up_status,
+                    "notes": notes,
+                    "recap": recap,
+                    "transcription": transcription,
+                }
+            )
+            .eq("id", call_id)
+            .execute()
+        )
+        if not result.data:
+            return None
+        return result.data[0]
 
     def create_call(
         self,

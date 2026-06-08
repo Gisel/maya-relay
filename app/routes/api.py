@@ -29,6 +29,14 @@ class NewCallRequest(BaseModel):
     display_name: str | None = None
 
 
+class CallDetailsUpdate(BaseModel):
+    outcome: Literal["connected", "voicemail", "no_answer", "follow_up_needed", "wrong_number", "cancelled"] | None = None
+    follow_up_status: Literal["none", "needed", "scheduled", "done"] = "none"
+    notes: str | None = None
+    recap: str | None = None
+    transcription: str | None = None
+
+
 class LoginRequest(BaseModel):
     password: str
 
@@ -372,6 +380,28 @@ def api_start_new_call(
     }
 
 
+@router.patch("/calls/{call_id}")
+def api_update_call_details(
+    call_id: str,
+    payload: CallDetailsUpdate,
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    repository: RelayRepository = Depends(get_repository),
+) -> dict[str, Any]:
+    require_admin(request, settings)
+    call = repository.update_call_details(
+        call_id=call_id,
+        outcome=payload.outcome,
+        follow_up_status=payload.follow_up_status,
+        notes=_clean_optional_text(payload.notes),
+        recap=_clean_optional_text(payload.recap),
+        transcription=_clean_optional_text(payload.transcription),
+    )
+    if call is None:
+        raise HTTPException(status_code=404)
+    return {"call": _serialize_call(call)}
+
+
 def _start_click_to_call(
     *,
     request: Request,
@@ -512,12 +542,22 @@ def _serialize_call(call: dict[str, Any]) -> dict[str, Any]:
         "status": call.get("status"),
         "outcome": call.get("outcome"),
         "notes": call.get("notes"),
+        "followUpStatus": call.get("follow_up_status") or "none",
+        "recap": call.get("recap"),
+        "transcription": call.get("transcription"),
         "startedAt": call.get("started_at"),
         "answeredAt": call.get("answered_at"),
         "completedAt": call.get("completed_at"),
         "createdAt": call.get("created_at"),
         "updatedAt": call.get("updated_at"),
     }
+
+
+def _clean_optional_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    return cleaned or None
 
 
 def _serialize_attachments(media_urls: tuple[str, ...] | list[str], content_types: tuple[str, ...] | list[str]) -> list[dict[str, str]]:

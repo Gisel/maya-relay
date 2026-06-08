@@ -64,6 +64,9 @@ create table if not exists public.calls (
     or outcome in ('connected', 'voicemail', 'no_answer', 'follow_up_needed', 'wrong_number', 'cancelled')
   ),
   notes text,
+  follow_up_status text not null default 'none' check (follow_up_status in ('none', 'needed', 'scheduled', 'done')),
+  recap text,
+  transcription text,
   started_at timestamptz not null default now(),
   answered_at timestamptz,
   completed_at timestamptz,
@@ -135,6 +138,24 @@ alter table public.contacts
 alter table public.conversations
   add column if not exists conversation_code text,
   add column if not exists customer_channel text not null default 'sms';
+
+alter table public.calls
+  add column if not exists follow_up_status text not null default 'none',
+  add column if not exists recap text,
+  add column if not exists transcription text;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'calls_follow_up_status_check'
+  ) then
+    alter table public.calls
+      add constraint calls_follow_up_status_check
+      check (follow_up_status in ('none', 'needed', 'scheduled', 'done'));
+  end if;
+end $$;
 
 do $$
 begin

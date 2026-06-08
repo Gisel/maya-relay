@@ -534,6 +534,9 @@ def test_api_conversation_detail_includes_call_history():
             "status": "completed",
             "outcome": None,
             "notes": None,
+            "followUpStatus": "none",
+            "recap": None,
+            "transcription": None,
             "startedAt": "2026-06-08T20:08:45Z",
             "answeredAt": "2026-06-08T20:08:49Z",
             "completedAt": "2026-06-08T20:09:28Z",
@@ -541,6 +544,42 @@ def test_api_conversation_detail_includes_call_history():
             "updatedAt": None,
         }
     ]
+
+
+def test_api_updates_call_details():
+    client, repository, _ = make_client(admin_password="secret")
+    repository.create_call(
+        conversation_id="conversation-1",
+        direction="outbound",
+        call_type="conversation_call",
+        customer_phone="+15550000001",
+        employee_phone="+15551234567",
+        twilio_call_sid="CAfake1",
+        status="completed",
+    )
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    response = client.patch(
+        "/api/calls/call-1",
+        json={
+            "outcome": "connected",
+            "follow_up_status": "needed",
+            "notes": "Customer wants a quote.",
+            "recap": "Discussed print timing.",
+            "transcription": "Transcript placeholder.",
+        },
+        headers={"cookie": cookie},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()["call"]
+    assert payload["outcome"] == "connected"
+    assert payload["followUpStatus"] == "needed"
+    assert payload["notes"] == "Customer wants a quote."
+    assert payload["recap"] == "Discussed print timing."
+    assert payload["transcription"] == "Transcript placeholder."
+    assert repository.calls[0]["outcome"] == "connected"
 
 
 def test_api_starts_click_to_call_bridge():
@@ -579,6 +618,11 @@ def test_api_starts_click_to_call_bridge():
             "employee_phone": "+15551234567",
             "twilio_call_sid": "CAfake1",
             "status": "initiated",
+            "outcome": None,
+            "notes": None,
+            "follow_up_status": "none",
+            "recap": None,
+            "transcription": None,
             "answered_at": None,
             "completed_at": None,
         }
