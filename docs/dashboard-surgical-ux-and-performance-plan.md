@@ -2,7 +2,7 @@
 
 Date: 2026-06-08
 
-This document is the working dashboard roadmap for Maya Relay. It captures what has already been completed, what should remain pinned, and what should happen in the next development session. The guiding rule is still surgical progress: protect working SMS, WhatsApp, Twilio, Supabase, and call behavior while improving the operator inbox step by step.
+This document is the working 360 functionality list for Maya Relay. It captures what is done, what is next, and what remains pending so we do not lose track while testing, shipping, and adding functionality surgically.
 
 ## Non-Negotiables
 
@@ -55,199 +55,111 @@ Visual direction to preserve:
 - Prefer subtle borders, quiet backgrounds, and compact spacing over heavy badges or oversized emphasis.
 - Keep the mobile polish that is already working.
 
-## Completed In Recent Sessions
-
-### Mobile Shell And Drawer Fixes
-
-Status: done.
-
-- Fixed New Call mobile drawer overflow.
-- Added Playwright regression coverage for the New Call mobile drawer.
-- Prevented mobile input focus zoom overflow.
-- Constrained mobile login panel width.
-
-Acceptance met:
-
-- New Call no longer spills horizontally on iPhone Safari.
-- Numeric keyboard open/close no longer deforms drawer width.
-- Login panel no longer creates the same wide-card overflow.
-
-### Frontend Fetch And Search Performance
-
-Status: done.
-
-- Reduced duplicate frontend conversation fetches.
-- Batched conversation list metadata queries on the backend.
-- Added `/api/conversations` pagination and frontend Load More.
-- Added local cache-first conversation search.
-- Kept debounced server search for older/unloaded matches.
-
-Acceptance met:
-
-- Initial boot no longer double-hits the conversation list the same way.
-- Loaded conversations filter locally first.
-- Server search still finds unloaded/older matches.
-- Browsing history can page forward with Load More.
-
-### Refresh And Message Ordering
-
-Status: done.
-
-- Added automatic inbox refresh for new messages.
-- Added manual Refresh button.
-- Moved active conversations to the top when new customer activity arrives.
-- Scrolled selected conversation to the newest message.
-
-Acceptance met:
-
-- New messages can appear in the dashboard without manual page reload.
-- Conversations with fresh activity move up instead of staying buried by old conversation creation date.
-- Opening a conversation scrolls to the latest visible message.
-
-### Needs Reply And Display Cleanup
-
-Status: done.
-
-- Added visual state for conversations that need a reply.
-- Kept internal relay/system/AI suggestion messages out of the chat timeline.
-- Preserved raw Supabase message data for audit/debugging.
-
-Acceptance met:
-
-- Customer messages can mark conversations as needing reply.
-- AI suggestions are not displayed as if Francisco sent them.
-- Dashboard display cleanup does not mutate stored message bodies.
-
-### Presentation UX Polish
-
-Status: partially done.
-
-- Desktop density improved.
-- Message bubble presentation improved.
-- Composer can grow for multi-line replies.
-- Header/topbar and button styling softened across multiple small commits.
-- Attachment previews are improved enough to avoid raw URL noise in common cases.
-
-Remaining caveat:
-
-- Visual styling is better, but the frontend still does not have a full design-token system. Future styling should use CSS tokens rather than adding more hardcoded colors.
-
-## Still Pending / Pinned
-
-### 1. Contact / Client Search Endpoint
-
-Status: pending.
-
-Why it matters:
-
-- Conversation search can find loaded conversations locally and older/unloaded conversations through server search.
-- But the app still does not have a dedicated client/contact search model.
-- As the business grows, the operator may need to find a client even when that client is not represented in the current loaded conversation page.
-
-Surgical plan:
-
-- Add a backend endpoint for contact/client search.
-- Query contacts by phone number, display name, and lookup name.
-- Keep the first version read-only.
-- Do not change conversation routing or message sending.
-- Add tests for search behavior.
-
-Likely endpoint:
-
-- `GET /api/contacts?query=...&limit=...`
-
-### 2. Scalable Client / Conversation Loading Model
-
-Status: pending.
-
-Why it matters:
-
-- Loading 50 conversations is fine now.
-- The app should not eventually load 100 clients times many conversations each.
-- Clients and conversations should not be treated as the same loading unit forever.
-
-Recommended model:
-
-- Conversation list remains paginated and activity-ordered.
-- Loaded conversations remain locally filterable.
-- Server conversation search covers older/unloaded conversation matches.
-- Contact/client search is separate from conversation browsing.
-- Conversation details load only when selected.
-- Future client profile can show recent conversations lazily after choosing a client.
-
-Decision needed later:
-
-- Whether the left column remains conversation-first only, or whether we add a separate client search mode/view.
-
-### 3. Attachment Preview Production Polish
-
-Status: partially done, still worth improving.
-
-Remaining work:
-
-- Make image previews more consistent.
-- Make non-image attachment cards feel intentional.
-- Show filename/type/open affordance when metadata is available.
-- Continue hiding raw attachment URL text when preview metadata exists.
-
-Constraints:
-
-- Do not mutate stored messages.
-- Do not change Twilio/Supabase attachment persistence.
-
-### 4. Client-Ready Visual Token Pass
-
-Status: pending, but not urgent before functionality.
-
-Goal:
-
-- Add a small set of reusable CSS tokens for surfaces, borders, muted text, warning/attention states, control radius, panel radius, and common spacing.
-- Migrate only the highest-churn hardcoded colors first.
-- Avoid a broad React refactor.
-
-Reason:
-
-- The current CSS is workable but still has many one-off hardcoded values.
-- Tokenizing gradually will make future visual changes cheaper.
-
-### 5. Close Conversation UX
-
-Status: pending.
-
-Ideas:
-
-- Add confirmation before closing if needed.
-- Decide how closed conversations appear in the list.
-- Add closed/open filtering only after the operator workflow is clearer.
-
-### 6. Call Logging / Manual Outbound Improvements
-
-Status: pending.
-
-Ideas:
-
-- Save call attempts/statuses in Supabase.
-- Show call history in customer profile.
-- Add create-contact flow, notes, and call outcome later.
-
-## Next Development Session Plan
-
-Recommended order:
-
-1. Add the contact/client search endpoint.
-2. Add backend tests for contact search.
-3. Decide the smallest frontend surface for using contact search without disrupting the current conversation list.
-4. If time allows, wire contact search into the existing search experience as a clearly separated fallback or result group.
-5. Document the scalable client/conversation loading model after implementation decisions are confirmed.
-
-Keep this session functionality-focused. Avoid more visual cleanup unless it blocks usability.
-
-## Backlog
-
-- CSV contact upload: `phone_number`, `display_name`, preserve manual names.
-- Better customer profile: notes, tags, history, active/inactive status.
-- WhatsApp templates for business-initiated messages outside the 24-hour window.
-- Production auth/users: real accounts, roles, and possibly Supabase Auth.
-- Observability: structured logs, failed delivery view, Twilio error explanations.
-- AI next phase: richer intent detection, missing-info checklist, safe auto-response.
-- Pricing/business packaging: refine monthly support, AI, and infrastructure fee after usage.
+## Done
+
+- SMS relay with conversation code routing.
+- WhatsApp inbound/outbound through Twilio.
+- AI suggested reply generation.
+- Copy-paste friendly AI suggestion SMS for on-the-go use.
+- React operator dashboard at `/app`.
+- Conversation search.
+- Local cache-first search for loaded conversations.
+- Server search for older/unloaded conversations.
+- Conversation pagination and Load More.
+- Send message from dashboard.
+- Attach/upload media foundation.
+- Public Supabase attachments bucket integration.
+- Twilio Lookup fallback and contact caching.
+- Click-to-call bridge: Francisco receives call first, then Twilio bridges to customer.
+- Manual outbound call to a new number.
+- Basic close/reopen conversation functionality.
+- Session ID exposed in UI.
+- Needs-reply visual state for customer messages.
+- Internal AI/system relay messages hidden from dashboard chat display.
+- New Call mobile drawer overflow fixed.
+- Login mobile overflow fixed.
+- Mobile dashboard improvements: compact composer, safer drawer behavior, improved mobile layout.
+- Reply composer grows vertically for multi-line replies.
+- Dashboard visual softening started.
+- CSS token rule documented for future frontend styling.
+- `.env` / Railway variables remain source of truth.
+
+## Next
+
+- Fix manual top Refresh button reliability.
+- Improve Close Conversation UX:
+  - confirmation or undo when closing
+  - decide whether closed conversations hide by default
+  - add closed/open filtering
+- Add Call Logging:
+  - save call attempts/statuses
+  - show call history
+  - add call outcomes: connected, voicemail, no answer, follow-up needed
+- Improve Manual Outbound Call:
+  - create/update contact after calling a new number
+  - add name
+  - add notes
+  - add call outcome
+- Add Customer Profile basics:
+  - notes
+  - visible customer history
+  - contact information foundation
+- Add WhatsApp Templates:
+  - quote follow-up
+  - proof ready
+  - pickup reminder
+  - payment reminder
+- Add Contact / Client Search foundation:
+  - backend endpoint
+  - tests
+  - no major UI disruption yet
+- Add CSV Contact Import:
+  - `phone_number`
+  - `display_name`
+  - preserve manual names
+  - blank values do not erase existing names
+  - use uploaded contacts before paid Twilio Lookup
+- Continue small operational polish:
+  - attachment preview polish
+  - remaining display cleanup
+  - mobile/header/customer action polish only if needed
+
+## Pending
+
+- Scalable client/conversation loading model:
+  - conversations remain paginated and activity-ordered
+  - contact/client search remains separate from conversation browsing
+  - conversation details load only when selected
+  - avoid loading all clients and all conversations at once
+- Production Auth / Users:
+  - real user accounts
+  - roles
+  - admin vs operator access
+  - Supabase Auth later
+- Observability:
+  - structured logs
+  - failed delivery view
+  - plain-English Twilio error explanations
+  - possible health/status dashboard
+- AI Next Phase:
+  - richer intent detection
+  - missing-info checklist
+  - suggested quick actions
+  - human approval mode first
+  - auto-response only for approved safe cases
+- WhatsApp advanced workflow:
+  - template approval/management
+  - business-initiated conversations outside the 24-hour window
+  - template usage tracking
+- Customer Profile advanced:
+  - tags
+  - active/inactive client status
+  - VIP/repeat customer marker
+  - deeper customer history
+- Call workflow advanced:
+  - call notes in timeline
+  - follow-up reminders
+  - call analytics later
+- Business / Pricing:
+  - refine monthly fee after real usage
+  - include infrastructure, AI, support, improvements, and monitoring
