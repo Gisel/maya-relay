@@ -1314,6 +1314,7 @@ button {
 
 .call-workspace {
   background: #f5f8fc;
+  container-type: inline-size;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   height: 100%;
@@ -1386,21 +1387,21 @@ button {
 .call-workspace-grid {
   display: grid;
   gap: 16px;
-  grid-template-columns: minmax(320px, 0.78fr) minmax(460px, 1.22fr);
+  grid-template-areas:
+    "summary summary"
+    "timeline editor";
+  grid-template-columns: minmax(230px, 0.42fr) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
+  min-width: 0;
   overflow: hidden;
   padding: 16px 22px 16px 16px;
 }
 
 .call-workspace-main {
+  display: contents;
   min-height: 0;
   overflow: hidden;
-}
-
-.call-workspace-main {
-  display: grid;
-  gap: 12px;
-  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .call-summary-card,
@@ -1411,6 +1412,16 @@ button {
   border-radius: 8px;
   box-shadow: 0 4px 12px rgb(20 28 42 / 4%);
   padding: 14px;
+}
+
+.call-summary-card {
+  grid-area: summary;
+  min-width: 0;
+}
+
+.call-timeline-section {
+  grid-area: timeline;
+  min-width: 0;
 }
 
 .call-summary-card > div:first-child {
@@ -1447,14 +1458,14 @@ button {
 .call-summary-card dl {
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(96px, 1fr));
   margin: 12px 0 0;
 }
 
 .call-summary-card dl div {
   background: #f8fafc;
   border-radius: 8px;
-  min-height: 52px;
+  min-height: 48px;
   padding: 8px 10px;
 }
 
@@ -1486,6 +1497,7 @@ button {
   display: grid;
   gap: 9px;
   margin-top: 12px;
+  max-height: 100%;
   min-height: 0;
   overflow-y: auto;
   padding-right: 8px;
@@ -1500,7 +1512,7 @@ button {
   color: #172033;
   display: grid;
   gap: 10px;
-  grid-template-columns: 34px minmax(0, 1fr) auto;
+  grid-template-columns: 30px minmax(0, 1fr);
   min-height: 58px;
   padding: 10px;
   text-align: left;
@@ -1543,11 +1555,13 @@ button {
 }
 
 .call-timeline-meta {
-  align-items: flex-end;
+  align-items: flex-start;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: wrap;
   gap: 4px;
-  white-space: nowrap;
+  grid-column: 2;
+  white-space: normal;
 }
 
 .call-timeline-meta span {
@@ -1559,8 +1573,10 @@ button {
 .call-editor-panel {
   display: grid;
   gap: 14px;
+  grid-area: editor;
   grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
+  min-width: 0;
   overflow: hidden;
   padding: 18px 20px;
 }
@@ -1578,6 +1594,10 @@ button {
   overflow-y: auto;
   padding-right: 12px;
   scrollbar-gutter: stable;
+}
+
+.call-editor-panel .button-grid {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
 .quick-responses {
@@ -1909,6 +1929,10 @@ button {
     padding: 12px 18px 12px 12px;
   }
 
+  .call-summary-card dl {
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  }
+
   .conversation-identity .channel-pill,
   .conversation-identity .delivery-pill,
   .conversation-identity .closed-pill {
@@ -2038,6 +2062,44 @@ button {
 
   .context-panel.is-collapsed {
     display: none;
+  }
+}
+
+@media (max-width: 1300px) and (min-width: 761px) {
+  .call-workspace-grid {
+    grid-template-areas:
+      "summary"
+      "editor"
+      "timeline";
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1.15fr) minmax(220px, 0.85fr);
+    overflow-y: auto;
+  }
+
+  .call-timeline-section,
+  .call-editor-panel {
+    min-height: 240px;
+  }
+}
+
+@container (max-width: 980px) {
+  .call-workspace-grid {
+    grid-template-areas:
+      "summary"
+      "editor"
+      "timeline";
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1.15fr) minmax(220px, 0.85fr);
+    overflow-y: auto;
+  }
+
+  .call-editor-panel,
+  .call-timeline-section {
+    min-height: 240px;
+  }
+
+  .call-summary-card dl {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   }
 }
 
@@ -2365,7 +2427,12 @@ button {
   }
 
   .call-workspace-grid {
+    grid-template-areas:
+      "summary"
+      "timeline"
+      "editor";
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
     overflow-y: auto;
     padding: 10px 14px 14px;
   }
@@ -2376,7 +2443,7 @@ button {
   }
 
   .call-summary-card dl {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .call-timeline-item {
