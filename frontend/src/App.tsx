@@ -836,6 +836,29 @@ export function App() {
 
   useEffect(() => {
     if (!isAuthenticated) return;
+    function auditDocumentClick(event: MouseEvent) {
+      const target = event.target instanceof Element ? event.target : null;
+      const button = target?.closest("button");
+      if (!button) return;
+      closeAuditLog("document button click captured", {
+        targetTag: target?.tagName,
+        targetClass: target?.getAttribute("class"),
+        buttonClass: button.getAttribute("class"),
+        buttonText: button.textContent?.trim(),
+        buttonAriaLabel: button.getAttribute("aria-label"),
+        buttonDisabled: button.hasAttribute("disabled"),
+        selectedId,
+        selectedConversationStatus: selectedConversation?.status,
+        selectedListItemStatus: selectedListItem?.status,
+        isCloseConfirmationOpen,
+      });
+    }
+    document.addEventListener("click", auditDocumentClick, true);
+    return () => document.removeEventListener("click", auditDocumentClick, true);
+  }, [isAuthenticated, isCloseConfirmationOpen, selectedConversation?.status, selectedId, selectedListItem?.status]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
     const intervalId = window.setInterval(() => {
       if (document.visibilityState !== "visible") return;
       closeAuditLog("auto-refresh interval fired", {
