@@ -424,6 +424,28 @@ def test_api_search_checks_beyond_first_conversation_page():
     assert [conversation["id"] for conversation in response.json()["conversations"]] == ["conversation-55"]
 
 
+def test_api_status_filter_checks_before_conversation_pagination():
+    client, repository, _ = make_client(admin_password="secret")
+    closed = repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    repository.update_conversation_status(closed.id, "closed")
+    for index in range(55):
+        repository.get_or_create_customer_conversation(
+            customer_phone=f"+1555001{index:04d}",
+            assigned_employee="+15551234567",
+        )
+
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    response = client.get("/api/conversations?status=closed", headers={"cookie": cookie})
+
+    assert response.status_code == 200
+    assert [conversation["id"] for conversation in response.json()["conversations"]] == [closed.id]
+
+
 def test_api_reply_uploads_image_as_media():
     client, repository, sender = make_client(admin_password="secret")
     repository.get_or_create_customer_conversation(

@@ -113,7 +113,13 @@ class RelayRepository(Protocol):
     ) -> None:
         ...
 
-    def list_conversations(self, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
+    def list_conversations(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        status: str = "",
+        channel: str = "",
+    ) -> list[dict[str, Any]]:
         ...
 
     def list_messages_for_conversation(self, conversation_id: str, limit: int = 100) -> list[dict[str, Any]]:
@@ -374,17 +380,25 @@ class SupabaseRelayRepository:
             .execute()
         )
 
-    def list_conversations(self, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
-        result = (
+    def list_conversations(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        status: str = "",
+        channel: str = "",
+    ) -> list[dict[str, Any]]:
+        query = (
             self.client.table("conversations")
             .select(
                 "id, customer_phone, assigned_employee, customer_channel, "
                 "conversation_code, status, created_at, updated_at"
             )
-            .order("updated_at", desc=True)
-            .range(offset, offset + limit - 1)
-            .execute()
         )
+        if status:
+            query = query.eq("status", status)
+        if channel:
+            query = query.eq("customer_channel", channel)
+        result = query.order("updated_at", desc=True).range(offset, offset + limit - 1).execute()
         if not result.data:
             return []
 

@@ -396,6 +396,40 @@ def test_list_conversations_applies_offset_and_limit():
     assert [conversation["id"] for conversation in conversations] == ["conversation-2"]
 
 
+def test_list_conversations_applies_status_before_offset_and_limit():
+    repository, client = build_repository()
+    client.seed(
+        "conversations",
+        [
+            {
+                "id": "conversation-1",
+                "customer_phone": "+15550000001",
+                "assigned_employee": "+15551234567",
+                "status": "open",
+                "updated_at": "2026-06-04T00:00:03+00:00",
+            },
+            {
+                "id": "conversation-2",
+                "customer_phone": "+15550000002",
+                "assigned_employee": "+15551234567",
+                "status": "open",
+                "updated_at": "2026-06-04T00:00:02+00:00",
+            },
+            {
+                "id": "conversation-3",
+                "customer_phone": "+15550000003",
+                "assigned_employee": "+15551234567",
+                "status": "closed",
+                "updated_at": "2026-06-04T00:00:01+00:00",
+            },
+        ],
+    )
+
+    conversations = repository.list_conversations(limit=1, offset=0, status="closed")
+
+    assert [conversation["id"] for conversation in conversations] == ["conversation-3"]
+
+
 def test_list_conversations_uses_latest_message_activity_for_display_order():
     repository, client = build_repository()
     client.seed(

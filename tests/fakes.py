@@ -195,9 +195,21 @@ class FakeRepository:
             }
         )
 
-    def list_conversations(self, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
+    def list_conversations(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        status: str = "",
+        channel: str = "",
+    ) -> list[dict[str, Any]]:
         rows = []
-        for conversation in self.conversations[offset: offset + limit]:
+        filtered_conversations = [
+            conversation
+            for conversation in self.conversations
+            if (not status or conversation.status == status)
+            and (not channel or conversation.customer_channel == channel)
+        ]
+        for conversation in filtered_conversations[offset: offset + limit]:
             messages = [
                 message
                 for message in self.messages

@@ -442,7 +442,7 @@ test("closing a conversation requires confirmation and can be undone", async ({ 
   await expect(page.getByRole("article").getByText("Hello")).toBeVisible();
 
   await page.locator(".conversation-status-action").click();
-  const dialog = page.getByRole("dialog", { name: "Close conversation?" });
+  const dialog = page.getByRole("dialog", { name: "Are you sure you want to close this conversation?" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(dialog).toHaveCount(0);
@@ -470,7 +470,10 @@ test("closed conversation filter reveals closed rows", async ({ page }) => {
   await expect(page.getByRole("article").getByText("Hello")).toBeVisible();
 
   await page.locator(".conversation-status-action").click();
-  await page.getByRole("dialog", { name: "Close conversation?" }).locator(".send-button").click();
+  await page
+    .getByRole("dialog", { name: "Are you sure you want to close this conversation?" })
+    .locator(".send-button")
+    .click();
   await expect(page.locator(".conversation-list").getByRole("button", { name: /Test Customer/ })).toHaveCount(0);
 
   await page.getByRole("button", { name: "closed" }).click();

@@ -420,7 +420,7 @@ function CloseConversationDrawer({
       labelledBy="close-conversation-title"
       onClose={onClose}
       open={open}
-      title="Close conversation?"
+      title="Are you sure you want to close this conversation?"
     >
       <div className="drawer-actions">
         <button className="ghost-button" disabled={disabled} onClick={onClose} type="button">
