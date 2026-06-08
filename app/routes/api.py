@@ -338,6 +338,37 @@ def api_call_conversation_customer(
     )
 
 
+@router.get("/calls")
+def api_calls(
+    request: Request,
+    q: str = "",
+    direction: Literal["outgoing", "incoming", "all"] = "all",
+    limit: int = 50,
+    offset: int = 0,
+    settings: Settings = Depends(get_settings),
+    repository: RelayRepository = Depends(get_repository),
+) -> dict[str, Any]:
+    require_admin(request, settings)
+    safe_limit = min(max(limit, 1), 100)
+    safe_offset = max(offset, 0)
+    storage_direction = {"outgoing": "outbound", "incoming": "inbound", "all": "all"}[direction]
+    rows, has_more = repository.list_call_conversations(
+        q=q,
+        direction=storage_direction,
+        limit=safe_limit,
+        offset=safe_offset,
+    )
+    return {
+        "calls": [_serialize_call_conversation(row) for row in rows],
+        "pagination": {
+            "limit": safe_limit,
+            "offset": safe_offset,
+            "nextOffset": safe_offset + safe_limit if has_more else None,
+            "hasMore": has_more,
+        },
+    }
+
+
 @router.post("/calls")
 def api_start_new_call(
     payload: NewCallRequest,
@@ -498,6 +529,43 @@ def _serialize_customer(conversation: dict[str, Any]) -> dict[str, Any]:
         "lookupName": lookup_name,
         "name": best_name,
     }
+
+
+def _serialize_call_conversation(row: dict[str, Any]) -> dict[str, Any]:
+    conversation = row.get("conversation") or {}
+    latest_call = row.get("latest_call") or {}
+    customer_source = {
+        "customer_phone": row.get("customer_phone") or latest_call.get("customer_phone") or conversation.get("customer_phone"),
+        "customer_display_name": row.get("customer_display_name"),
+        "customer_lookup_name": row.get("customer_lookup_name"),
+        "customer_name": row.get("customer_name"),
+    }
+    return {
+        "id": row.get("id"),
+        "conversation": _serialize_call_conversation_detail(conversation) if conversation else None,
+        "customer": _serialize_customer(customer_source),
+        "latestCall": _serialize_call(latest_call),
+        "callCount": row.get("call_count") or 0,
+        "workflowStatus": _call_workflow_status(latest_call),
+    }
+
+
+def _serialize_call_conversation_detail(conversation: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": conversation.get("id"),
+        "code": conversation.get("conversation_code"),
+        "status": conversation.get("status"),
+        "channel": conversation.get("customer_channel") or "sms",
+        "assignedEmployee": conversation.get("assigned_employee"),
+        "createdAt": conversation.get("created_at"),
+        "updatedAt": conversation.get("updated_at"),
+    }
+
+
+def _call_workflow_status(call: dict[str, Any]) -> str:
+    if not call.get("outcome") or call.get("follow_up_status") in {"needed", "scheduled"}:
+        return "pending_follow_up"
+    return "done"
 
 
 def _serialize_last_message(message: dict[str, Any]) -> dict[str, Any] | None:

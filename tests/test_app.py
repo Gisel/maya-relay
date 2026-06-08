@@ -540,6 +540,68 @@ def test_api_conversation_detail_includes_call_history():
     assert call["completedAt"] == "2026-06-08T20:09:28Z"
 
 
+def test_api_calls_groups_by_conversation_and_filters_direction_search_and_pagination():
+    client, repository, _ = make_client(admin_password="secret")
+    repository.upsert_contact_display_name("+15550000001", "Maya Client")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    repository.create_call(
+        conversation_id="conversation-1",
+        direction="outbound",
+        call_type="conversation_call",
+        customer_phone="+15550000001",
+        employee_phone="+15551234567",
+        twilio_call_sid="CAold",
+        status="completed",
+    )
+    repository.create_call(
+        conversation_id="conversation-1",
+        direction="outbound",
+        call_type="manual_outbound",
+        customer_phone="+15550000001",
+        employee_phone="+15551234567",
+        twilio_call_sid="CAnew",
+        status="completed",
+    )
+    repository.create_call(
+        conversation_id=None,
+        direction="inbound",
+        call_type="inbound",
+        customer_phone="+15550000002",
+        employee_phone="+15551234567",
+        twilio_call_sid="CAin",
+        status="completed",
+    )
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    outgoing = client.get("/api/calls?direction=outgoing&q=maya&limit=1", headers={"cookie": cookie})
+
+    assert outgoing.status_code == 200
+    payload = outgoing.json()
+    assert payload["pagination"]["hasMore"] is False
+    assert len(payload["calls"]) == 1
+    row = payload["calls"][0]
+    assert row["id"] == "conversation-1"
+    assert row["customer"]["name"] == "Maya Client"
+    assert row["conversation"]["code"] == "C0001"
+    assert row["latestCall"]["id"] == "call-2"
+    assert row["callCount"] == 2
+
+    incoming = client.get("/api/calls?direction=incoming", headers={"cookie": cookie})
+
+    assert incoming.status_code == 200
+    assert [row["latestCall"]["direction"] for row in incoming.json()["calls"]] == ["inbound"]
+
+    paged = client.get("/api/calls?direction=all&limit=1", headers={"cookie": cookie})
+
+    assert paged.status_code == 200
+    assert paged.json()["pagination"]["hasMore"] is True
+    assert paged.json()["pagination"]["nextOffset"] == 1
+
+
 def test_api_updates_call_details():
     client, repository, _ = make_client(admin_password="secret")
     repository.create_call(

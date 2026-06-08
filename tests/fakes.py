@@ -252,6 +252,70 @@ class FakeRepository:
             if call["conversation_id"] == conversation_id
         ][:limit]
 
+    def list_call_conversations(
+        self,
+        *,
+        q: str = "",
+        direction: str = "all",
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[list[dict[str, Any]], bool]:
+        calls = [
+            call
+            for call in reversed(self.calls)
+            if direction == "all" or call.get("direction") == direction
+        ]
+        grouped: dict[str, dict[str, Any]] = {}
+        for call in calls:
+            key = call.get("conversation_id") or f"phone:{call.get('customer_phone')}"
+            conversation = self.get_conversation(call.get("conversation_id") or "")
+            contact = self.get_contact((conversation.customer_phone if conversation else call.get("customer_phone")) or "")
+            row = grouped.setdefault(
+                key,
+                {
+                    "id": key,
+                    "conversation": {
+                        "id": conversation.id,
+                        "customer_phone": conversation.customer_phone,
+                        "assigned_employee": conversation.assigned_employee,
+                        "customer_channel": conversation.customer_channel,
+                        "conversation_code": conversation.conversation_code,
+                        "status": conversation.status,
+                        "created_at": "",
+                        "updated_at": "",
+                    } if conversation else None,
+                    "customer_phone": conversation.customer_phone if conversation else call.get("customer_phone"),
+                    "customer_display_name": contact.display_name if contact else None,
+                    "customer_lookup_name": contact.lookup_name if contact else None,
+                    "customer_name": contact.best_name if contact else None,
+                    "latest_call": call,
+                    "call_count": 0,
+                },
+            )
+            row["call_count"] += 1
+
+        rows = list(grouped.values())
+        needle = q.strip().lower()
+        if needle:
+            rows = [
+                row for row in rows
+                if needle in " ".join(
+                    str(value)
+                    for value in (
+                        row.get("customer_phone"),
+                        row.get("customer_name"),
+                        row.get("customer_display_name"),
+                        row.get("customer_lookup_name"),
+                        (row.get("conversation") or {}).get("conversation_code"),
+                        (row.get("latest_call") or {}).get("status"),
+                        (row.get("latest_call") or {}).get("direction"),
+                    )
+                    if value
+                ).lower()
+            ]
+        page_rows = rows[offset: offset + limit + 1]
+        return page_rows[:limit], len(page_rows) > limit
+
     def update_call_details(
         self,
         *,

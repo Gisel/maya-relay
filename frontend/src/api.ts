@@ -1,6 +1,7 @@
 export type Channel = "sms" | "whatsapp";
 export type ConversationStatus = "open" | "closed";
 export type ConversationStatusFilter = ConversationStatus | "all";
+export type CallDirectionFilter = "outgoing" | "incoming" | "all";
 export type DeliveryStatus = "delivered" | "failed" | "pending" | "queued" | "undelivered" | string;
 export type MessageDirection = "customer_to_employee" | "employee_to_customer" | "system" | string;
 
@@ -70,6 +71,23 @@ export type CallRecord = {
 export type CallOutcome = "connected" | "voicemail" | "no_answer" | "follow_up_needed" | "wrong_number" | "cancelled";
 export type FollowUpStatus = "none" | "needed" | "scheduled" | "done";
 
+export type CallConversationListItem = {
+  id: string;
+  conversation: {
+    id: string;
+    code: string | null;
+    status: ConversationStatus;
+    channel: Channel;
+    assignedEmployee: string | null;
+    createdAt: string | null;
+    updatedAt: string | null;
+  } | null;
+  customer: Customer;
+  latestCall: CallRecord;
+  callCount: number;
+  workflowStatus: "pending_follow_up" | "done" | string;
+};
+
 export type Attachment = {
   url: string;
   contentType: string;
@@ -114,6 +132,16 @@ export type ConversationDetailResponse = {
   messages: Message[];
   calls: CallRecord[];
   suggestedReply: string;
+};
+
+export type CallsResponse = {
+  calls: CallConversationListItem[];
+  pagination?: {
+    limit: number;
+    offset: number;
+    nextOffset: number | null;
+    hasMore: boolean;
+  };
 };
 
 export type ReplyResponse = {
@@ -196,6 +224,16 @@ export function getConversations(query = "", offset = 0, limit = 50, status: Con
   if (status !== "all") params.set("status", status);
   const suffix = params.toString() ? `?${params.toString()}` : "";
   return request<ConversationsResponse>(`/api/conversations${suffix}`);
+}
+
+export function getCalls(query = "", offset = 0, limit = 50, direction: CallDirectionFilter = "all") {
+  const params = new URLSearchParams();
+  if (query.trim()) params.set("q", query.trim());
+  if (offset > 0) params.set("offset", String(offset));
+  if (limit !== 50) params.set("limit", String(limit));
+  if (direction !== "all") params.set("direction", direction);
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return request<CallsResponse>(`/api/calls${suffix}`);
 }
 
 export function getConversationDetail(conversationId: string) {

@@ -49,6 +49,7 @@ async function mockMayaRelayApi(
     detail: 0,
     me: 0,
     callStarts: 0,
+    callLists: 0,
     callUpdates: 0,
     statusUpdates: 0,
     quickResponses: 0,
@@ -275,6 +276,54 @@ async function mockMayaRelayApi(
     });
   });
 
+  await page.route(/\/api\/calls(?:\?.*)?$/, async (route) => {
+    requestCounts.callLists += 1;
+    const url = new URL(route.request().url());
+    const query = (url.searchParams.get("q") || "").toLowerCase();
+    const direction = url.searchParams.get("direction") || "all";
+    const offset = Number(url.searchParams.get("offset") || "0");
+    const directionMatches = direction === "all" || direction === "outgoing"
+      ? (call: typeof calls[number]) => call.direction === "outbound"
+      : (call: typeof calls[number]) => call.direction === "inbound";
+    const matchingCalls = calls.filter(directionMatches);
+    const row = matchingCalls.length
+      ? {
+        id: "conversation-1",
+        conversation: {
+          id: "conversation-1",
+          code: "C0001",
+          status: conversationStatus,
+          channel: "sms",
+          assignedEmployee: "+15551234567",
+          createdAt: "2026-06-06T14:00:00Z",
+          updatedAt: "2026-06-06T14:00:00Z",
+        },
+        customer: conversation.customer,
+        latestCall: matchingCalls[0],
+        callCount: matchingCalls.length,
+        workflowStatus: matchingCalls[0].outcome || matchingCalls[0].followUpStatus === "done" ? "done" : "pending_follow_up",
+      }
+      : null;
+    const rows = row && [row.customer.name, row.customer.phone, row.conversation.code]
+      .join(" ")
+      .toLowerCase()
+      .includes(query)
+      ? [row]
+      : [];
+    await route.fulfill({
+      contentType: "application/json",
+      json: {
+        calls: rows.slice(offset, offset + 50),
+        pagination: {
+          limit: 50,
+          offset,
+          nextOffset: null,
+          hasMore: false,
+        },
+      },
+    });
+  });
+
   await page.route("**/api/calls/*", async (route) => {
     requestCounts.callUpdates += 1;
     const callId = route.request().url().split("/api/calls/")[1];
@@ -322,6 +371,9 @@ async function mockMayaRelayApi(
     },
     get callStarts() {
       return requestCounts.callStarts;
+    },
+    get callLists() {
+      return requestCounts.callLists;
     },
     get callUpdates() {
       return requestCounts.callUpdates;
@@ -398,52 +450,47 @@ test("authenticated boot loads each initial resource once", async ({ page }) => 
   expect(requestCounts.me).toBeLessThanOrEqual(2);
 });
 
-test("call history shows logged calls and refreshes after starting a call", async ({ page }) => {
+test("calls tab shows grouped call activity and refreshes after starting a call", async ({ page }) => {
   const requestCounts = await mockMayaRelayApi(page);
 
   await page.goto("/app/");
-  const detailsButton = page.getByRole("button", { name: "Details" });
-  if (await detailsButton.count()) {
-    await detailsButton.click();
-  }
+  await page.getByRole("tab", { name: "Calls" }).click();
 
-  await expect(page.getByRole("heading", { name: "Call History" })).toBeVisible();
-  await expect(page.getByText("Conversation call")).toBeVisible();
-  await expect(page.getByText("completed")).toBeVisible();
-  await expect(page.getByText("45s")).toBeVisible();
+  await expect(page.getByPlaceholder("Search calls...")).toBeVisible();
+  await expect(page.getByRole("group", { name: "Call direction filter" }).getByRole("button", { name: "outgoing" })).toBeVisible();
+  await expect(page.locator(".call-activity-row", { hasText: "Test Customer" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Latest call summary" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Call timeline" })).toBeVisible();
+  await expect(page.locator(".call-summary-card").getByText("completed")).toBeVisible();
+  await expect(page.locator(".call-summary-card").getByText("45s")).toBeVisible();
 
-  await page.getByLabel("Close details panel").click();
+  await page.getByRole("tab", { name: "Text" }).click();
   await page.getByRole("button", { name: "Call", exact: true }).click();
 
   await expect.poll(() => requestCounts.callStarts).toBe(1);
   await expect(page.getByText("Calling Francisco first, then +15550000001.")).toBeVisible();
-  await page.getByRole("button", { name: "Details" }).click();
-  await expect(page.locator(".call-history-item.status-initiated")).toBeVisible();
+  await page.getByRole("tab", { name: "Calls" }).click();
+  await expect(page.locator(".call-activity-row", { hasText: "initiated" })).toBeVisible();
 });
 
-test("call details drawer saves outcome follow-up notes recap and transcription", async ({ page }) => {
+test("calls workspace saves outcome follow-up notes recap and transcription", async ({ page }) => {
   const requestCounts = await mockMayaRelayApi(page);
 
   await page.goto("/app/");
-  const detailsButton = page.getByRole("button", { name: "Details" });
-  if (await detailsButton.count()) {
-    await detailsButton.click();
-  }
-  await page.getByRole("button", { name: /Conversation call/ }).click();
+  await page.getByRole("tab", { name: "Calls" }).click();
 
-  const drawer = page.getByRole("dialog", { name: "Call details" });
-  await expect(drawer).toBeVisible();
-  await drawer.getByRole("button", { name: "Connected" }).click();
-  await drawer.getByRole("button", { name: "Needed" }).click();
-  await drawer.getByLabel("Notes").fill("Customer asked for pricing.");
-  await drawer.getByLabel("Recap").fill("Reviewed timing and next steps.");
-  await drawer.getByLabel("Transcription").fill("Placeholder transcript.");
-  await drawer.getByRole("button", { name: "Save call" }).click();
+  const workspace = page.locator(".call-workspace");
+  await expect(workspace.getByRole("heading", { name: "Call details" })).toBeVisible();
+  await workspace.getByRole("button", { name: "Connected" }).click();
+  await workspace.getByRole("button", { name: "Pending follow-up" }).click();
+  await workspace.getByLabel("Notes").fill("Customer asked for pricing.");
+  await workspace.getByLabel("Recap").fill("Reviewed timing and next steps.");
+  await workspace.getByLabel("Transcription").fill("Placeholder transcript.");
+  await workspace.getByRole("button", { name: "Save call" }).click();
 
   await expect.poll(() => requestCounts.callUpdates).toBe(1);
-  await expect(drawer).toHaveCount(0);
-  await expect(page.getByText("Connected")).toBeVisible();
-  await expect(page.getByText("Follow-up needed")).toBeVisible();
+  await expect(workspace.locator(".call-summary-card").getByText("Connected")).toBeVisible();
+  await expect(workspace.locator(".call-summary-card").getByText("Pending follow-up")).toBeVisible();
 });
 
 test("customer messages mark conversations as needing reply", async ({ page }) => {

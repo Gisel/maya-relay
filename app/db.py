@@ -128,6 +128,16 @@ class RelayRepository(Protocol):
     def list_calls_for_conversation(self, conversation_id: str, limit: int = 20) -> list[dict[str, Any]]:
         ...
 
+    def list_call_conversations(
+        self,
+        *,
+        q: str = "",
+        direction: str = "all",
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[list[dict[str, Any]], bool]:
+        ...
+
     def update_call_details(
         self,
         *,
@@ -530,6 +540,89 @@ class SupabaseRelayRepository:
         )
         return result.data
 
+    def list_call_conversations(
+        self,
+        *,
+        q: str = "",
+        direction: str = "all",
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[list[dict[str, Any]], bool]:
+        query = self.client.table("calls").select(
+            "id, conversation_id, direction, call_type, customer_phone, employee_phone, twilio_call_sid, "
+            "status, outcome, notes, follow_up_status, recap, transcription, "
+            "started_at, answered_at, completed_at, created_at, updated_at"
+        )
+        if direction in {"inbound", "outbound"}:
+            query = query.eq("direction", direction)
+
+        calls = query.order("created_at", desc=True).limit(max(limit + offset, 1) * 10).execute().data
+        if not calls:
+            return [], False
+
+        conversation_ids = sorted({call["conversation_id"] for call in calls if call.get("conversation_id")})
+        customer_phone_set = {call["customer_phone"] for call in calls if call.get("customer_phone")}
+        conversations_by_id: dict[str, dict[str, Any]] = {}
+        contacts_by_phone: dict[str, dict[str, Any]] = {}
+
+        if conversation_ids:
+            conversations = (
+                self.client.table("conversations")
+                .select(
+                    "id, customer_phone, assigned_employee, customer_channel, "
+                    "conversation_code, status, created_at, updated_at"
+                )
+                .in_("id", conversation_ids)
+                .execute()
+            )
+            conversations_by_id = {conversation["id"]: conversation for conversation in conversations.data}
+            customer_phone_set.update(conversation["customer_phone"] for conversation in conversations.data)
+
+        customer_phones = sorted(customer_phone_set)
+        if customer_phones:
+            contacts = (
+                self.client.table("contacts")
+                .select("phone_number, display_name, lookup_name")
+                .in_("phone_number", customer_phones)
+                .execute()
+            )
+            contacts_by_phone = {contact["phone_number"]: contact for contact in contacts.data}
+
+        grouped: dict[str, dict[str, Any]] = {}
+        for call in calls:
+            key = call.get("conversation_id") or f"phone:{call.get('customer_phone')}"
+            if not key:
+                continue
+            conversation = conversations_by_id.get(call.get("conversation_id") or "")
+            phone = (conversation or {}).get("customer_phone") or call.get("customer_phone")
+            contact = contacts_by_phone.get(phone or "", {})
+            row = grouped.setdefault(
+                key,
+                {
+                    "id": key,
+                    "conversation": conversation,
+                    "customer_phone": phone,
+                    "customer_display_name": contact.get("display_name"),
+                    "customer_lookup_name": contact.get("lookup_name"),
+                    "customer_name": contact.get("display_name") or contact.get("lookup_name"),
+                    "latest_call": call,
+                    "call_count": 0,
+                },
+            )
+            row["call_count"] += 1
+            if str(call.get("created_at") or "") > str((row["latest_call"] or {}).get("created_at") or ""):
+                row["latest_call"] = call
+
+        rows = list(grouped.values())
+        rows.sort(key=lambda row: row.get("latest_call", {}).get("created_at") or "", reverse=True)
+        needle = q.strip().lower()
+        if needle:
+            rows = [row for row in rows if _call_conversation_matches(row, needle)]
+
+        page_rows = rows[offset: offset + limit + 1]
+        has_more = len(page_rows) > limit
+        return page_rows[:limit], has_more
+
     def update_call_details(
         self,
         *,
@@ -687,3 +780,29 @@ def _conversation_activity_at(conversation: dict[str, Any], last_message: dict[s
     if conversation_updated_at and message_created_at:
         return max(str(conversation_updated_at), str(message_created_at))
     return message_created_at or conversation_updated_at
+
+
+def _call_conversation_matches(row: dict[str, Any], needle: str) -> bool:
+    conversation = row.get("conversation") or {}
+    latest_call = row.get("latest_call") or {}
+    haystack = " ".join(
+        str(value)
+        for value in (
+            row.get("customer_phone"),
+            row.get("customer_name"),
+            row.get("customer_display_name"),
+            row.get("customer_lookup_name"),
+            conversation.get("conversation_code"),
+            conversation.get("customer_phone"),
+            latest_call.get("customer_phone"),
+            latest_call.get("direction"),
+            latest_call.get("call_type"),
+            latest_call.get("status"),
+            latest_call.get("outcome"),
+            latest_call.get("follow_up_status"),
+            latest_call.get("notes"),
+            latest_call.get("recap"),
+        )
+        if value
+    ).lower()
+    return needle in haystack

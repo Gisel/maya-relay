@@ -2,7 +2,6 @@ import {
   AlertTriangle,
   Archive,
   CheckCircle2,
-  Clock,
   FileText,
   LogOut,
   PanelRightClose,
@@ -20,6 +19,8 @@ import { DragEvent, FormEvent, ReactNode, useCallback, useEffect, useMemo, useRe
 import { createPortal } from "react-dom";
 import {
   ApiError,
+  CallConversationListItem,
+  CallDirectionFilter,
   CallOutcome,
   CallRecord,
   Channel,
@@ -33,6 +34,7 @@ import {
   Metrics,
   QuickResponse,
   callConversationCustomer,
+  getCalls,
   getConversationDetail,
   getConversations,
   getMe,
@@ -45,23 +47,13 @@ import {
   updateConversationStatus,
 } from "./api";
 import logoMaya from "./assets/logo-maya.jpg";
+import { CallDetailsForm, CallDetailsPayload } from "./calls/CallDetailsForm";
+import { CallsPanel } from "./calls/CallsPanel";
+import { CallWorkspace } from "./calls/CallWorkspace";
+import { WorkspaceMode, WorkspaceTabs } from "./calls/WorkspaceTabs";
 
 const INBOX_REFRESH_INTERVAL_MS = 15000;
 const CLOSE_AUDIT_LOG_PREFIX = "[Maya Relay Close Audit]";
-const CALL_OUTCOMES: { value: CallOutcome; label: string }[] = [
-  { value: "connected", label: "Connected" },
-  { value: "voicemail", label: "Voicemail" },
-  { value: "no_answer", label: "No answer" },
-  { value: "follow_up_needed", label: "Follow-up" },
-  { value: "wrong_number", label: "Wrong number" },
-  { value: "cancelled", label: "Cancelled" },
-];
-const FOLLOW_UP_STATUSES: { value: FollowUpStatus; label: string }[] = [
-  { value: "none", label: "None" },
-  { value: "needed", label: "Needed" },
-  { value: "scheduled", label: "Scheduled" },
-  { value: "done", label: "Done" },
-];
 
 function closeAuditLog(event: string, details: Record<string, unknown> = {}) {
   console.info(CLOSE_AUDIT_LOG_PREFIX, event, {
@@ -197,45 +189,9 @@ function callTypeLabel(call: CallRecord) {
   return "Call";
 }
 
-function callDuration(call: CallRecord) {
-  if (!call.answeredAt || !call.completedAt) return "";
-  const answeredAt = new Date(call.answeredAt);
-  const completedAt = new Date(call.completedAt);
-  if (Number.isNaN(answeredAt.getTime()) || Number.isNaN(completedAt.getTime())) return "";
-  const durationSeconds = Math.max(0, Math.round((completedAt.getTime() - answeredAt.getTime()) / 1000));
-  if (durationSeconds < 60) return `${durationSeconds}s`;
-  const minutes = Math.floor(durationSeconds / 60);
-  const seconds = durationSeconds % 60;
-  return seconds ? `${minutes}m ${seconds}s` : `${minutes}m`;
-}
-
-function outcomeLabel(outcome: string | null | undefined) {
-  if (!outcome) return "No outcome";
-  return CALL_OUTCOMES.find((item) => item.value === outcome)?.label || outcome;
-}
-
 function newClientRequestId() {
   if (crypto.randomUUID) return crypto.randomUUID();
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function MetricCard({
-  label,
-  value,
-  active,
-  warning,
-}: {
-  label: string;
-  value: number;
-  active?: boolean;
-  warning?: boolean;
-}) {
-  return (
-    <button className={`metric-card ${active ? "is-active" : ""}`} type="button">
-      <span>{label}</span>
-      <strong className={warning ? "warning" : ""}>{value}</strong>
-    </button>
-  );
 }
 
 function StatusPill({ status }: { status: ConversationStatus }) {
@@ -275,56 +231,6 @@ function MessageBubble({ message, onMediaLoad }: { message: Message; onMediaLoad
         <span>{message.deliveryStatus}</span>
       </footer>
     </article>
-  );
-}
-
-function CallHistory({ calls, onSelectCall }: { calls: CallRecord[]; onSelectCall: (call: CallRecord) => void }) {
-  return (
-    <section className="context-section">
-      <h2>
-        <Phone size={18} />
-        Call History
-      </h2>
-      {calls.length === 0 ? (
-        <p className="empty-call-history">No calls logged for this conversation yet.</p>
-      ) : (
-        <div className="call-history-list">
-          {calls.map((call) => {
-            const duration = callDuration(call);
-            return (
-              <button
-                className={`call-history-item status-${call.status || "unknown"}`}
-                key={call.id}
-                onClick={() => onSelectCall(call)}
-                type="button"
-              >
-                <div className="call-history-main">
-                  <span className="call-history-icon">
-                    <Phone size={16} />
-                  </span>
-                  <div>
-                    <strong>{callTypeLabel(call)}</strong>
-                    <p>{cleanPhone(call.customerPhone)}</p>
-                  </div>
-                </div>
-                <div className="call-history-meta">
-                  <span className="call-status-pill">{call.status || "unknown"}</span>
-                  {call.outcome && <span>{outcomeLabel(call.outcome)}</span>}
-                  {call.followUpStatus !== "none" && <span>Follow-up {call.followUpStatus}</span>}
-                  <span>{formatDate(call.startedAt || call.createdAt)}</span>
-                  {duration && (
-                    <span>
-                      <Clock size={13} />
-                      {duration}
-                    </span>
-                  )}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </section>
   );
 }
 
@@ -561,39 +467,6 @@ function CallDetailsDrawer({
     },
   ) => Promise<void>;
 }) {
-  const [outcome, setOutcome] = useState<CallOutcome | null>(null);
-  const [followUpStatus, setFollowUpStatus] = useState<FollowUpStatus>("none");
-  const [notes, setNotes] = useState("");
-  const [recap, setRecap] = useState("");
-  const [transcription, setTranscription] = useState("");
-  const [error, setError] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
-
-  useEffect(() => {
-    if (!call || !open) return;
-    setOutcome((call.outcome as CallOutcome | null) || null);
-    setFollowUpStatus(call.followUpStatus || "none");
-    setNotes(call.notes || "");
-    setRecap(call.recap || "");
-    setTranscription(call.transcription || "");
-    setError("");
-  }, [call, open]);
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!call) return;
-    setIsSaving(true);
-    setError("");
-    try {
-      await onSave(call.id, { outcome, followUpStatus, notes, recap, transcription });
-      onClose();
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Could not save call details.");
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
   return (
     <Drawer
       description={call ? `${callTypeLabel(call)} - ${cleanPhone(call.customerPhone)}` : undefined}
@@ -602,64 +475,14 @@ function CallDetailsDrawer({
       open={open && Boolean(call)}
       title="Call details"
     >
-      <form className="drawer-form call-details-form" onSubmit={handleSubmit}>
-        <fieldset>
-          <legend>Outcome</legend>
-          <div className="button-grid outcome-grid">
-            {CALL_OUTCOMES.map((item) => (
-              <button
-                className={outcome === item.value ? "is-active" : ""}
-                key={item.value}
-                onClick={() => setOutcome(item.value)}
-                type="button"
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </fieldset>
-
-        <fieldset>
-          <legend>Follow-up status</legend>
-          <div className="button-grid follow-up-grid">
-            {FOLLOW_UP_STATUSES.map((item) => (
-              <button
-                className={followUpStatus === item.value ? "is-active" : ""}
-                key={item.value}
-                onClick={() => setFollowUpStatus(item.value)}
-                type="button"
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </fieldset>
-
-        <label>
-          <span>Notes</span>
-          <textarea onChange={(event) => setNotes(event.target.value)} rows={4} value={notes} />
-        </label>
-
-        <label>
-          <span>Recap</span>
-          <textarea onChange={(event) => setRecap(event.target.value)} rows={4} value={recap} />
-        </label>
-
-        <label>
-          <span>Transcription</span>
-          <textarea onChange={(event) => setTranscription(event.target.value)} rows={6} value={transcription} />
-        </label>
-
-        {error && <p className="form-error">{error}</p>}
-        <div className="drawer-actions">
-          <button className="ghost-button" disabled={isSaving} onClick={onClose} type="button">
-            Cancel
-          </button>
-          <button className="send-button" disabled={isSaving} type="submit">
-            {isSaving ? "Saving..." : "Save call"}
-          </button>
-        </div>
-      </form>
+      <CallDetailsForm
+        call={call}
+        onCancel={onClose}
+        onSave={async (callId, payload) => {
+          await onSave(callId, payload);
+          onClose();
+        }}
+      />
     </Drawer>
   );
 }
@@ -788,6 +611,16 @@ export function App() {
   const [authError, setAuthError] = useState("");
   const [conversations, setConversations] = useState<ConversationListItem[]>([]);
   const [metrics, setMetrics] = useState<Metrics>({ open: 0, failed: 0, recent: 0 });
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("text");
+  const [callRows, setCallRows] = useState<CallConversationListItem[]>([]);
+  const [selectedCallRowId, setSelectedCallRowId] = useState("");
+  const [callSearch, setCallSearch] = useState("");
+  const [callDirectionFilter, setCallDirectionFilter] = useState<CallDirectionFilter>("outgoing");
+  const [isLoadingCalls, setIsLoadingCalls] = useState(false);
+  const [isSearchingCalls, setIsSearchingCalls] = useState(false);
+  const [isLoadingMoreCalls, setIsLoadingMoreCalls] = useState(false);
+  const [nextCallOffset, setNextCallOffset] = useState<number | null>(null);
+  const [hasMoreCalls, setHasMoreCalls] = useState(false);
   const [selectedId, setSelectedId] = useState("");
   const [selectedConversation, setSelectedConversation] = useState<ConversationDetail | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -821,7 +654,9 @@ export function App() {
   });
   const didRunInitialSearchEffect = useRef(false);
   const searchRequestId = useRef(0);
+  const callSearchRequestId = useRef(0);
   const isRefreshingList = useRef(false);
+  const isRefreshingCalls = useRef(false);
   const isRefreshingDetail = useRef(false);
   const messageThreadRef = useRef<HTMLDivElement | null>(null);
   const messageThreadEndRef = useRef<HTMLDivElement | null>(null);
@@ -841,6 +676,10 @@ export function App() {
   const selectedListItem = useMemo(
     () => allKnownConversations.find((conversation) => conversation.id === selectedId) || null,
     [allKnownConversations, selectedId],
+  );
+  const selectedCallRow = useMemo(
+    () => callRows.find((row) => row.id === selectedCallRowId) || null,
+    [callRows, selectedCallRowId],
   );
   const selectedCall = useMemo(
     () => calls.find((call) => call.id === selectedCallId) || null,
@@ -969,6 +808,74 @@ export function App() {
     }
   }, [statusFilter]);
 
+  const loadCalls = useCallback(async (fallbackSelectedRowId = "") => {
+    setIsLoadingCalls(true);
+    setAppError("");
+    try {
+      const payload = await getCalls("", 0, 50, callDirectionFilter);
+      setCallRows(payload.calls);
+      setNextCallOffset(payload.pagination?.nextOffset ?? null);
+      setHasMoreCalls(payload.pagination?.hasMore ?? false);
+      setSelectedCallRowId((current) => {
+        if (current && payload.calls.some((row) => row.id === current)) return current;
+        if (fallbackSelectedRowId) return fallbackSelectedRowId;
+        return payload.calls[0]?.id || "";
+      });
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setIsAuthenticated(false);
+      } else {
+        setAppError(error instanceof Error ? error.message : "Could not load calls.");
+      }
+    } finally {
+      setIsLoadingCalls(false);
+    }
+  }, [callDirectionFilter]);
+
+  const refreshCalls = useCallback(async ({ force = false }: { force?: boolean } = {}) => {
+    if (isRefreshingCalls.current && !force) return;
+    isRefreshingCalls.current = true;
+    try {
+      const payload = await getCalls("", 0, 50, callDirectionFilter);
+      setCallRows((current) => {
+        const seen = new Set(payload.calls.map((row) => row.id));
+        return [...payload.calls, ...current.filter((row) => !seen.has(row.id))];
+      });
+      setNextCallOffset(payload.pagination?.nextOffset ?? null);
+      setHasMoreCalls(payload.pagination?.hasMore ?? false);
+      setSelectedCallRowId((current) => current || payload.calls[0]?.id || "");
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setIsAuthenticated(false);
+      }
+    } finally {
+      isRefreshingCalls.current = false;
+    }
+  }, [callDirectionFilter]);
+
+  const loadMoreCalls = useCallback(async () => {
+    if (nextCallOffset === null || callSearch.trim()) return;
+    setIsLoadingMoreCalls(true);
+    setAppError("");
+    try {
+      const payload = await getCalls("", nextCallOffset, 50, callDirectionFilter);
+      setCallRows((current) => {
+        const seen = new Set(current.map((row) => row.id));
+        return [...current, ...payload.calls.filter((row) => !seen.has(row.id))];
+      });
+      setNextCallOffset(payload.pagination?.nextOffset ?? null);
+      setHasMoreCalls(payload.pagination?.hasMore ?? false);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setIsAuthenticated(false);
+      } else {
+        setAppError(error instanceof Error ? error.message : "Could not load more calls.");
+      }
+    } finally {
+      setIsLoadingMoreCalls(false);
+    }
+  }, [callDirectionFilter, callSearch, nextCallOffset]);
+
   const refreshDetail = useCallback(async (conversationId: string, { force = false }: { force?: boolean } = {}) => {
     if (!conversationId || (isRefreshingDetail.current && !force)) return;
     isRefreshingDetail.current = true;
@@ -1012,6 +919,11 @@ export function App() {
   }, [isAuthenticated, loadConversations]);
 
   useEffect(() => {
+    if (!isAuthenticated || workspaceMode !== "calls") return;
+    loadCalls();
+  }, [isAuthenticated, loadCalls, workspaceMode]);
+
+  useEffect(() => {
     if (!isAuthenticated) return;
     if (!didRunInitialSearchEffect.current) {
       didRunInitialSearchEffect.current = true;
@@ -1052,9 +964,69 @@ export function App() {
   }, [isAuthenticated, search, statusFilter]);
 
   useEffect(() => {
+    if (!isAuthenticated || workspaceMode !== "calls") return;
+    const query = callSearch.trim();
+    if (!query) {
+      callSearchRequestId.current += 1;
+      setIsSearchingCalls(false);
+      void loadCalls();
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      const requestId = callSearchRequestId.current + 1;
+      callSearchRequestId.current = requestId;
+      setIsSearchingCalls(true);
+      getCalls(query, 0, 50, callDirectionFilter)
+        .then((payload) => {
+          if (callSearchRequestId.current !== requestId) return;
+          setCallRows(payload.calls);
+          setNextCallOffset(payload.pagination?.nextOffset ?? null);
+          setHasMoreCalls(payload.pagination?.hasMore ?? false);
+          setSelectedCallRowId((current) => {
+            if (current && payload.calls.some((row) => row.id === current)) return current;
+            return payload.calls[0]?.id || "";
+          });
+        })
+        .catch((error) => {
+          if (callSearchRequestId.current !== requestId) return;
+          if (error instanceof ApiError && error.status === 401) {
+            setIsAuthenticated(false);
+          } else {
+            setAppError(error instanceof Error ? error.message : "Could not search calls.");
+          }
+        })
+        .finally(() => {
+          if (callSearchRequestId.current === requestId) {
+            setIsSearchingCalls(false);
+          }
+        });
+    }, 250);
+    return () => window.clearTimeout(timeoutId);
+  }, [callDirectionFilter, callSearch, isAuthenticated, loadCalls, workspaceMode]);
+
+  useEffect(() => {
     if (!isAuthenticated) return;
     loadDetail(selectedId);
   }, [isAuthenticated, loadDetail, selectedId]);
+
+  useEffect(() => {
+    if (!isAuthenticated || workspaceMode !== "calls") return;
+    if (!selectedCallRow) return;
+    const conversationId = selectedCallRow.conversation?.id;
+    if (!conversationId) {
+      setSelectedId("");
+      setSelectedConversation(null);
+      setMessages([]);
+      setCalls([selectedCallRow.latestCall]);
+      setSelectedCallId(selectedCallRow.latestCall.id);
+      setSuggestedReply("");
+      return;
+    }
+    if (selectedId !== conversationId) {
+      setSelectedId(conversationId);
+    }
+    setSelectedCallId((current) => current || selectedCallRow.latestCall.id);
+  }, [isAuthenticated, selectedCallRow, selectedId, workspaceMode]);
 
   useEffect(() => {
     scrollMessagesToLatest();
@@ -1099,12 +1071,15 @@ export function App() {
       if (!search.trim()) {
         void refreshConversationList();
       }
+      if (workspaceMode === "calls" && !callSearch.trim()) {
+        void refreshCalls();
+      }
       if (selectedId && !draft.trim() && files.length === 0) {
         void refreshDetail(selectedId);
       }
     }, INBOX_REFRESH_INTERVAL_MS);
     return () => window.clearInterval(intervalId);
-  }, [draft, files.length, isAuthenticated, isCloseConfirmationOpen, refreshConversationList, refreshDetail, search, selectedId]);
+  }, [callSearch, draft, files.length, isAuthenticated, isCloseConfirmationOpen, refreshCalls, refreshConversationList, refreshDetail, search, selectedId, workspaceMode]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -1120,6 +1095,9 @@ export function App() {
       if (!search.trim()) {
         void refreshConversationList();
       }
+      if (workspaceMode === "calls" && !callSearch.trim()) {
+        void refreshCalls();
+      }
       if (selectedId && !draft.trim() && files.length === 0) {
         void refreshDetail(selectedId);
       }
@@ -1130,7 +1108,7 @@ export function App() {
       window.removeEventListener("focus", refreshWhenVisible);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
-  }, [draft, files.length, isAuthenticated, isCloseConfirmationOpen, refreshConversationList, refreshDetail, search, selectedId]);
+  }, [callSearch, draft, files.length, isAuthenticated, isCloseConfirmationOpen, refreshCalls, refreshConversationList, refreshDetail, search, selectedId, workspaceMode]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 760px)");
@@ -1152,6 +1130,13 @@ export function App() {
     setIsAuthenticated(false);
     didRunInitialSearchEffect.current = false;
     setConversations([]);
+    setWorkspaceMode("text");
+    setCallRows([]);
+    setSelectedCallRowId("");
+    setCallSearch("");
+    setCallDirectionFilter("outgoing");
+    setNextCallOffset(null);
+    setHasMoreCalls(false);
     setSearchResults(null);
     setNextConversationOffset(null);
     setHasMoreConversations(false);
@@ -1169,11 +1154,44 @@ export function App() {
     setAppError("");
     try {
       await Promise.all([
-        search.trim() ? Promise.resolve() : refreshConversationList({ force: true }),
+        workspaceMode === "calls"
+          ? (callSearch.trim() ? Promise.resolve() : refreshCalls({ force: true }))
+          : (search.trim() ? Promise.resolve() : refreshConversationList({ force: true })),
         selectedId ? refreshDetail(selectedId, { force: true }) : Promise.resolve(),
       ]);
     } finally {
       setIsRefreshingInbox(false);
+    }
+  }
+
+  function handleWorkspaceModeChange(nextMode: WorkspaceMode) {
+    setWorkspaceMode(nextMode);
+    setAppError("");
+    if (nextMode === "calls") {
+      setDraft("");
+      setFiles([]);
+      setClosedConversationUndo(null);
+      if (callRows.length === 0) {
+        void loadCalls();
+      }
+    } else {
+      setSelectedCallId("");
+    }
+  }
+
+  function handleSelectCallRow(row: CallConversationListItem) {
+    setSelectedCallRowId(row.id);
+    setSelectedCallId(row.latestCall.id);
+    setDraft("");
+    setFiles([]);
+    setDetailError("");
+    setSuggestedReply("");
+    setCallStatus("");
+    if (row.conversation?.id) {
+      setSelectedId(row.conversation.id);
+    }
+    if (window.matchMedia("(max-width: 760px)").matches) {
+      setIsContextOpen(false);
     }
   }
 
@@ -1319,6 +1337,9 @@ export function App() {
       const response = await callConversationCustomer(selectedId);
       setCallStatus(`Calling Francisco first, then ${response.to}.`);
       await refreshDetail(selectedId, { force: true });
+      if (workspaceMode === "calls") {
+        await refreshCalls({ force: true });
+      }
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         setIsAuthenticated(false);
@@ -1348,6 +1369,9 @@ export function App() {
       setCallStatus(`Calling Francisco first, then ${response.to}.`);
       await loadConversations(response.conversation.id);
       await refreshDetail(response.conversation.id, { force: true });
+      if (workspaceMode === "calls") {
+        await refreshCalls({ force: true });
+      }
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         setIsAuthenticated(false);
@@ -1379,6 +1403,19 @@ export function App() {
       transcription: payload.transcription.trim() || null,
     });
     setCalls((current) => current.map((call) => (call.id === callId ? response.call : call)));
+    setCallRows((current) =>
+      current.map((row) => (
+        row.latestCall.id === callId
+          ? {
+            ...row,
+            latestCall: response.call,
+            workflowStatus: !response.call.outcome || ["needed", "scheduled"].includes(response.call.followUpStatus)
+              ? "pending_follow_up"
+              : "done",
+          }
+          : row
+      )),
+    );
   }
 
   if (isCheckingSession) {
@@ -1399,6 +1436,15 @@ export function App() {
   const displayPhone = cleanPhone(customerPhone);
   const channel = effectiveChannel(activeConversation?.channel || "sms", customerPhone);
   const status = activeConversation?.status || "open";
+  const contextCustomerName =
+    workspaceMode === "calls" && selectedCallRow
+      ? selectedCallRow.customer.name || cleanPhone(selectedCallRow.customer.phone) || cleanPhone(selectedCallRow.latestCall.customerPhone) || "Unknown customer"
+      : customerName;
+  const contextDisplayPhone =
+    workspaceMode === "calls" && selectedCallRow
+      ? cleanPhone(selectedCallRow.customer.phone || selectedCallRow.latestCall.customerPhone)
+      : displayPhone;
+  const contextCode = workspaceMode === "calls" ? selectedCallRow?.conversation?.code : activeConversation?.code;
 
   return (
     <div className="app-shell">
@@ -1434,107 +1480,128 @@ export function App() {
 
       <main className="workspace">
         <aside className="inbox-panel">
-          <div className="metrics-row">
-            <MetricCard active label="Open" value={metrics.open} />
-            <MetricCard label="Failed" value={metrics.failed} warning />
-            <MetricCard label="Recent" value={metrics.recent} />
-          </div>
+          <WorkspaceTabs mode={workspaceMode} onModeChange={handleWorkspaceModeChange} />
 
-          <label className="search-box">
-            <Search size={20} />
-            <input
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search conversations..."
-              type="search"
-              value={search}
-            />
-          </label>
+          {workspaceMode === "text" ? (
+            <>
+              <label className="search-box">
+                <Search size={20} />
+                <input
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search conversations..."
+                  type="search"
+                  value={search}
+                />
+              </label>
 
-          <div className="conversation-filter" role="group" aria-label="Conversation status filter">
-            {(["open", "closed", "all"] as ConversationStatusFilter[]).map((filter) => (
-              <button
-                className={statusFilter === filter ? "is-active" : ""}
-                key={filter}
-                onClick={() => {
-                  setStatusFilter(filter);
-                  setSearchResults(null);
-                  setNextConversationOffset(null);
-                  setHasMoreConversations(false);
-                  setClosedConversationUndo(null);
-                }}
-                type="button"
-              >
-                {filter === "all" ? "All" : filter}
-              </button>
-            ))}
-          </div>
-
-          <div className="conversation-list">
-            {isLoadingList && <p className="panel-note">Loading conversations...</p>}
-            {!isLoadingList && visibleConversations.length === 0 && <p className="panel-note">No conversations found.</p>}
-            {visibleConversations.map((conversation) => (
-              (() => {
-                const listChannel = effectiveChannel(conversation.channel, conversation.customer.phone);
-                const requiresReply = needsReply(conversation);
-                return (
+              <div className="conversation-filter" role="group" aria-label="Conversation status filter">
+                {(["open", "closed", "all"] as ConversationStatusFilter[]).map((filter) => (
                   <button
-                    className={[
-                      "conversation-row",
-                      `channel-${listChannel}`,
-                      `delivery-${deliveryStatus(conversation)}`,
-                      `status-${conversation.status}`,
-                      requiresReply ? "needs-reply" : "",
-                      conversation.id === selectedId ? "selected" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    key={conversation.id}
+                    className={statusFilter === filter ? "is-active" : ""}
+                    key={filter}
                     onClick={() => {
-                      setSelectedId(conversation.id);
-                      setDraft("");
-                      setFiles([]);
-                      setDetailError("");
-                      setSuggestedReply("");
-                      setCallStatus("");
-                      if (window.matchMedia("(max-width: 760px)").matches) {
-                        setIsContextOpen(false);
-                      }
+                      setStatusFilter(filter);
+                      setSearchResults(null);
+                      setNextConversationOffset(null);
+                      setHasMoreConversations(false);
+                      setClosedConversationUndo(null);
                     }}
                     type="button"
                   >
-                    <span className="conversation-row-heading">
-                      <span className="conversation-identity">
-                        <strong>{displayCustomerName(conversation)}</strong>
-                        <span className={`channel-pill ${listChannel}`}>{channelLabel(listChannel)}</span>
-                        {conversation.status === "closed" && <span className="closed-pill">Closed</span>}
-                        {requiresReply && <span className="attention-pill">Needs reply</span>}
-                        {(deliveryStatus(conversation) === "failed" || deliveryStatus(conversation) === "undelivered") && (
-                          <DeliveryPill status={deliveryStatus(conversation)} />
-                        )}
-                      </span>
-                      <em>{relativeDate(conversation.updatedAt)}</em>
-                    </span>
-                    <p>{previewBody(conversation)}</p>
+                    {filter === "all" ? "All" : filter}
                   </button>
-                );
-              })()
-            ))}
-            {search.trim() && isSearchingConversations && (
-              <p className="panel-note">Searching older conversations...</p>
-            )}
-            {!search.trim() && hasMoreConversations && (
-              <button
-                className="load-more-button"
-                disabled={isLoadingMore}
-                onClick={loadMoreConversations}
-                type="button"
-              >
-                {isLoadingMore ? "Loading..." : "Load more"}
-              </button>
-            )}
-          </div>
+                ))}
+              </div>
+
+              <div className="conversation-list">
+                {isLoadingList && <p className="panel-note">Loading conversations...</p>}
+                {!isLoadingList && visibleConversations.length === 0 && <p className="panel-note">No conversations found.</p>}
+                {visibleConversations.map((conversation) => (
+                  (() => {
+                    const listChannel = effectiveChannel(conversation.channel, conversation.customer.phone);
+                    const requiresReply = needsReply(conversation);
+                    return (
+                      <button
+                        className={[
+                          "conversation-row",
+                          `channel-${listChannel}`,
+                          `delivery-${deliveryStatus(conversation)}`,
+                          `status-${conversation.status}`,
+                          requiresReply ? "needs-reply" : "",
+                          conversation.id === selectedId ? "selected" : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        key={conversation.id}
+                        onClick={() => {
+                          setSelectedId(conversation.id);
+                          setDraft("");
+                          setFiles([]);
+                          setDetailError("");
+                          setSuggestedReply("");
+                          setCallStatus("");
+                          if (window.matchMedia("(max-width: 760px)").matches) {
+                            setIsContextOpen(false);
+                          }
+                        }}
+                        type="button"
+                      >
+                        <span className="conversation-row-heading">
+                          <span className="conversation-identity">
+                            <strong>{displayCustomerName(conversation)}</strong>
+                            <span className={`channel-pill ${listChannel}`}>{channelLabel(listChannel)}</span>
+                            {conversation.status === "closed" && <span className="closed-pill">Closed</span>}
+                            {requiresReply && <span className="attention-pill">Needs reply</span>}
+                            {(deliveryStatus(conversation) === "failed" || deliveryStatus(conversation) === "undelivered") && (
+                              <DeliveryPill status={deliveryStatus(conversation)} />
+                            )}
+                          </span>
+                          <em>{relativeDate(conversation.updatedAt)}</em>
+                        </span>
+                        <p>{previewBody(conversation)}</p>
+                      </button>
+                    );
+                  })()
+                ))}
+                {search.trim() && isSearchingConversations && (
+                  <p className="panel-note">Searching older conversations...</p>
+                )}
+                {!search.trim() && hasMoreConversations && (
+                  <button
+                    className="load-more-button"
+                    disabled={isLoadingMore}
+                    onClick={loadMoreConversations}
+                    type="button"
+                  >
+                    {isLoadingMore ? "Loading..." : "Load more"}
+                  </button>
+                )}
+              </div>
+            </>
+          ) : (
+            <CallsPanel
+              directionFilter={callDirectionFilter}
+              hasMore={hasMoreCalls}
+              isLoading={isLoadingCalls}
+              isLoadingMore={isLoadingMoreCalls}
+              isSearching={isSearchingCalls}
+              onDirectionChange={(filter) => {
+                setCallDirectionFilter(filter);
+                setNextCallOffset(null);
+                setHasMoreCalls(false);
+                setSelectedCallRowId("");
+              }}
+              onLoadMore={loadMoreCalls}
+              onSearchChange={setCallSearch}
+              onSelect={handleSelectCallRow}
+              rows={callRows}
+              search={callSearch}
+              selectedId={selectedCallRowId}
+            />
+          )}
         </aside>
 
+        {workspaceMode === "text" ? (
         <section className={`conversation-panel channel-${channel}`}>
           <header className="conversation-header">
             <div className="conversation-title-block">
@@ -1625,6 +1692,16 @@ export function App() {
             onSend={handleSend}
           />
         </section>
+        ) : (
+          <CallWorkspace
+            calls={calls}
+            isLoadingDetail={isLoadingDetail}
+            onSaveCallDetails={handleSaveCallDetails}
+            onSelectCall={setSelectedCallId}
+            selectedCall={selectedCall}
+            selectedRow={selectedCallRow}
+          />
+        )}
 
         <aside className={`context-panel mobile-drawer ${isContextOpen ? "is-open" : "is-collapsed"}`}>
           <div className="context-panel-header">
@@ -1636,51 +1713,47 @@ export function App() {
 
           <section className="context-section">
             <h2>Customer Profile</h2>
-            <strong>{customerName}</strong>
-            <p>{displayPhone}</p>
-            {activeConversation?.code && <em>Session ID: #{activeConversation.code}</em>}
+            <strong>{contextCustomerName}</strong>
+            <p>{contextDisplayPhone}</p>
+            {contextCode && <em>Session ID: #{contextCode}</em>}
           </section>
 
-          <div className="context-scroll-area">
-            <CallHistory calls={calls} onSelectCall={(call) => setSelectedCallId(call.id)} />
+          <section className="context-section">
+            <h2>
+              <Sparkles size={18} />
+              AI Suggested Reply
+            </h2>
+            <div className="intent-box">
+              <span>{suggestedReply ? "Ready" : "No suggestion"}</span>
+              <p>{suggestedReply || "No AI suggestion is available for this conversation yet."}</p>
+              {suggestedReply && (
+                <button
+                  className="secondary-action"
+                  onClick={() => {
+                    setDraft(suggestedReply);
+                    setSuggestedReply("");
+                  }}
+                  type="button"
+                >
+                  Use suggested reply
+                </button>
+              )}
+            </div>
+          </section>
 
-            <section className="context-section">
-              <h2>
-                <Sparkles size={18} />
-                AI Suggested Reply
-              </h2>
-              <div className="intent-box">
-                <span>{suggestedReply ? "Ready" : "No suggestion"}</span>
-                <p>{suggestedReply || "No AI suggestion is available for this conversation yet."}</p>
-                {suggestedReply && (
-                  <button
-                    className="secondary-action"
-                    onClick={() => {
-                      setDraft(suggestedReply);
-                      setSuggestedReply("");
-                    }}
-                    type="button"
-                  >
-                    Use suggested reply
-                  </button>
-                )}
-              </div>
-            </section>
-
-            <section className="context-section">
-              <h2>Quick Responses</h2>
-              <div className="quick-responses">
-                {quickResponses.map((response, index) => (
-                  <button key={response.id} onClick={() => setDraft(response.body)} type="button">
-                    {index === 0 && "?"}
-                    {index === 1 && <CheckCircle2 size={16} />}
-                    {index === 2 && <Sparkles size={16} />}
-                    <span>{response.label}</span>
-                  </button>
-                ))}
-              </div>
-            </section>
-          </div>
+          <section className="context-section">
+            <h2>Quick Responses</h2>
+            <div className="quick-responses">
+              {quickResponses.map((response, index) => (
+                <button key={response.id} onClick={() => setDraft(response.body)} type="button">
+                  {index === 0 && "?"}
+                  {index === 1 && <CheckCircle2 size={16} />}
+                  {index === 2 && <Sparkles size={16} />}
+                  <span>{response.label}</span>
+                </button>
+              ))}
+            </div>
+          </section>
         </aside>
       </main>
       <NewCallDrawer
@@ -1701,7 +1774,7 @@ export function App() {
         call={selectedCall}
         onClose={() => setSelectedCallId("")}
         onSave={handleSaveCallDetails}
-        open={Boolean(selectedCall)}
+        open={workspaceMode === "text" && Boolean(selectedCall)}
       />
     </div>
   );
