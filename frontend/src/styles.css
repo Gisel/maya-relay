@@ -1547,6 +1547,7 @@ button {
 }
 
 .call-timeline-list {
+  align-content: start;
   display: grid;
   gap: 7px;
   margin-top: 10px;
@@ -1558,7 +1559,7 @@ button {
 }
 
 .call-timeline-item {
-  align-items: center;
+  align-items: start;
   background: #ffffff;
   border: 1px solid #dfe4ec;
   border-radius: 8px;
@@ -1568,8 +1569,13 @@ button {
   grid-template-columns: 28px minmax(0, 1fr);
   grid-template-rows: auto auto;
   min-height: 0;
-  padding: 8px 9px;
+  padding: 7px 8px;
   text-align: left;
+}
+
+.call-timeline-item .call-row-icon {
+  height: 28px;
+  width: 28px;
 }
 
 .call-timeline-item.selected {
@@ -1626,6 +1632,7 @@ button {
   gap: 8px;
   grid-column: 1 / -1;
   grid-row: 2;
+  line-height: 1.2;
 }
 
 .call-timeline-meta span {
