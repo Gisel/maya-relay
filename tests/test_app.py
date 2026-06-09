@@ -771,6 +771,79 @@ def test_twilio_voice_bridge_dials_customer():
     assert "+13852208404" in response.text
 
 
+def test_twilio_studio_incoming_voice_call_logs_inbound():
+    client, repository, _ = make_client()
+
+    response = client.post(
+        "/webhooks/twilio/voice/studio/incoming",
+        data={
+            "CallSid": "CAinbound",
+            "CallStatus": "ringing",
+            "From": "+15550000009",
+            "To": "+13852208404",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "logged",
+        "callId": "call-1",
+        "conversationId": "conversation-1",
+    }
+    assert len(repository.conversations) == 1
+    assert len(repository.calls) == 1
+    call = repository.calls[0]
+    assert call["conversation_id"] == "conversation-1"
+    assert call["direction"] == "inbound"
+    assert call["call_type"] == "inbound"
+    assert call["customer_phone"] == "+15550000009"
+    assert call["employee_phone"] == "+15551234567"
+    assert call["twilio_call_sid"] == "CAinbound"
+    assert call["status"] == "ringing"
+    assert repository.call_events[0]["call_id"] == "call-1"
+    assert repository.call_events[0]["event_type"] == "ringing"
+
+
+def test_twilio_studio_incoming_voice_complete_updates_inbound_call():
+    client, repository, _ = make_client()
+    repository.create_call(
+        conversation_id="conversation-1",
+        direction="inbound",
+        call_type="inbound",
+        customer_phone="+15550000009",
+        employee_phone="+15551234567",
+        twilio_call_sid="CAinbound",
+        status="ringing",
+    )
+
+    response = client.post(
+        "/webhooks/twilio/voice/studio/complete",
+        data={
+            "CallSid": "CAinbound",
+            "DialCallSid": "CAofficeleg",
+            "DialCallStatus": "completed",
+        },
+    )
+
+    assert response.status_code == 204
+    assert repository.calls[0]["status"] == "completed"
+    assert repository.calls[0]["completed_at"] is not None
+    assert repository.call_events == [
+        {
+            "id": "call-event-1",
+            "call_id": "call-1",
+            "twilio_call_sid": "CAinbound",
+            "event_type": "studio-complete",
+            "call_status": "completed",
+            "payload": {
+                "CallSid": "CAinbound",
+                "DialCallSid": "CAofficeleg",
+                "DialCallStatus": "completed",
+            },
+        }
+    ]
+
+
 def test_twilio_voice_status_updates_call_log_and_records_event():
     client, repository, _ = make_client()
     repository.create_call(
