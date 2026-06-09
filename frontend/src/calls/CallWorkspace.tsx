@@ -25,6 +25,14 @@ function timelineTitle(call: CallRecord) {
   return `${callDirectionLabel(call.direction)} call`;
 }
 
+function callStatusTone(status?: string | null) {
+  const normalized = (status || "").toLowerCase();
+  if (normalized === "completed") return "complete";
+  if (["busy", "canceled", "cancelled", "failed", "no-answer"].includes(normalized)) return "failed";
+  if (["initiated", "in-progress", "queued", "ringing"].includes(normalized)) return "active";
+  return "unknown";
+}
+
 export function CallWorkspace({
   calls,
   isLoadingDetail,
@@ -84,8 +92,12 @@ export function CallWorkspace({
               </div>
             </div>
             <p className="call-summary-meta">
-              <span>
-                <strong>Status:</strong> {latestCall.status || "unknown"}
+              <span
+                aria-label={`Status: ${latestCall.status || "unknown"}`}
+                className="call-summary-status"
+                title={`Status: ${latestCall.status || "unknown"}`}
+              >
+                <span className={`call-summary-status-dot status-${callStatusTone(latestCall.status)}`} />
               </span>
               <span>
                 <strong>Outcome:</strong> {outcomeLabel(latestCall.outcome)}

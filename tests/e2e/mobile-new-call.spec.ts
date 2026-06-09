@@ -461,7 +461,7 @@ test("calls tab shows grouped call activity and refreshes after starting a call"
   await expect(page.locator(".call-activity-row", { hasText: "Test Customer" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Latest call summary" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Call timeline" })).toBeVisible();
-  await expect(page.locator(".call-summary-card").getByText("completed")).toBeVisible();
+  await expect(page.locator(".call-summary-status[aria-label='Status: completed']")).toBeVisible();
   await expect(page.locator(".call-summary-card").getByText("45s")).toBeVisible();
 
   await page.getByRole("tab", { name: "Text" }).click();

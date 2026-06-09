@@ -1500,6 +1500,36 @@ button {
   padding-left: 0;
 }
 
+.call-summary-meta .call-summary-status {
+  align-items: center;
+  display: inline-flex;
+  flex: 0 0 auto;
+  padding-right: 8px;
+}
+
+.call-summary-status-dot {
+  border-radius: 999px;
+  display: inline-flex;
+  height: 8px;
+  width: 8px;
+}
+
+.call-summary-status-dot.status-complete {
+  background: var(--brand-blue);
+}
+
+.call-summary-status-dot.status-failed {
+  background: #dc2626;
+}
+
+.call-summary-status-dot.status-active {
+  background: #d99a17;
+}
+
+.call-summary-status-dot.status-unknown {
+  background: #98a2b3;
+}
+
 .call-summary-meta strong {
   color: #8a94a6;
   font-size: 10px;
