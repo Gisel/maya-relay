@@ -535,6 +535,11 @@ def test_api_conversation_detail_includes_call_history():
     assert call["status"] == "completed"
     assert call["outcome"] is None
     assert call["followUpStatus"] == "none"
+    assert call["recordingSid"] is None
+    assert call["recordingUrl"] is None
+    assert call["recordingStatus"] is None
+    assert call["recordingDurationSeconds"] is None
+    assert call["recordingChannels"] is None
     assert call["startedAt"] == "2026-06-08T20:08:45Z"
     assert call["answeredAt"] == "2026-06-08T20:08:49Z"
     assert call["completedAt"] == "2026-06-08T20:09:28Z"
@@ -881,6 +886,55 @@ def test_twilio_voice_status_updates_call_log_and_records_event():
                 "CallStatus": "answered",
                 "From": "+13852208404",
                 "To": "+15551234567",
+            },
+        }
+    ]
+
+
+def test_twilio_voice_recording_status_updates_call_log_and_records_event():
+    client, repository, _ = make_client()
+    repository.create_call(
+        conversation_id="conversation-1",
+        direction="inbound",
+        call_type="inbound",
+        customer_phone="+15550000009",
+        employee_phone="+15551234567",
+        twilio_call_sid="CAinbound",
+        status="ringing",
+    )
+
+    response = client.post(
+        "/webhooks/twilio/voice/recording",
+        data={
+            "CallSid": "CAinbound",
+            "RecordingSid": "REfake1",
+            "RecordingUrl": "https://api.twilio.com/2010-04-01/Accounts/ACfake/Recordings/REfake1",
+            "RecordingStatus": "completed",
+            "RecordingDuration": "37",
+            "RecordingChannels": "1",
+        },
+    )
+
+    assert response.status_code == 204
+    assert repository.calls[0]["recording_sid"] == "REfake1"
+    assert repository.calls[0]["recording_url"] == "https://api.twilio.com/2010-04-01/Accounts/ACfake/Recordings/REfake1"
+    assert repository.calls[0]["recording_status"] == "completed"
+    assert repository.calls[0]["recording_duration_seconds"] == 37
+    assert repository.calls[0]["recording_channels"] == 1
+    assert repository.call_events == [
+        {
+            "id": "call-event-1",
+            "call_id": "call-1",
+            "twilio_call_sid": "CAinbound",
+            "event_type": "recording-status",
+            "call_status": "completed",
+            "payload": {
+                "CallSid": "CAinbound",
+                "RecordingSid": "REfake1",
+                "RecordingUrl": "https://api.twilio.com/2010-04-01/Accounts/ACfake/Recordings/REfake1",
+                "RecordingStatus": "completed",
+                "RecordingDuration": "37",
+                "RecordingChannels": "1",
             },
         }
     ]

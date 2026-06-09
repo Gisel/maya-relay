@@ -179,6 +179,18 @@ class RelayRepository(Protocol):
     ) -> dict[str, Any] | None:
         ...
 
+    def update_call_recording_by_sid(
+        self,
+        *,
+        twilio_call_sid: str,
+        recording_sid: str | None,
+        recording_url: str | None,
+        recording_status: str | None,
+        recording_duration_seconds: int | None,
+        recording_channels: int | None,
+    ) -> dict[str, Any] | None:
+        ...
+
     def create_call_event(
         self,
         *,
@@ -531,6 +543,7 @@ class SupabaseRelayRepository:
             .select(
                 "id, conversation_id, direction, call_type, customer_phone, employee_phone, twilio_call_sid, "
                 "status, outcome, notes, follow_up_status, recap, transcription, "
+                "recording_sid, recording_url, recording_status, recording_duration_seconds, recording_channels, "
                 "started_at, answered_at, completed_at, created_at, updated_at"
             )
             .eq("conversation_id", conversation_id)
@@ -551,6 +564,7 @@ class SupabaseRelayRepository:
         query = self.client.table("calls").select(
             "id, conversation_id, direction, call_type, customer_phone, employee_phone, twilio_call_sid, "
             "status, outcome, notes, follow_up_status, recap, transcription, "
+            "recording_sid, recording_url, recording_status, recording_duration_seconds, recording_channels, "
             "started_at, answered_at, completed_at, created_at, updated_at"
         )
         if direction in {"inbound", "outbound"}:
@@ -719,6 +733,37 @@ class SupabaseRelayRepository:
         result = (
             self.client.table("calls")
             .update({"status": status, **timestamp_updates})
+            .eq("twilio_call_sid", twilio_call_sid)
+            .execute()
+        )
+        if not result.data:
+            return None
+        return result.data[0]
+
+    def update_call_recording_by_sid(
+        self,
+        *,
+        twilio_call_sid: str,
+        recording_sid: str | None,
+        recording_url: str | None,
+        recording_status: str | None,
+        recording_duration_seconds: int | None,
+        recording_channels: int | None,
+    ) -> dict[str, Any] | None:
+        if not twilio_call_sid:
+            return None
+
+        result = (
+            self.client.table("calls")
+            .update(
+                {
+                    "recording_sid": recording_sid,
+                    "recording_url": recording_url,
+                    "recording_status": recording_status,
+                    "recording_duration_seconds": recording_duration_seconds,
+                    "recording_channels": recording_channels,
+                }
+            )
             .eq("twilio_call_sid", twilio_call_sid)
             .execute()
         )

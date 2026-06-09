@@ -162,6 +162,51 @@ async def studio_incoming_voice_complete(
     return Response(status_code=204)
 
 
+@router.post("/recording")
+async def voice_recording_status(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    repository: RelayRepository = Depends(get_repository),
+) -> Response:
+    form_payload = await request.form()
+    payload: dict[str, Any] = {key: str(value) for key, value in form_payload.multi_items()}
+    if not await _validate_recording_request(request, settings, payload):
+        return PlainTextResponse("Forbidden", status_code=403)
+
+    call_sid = _payload_value(payload, "CallSid", "call_sid", "callSid")
+    recording_status = _payload_value(payload, "RecordingStatus", "recording_status", "recordingStatus")
+    recording_sid = _payload_value(payload, "RecordingSid", "recording_sid", "recordingSid")
+    recording_url = _payload_value(payload, "RecordingUrl", "recording_url", "recordingUrl")
+    recording_duration_seconds = _int_payload_value(
+        payload,
+        "RecordingDuration",
+        "recording_duration",
+        "recordingDuration",
+    )
+    recording_channels = _int_payload_value(payload, "RecordingChannels", "recording_channels", "recordingChannels")
+
+    try:
+        call = repository.update_call_recording_by_sid(
+            twilio_call_sid=call_sid,
+            recording_sid=recording_sid or None,
+            recording_url=recording_url or None,
+            recording_status=recording_status or None,
+            recording_duration_seconds=recording_duration_seconds,
+            recording_channels=recording_channels,
+        )
+        repository.create_call_event(
+            call_id=call.get("id") if call else None,
+            twilio_call_sid=call_sid or None,
+            event_type="recording-status",
+            call_status=recording_status or None,
+            payload=payload,
+        )
+    except Exception:
+        logger.exception("Failed to persist Twilio recording status for CallSid %s", call_sid)
+
+    return Response(status_code=204)
+
+
 def _inbound_dial_status(dial_call_status: str) -> str:
     normalized = (dial_call_status or "").strip().lower()
     if normalized in {"completed", "busy", "failed", "no-answer", "canceled", "cancelled"}:
@@ -180,12 +225,34 @@ async def _validate_studio_or_twilio_request(request: Request, settings: Setting
     return not settings.verify_twilio_signature
 
 
+async def _validate_recording_request(request: Request, settings: Settings, payload: dict[str, Any]) -> bool:
+    if request.headers.get("X-Twilio-Signature"):
+        return await _validate_twilio_request(request, settings)
+
+    studio_secret = settings.twilio_studio_webhook_secret.strip()
+    if studio_secret:
+        provided_secret = _payload_value(payload, "access_key", "accessKey", "secret") or request.query_params.get("access_key", "")
+        return provided_secret == studio_secret
+
+    return not settings.verify_twilio_signature
+
+
 def _payload_value(payload: dict[str, Any], *names: str) -> str:
     for name in names:
         value = payload.get(name)
         if value:
             return str(value).strip()
     return ""
+
+
+def _int_payload_value(payload: dict[str, Any], *names: str) -> int | None:
+    value = _payload_value(payload, *names)
+    if not value:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
 
 
 def _voice_phone_number(phone_number: str) -> str:

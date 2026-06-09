@@ -95,6 +95,10 @@ Visual direction to preserve:
   - `POST /webhooks/twilio/voice/studio/incoming` logs inbound Studio calls without changing Maya Router routing.
   - `POST /webhooks/twilio/voice/studio/complete` can mark Studio-routed inbound calls complete/busy/no-answer later.
   - Optional `TWILIO_STUDIO_WEBHOOK_SECRET` protects Studio HTTP Request widgets.
+- Recording capture foundation:
+  - `POST /webhooks/twilio/voice/recording` stores Twilio recording metadata on the matching call by `CallSid`.
+  - Call Details shows recording status and an Open Recording link when Twilio provides `RecordingUrl`.
+  - Transcription remains manual until a transcription provider workflow is connected.
 - Basic close/reopen conversation functionality.
 - Close Conversation UX:
   - confirmation before closing
@@ -116,11 +120,12 @@ Visual direction to preserve:
 
 ## Next
 
-- Validate Incoming Call Logging:
-  - wait for Railway deploy after `fb6e5ba Log inbound Studio voice calls`
-  - call the Maya number
-  - confirm Twilio Studio `log_incoming_call` widget returns Success
-  - confirm Maya Relay Calls tab -> Incoming shows the caller
+- Validate Recording Capture:
+  - wait for Railway deploy after the recording webhook commit
+  - add the Recording Status Callback URL to the Studio Record Voicemail widget
+  - leave Studio "Transcribe Audio To Text" off for now
+  - call the Maya number and leave a voicemail
+  - confirm Call Details shows recording status and an Open Recording link
   - if not visible, inspect Railway logs and Studio execution logs
 - Add Studio completion logging:
   - add a second Studio HTTP Request near the end of the router flow
@@ -243,6 +248,34 @@ Widget transitions:
 
 Do not check "Authenticate with Twilio" for this widget. The request goes to Maya Relay, not Twilio's API.
 
+### Recording Capture
+
+Current state:
+
+- Maya Relay accepts recording callbacks at:
+  - `https://maya-relay-production.up.railway.app/webhooks/twilio/voice/recording`
+- The callback stores:
+  - `RecordingSid`
+  - `RecordingUrl`
+  - `RecordingStatus`
+  - `RecordingDuration`
+  - `RecordingChannels`
+- The callback matches recordings to calls by `CallSid`.
+- Call Details displays recording status and an Open Recording link when recording metadata exists.
+
+Twilio Studio setup for voicemail:
+
+- In the Record Voicemail widget, set Recording Status Callback to:
+  - `https://maya-relay-production.up.railway.app/webhooks/twilio/voice/recording`
+- Leave "Transcribe Audio To Text" off for now.
+- Add a Transcription Callback URL later only if using Twilio's built-in transcription.
+
+Important:
+
+- The Record Voicemail widget captures voicemail-style caller audio.
+- Full two-party call recording is a separate setting on the widgets that connect/dial the call.
+- Twilio recording URLs may require Twilio authentication for playback; if direct browser playback is blocked, add a Maya Relay proxy endpoint before transcription automation.
+
 ### Notes, Transcription, And Recap
 
 Current state:
@@ -250,6 +283,7 @@ Current state:
 - `notes` exists in the `calls` table and is editable in the Calls workspace.
 - `transcription` exists in the `calls` table and is editable manually.
 - `recap` exists in the `calls` table and is editable manually.
+- recording metadata exists in the `calls` table and is displayed when Twilio sends it.
 
 Recommended meaning:
 
@@ -259,8 +293,8 @@ Recommended meaning:
 
 Automation path, not started yet:
 
-1. Add call recording after consent language and pricing are approved.
-2. Receive Twilio recording callbacks.
+1. Confirm Twilio recording capture works in production.
+2. Add secure download/proxy for Twilio recordings if direct access is blocked.
 3. Send recording to AssemblyAI or another transcription provider.
 4. Save transcript into `calls.transcription`.
 5. Generate and save recap into `calls.recap`.

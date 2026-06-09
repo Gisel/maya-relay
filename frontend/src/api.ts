@@ -61,6 +61,11 @@ export type CallRecord = {
   followUpStatus: "none" | "needed" | "scheduled" | "done";
   recap: string | null;
   transcription: string | null;
+  recordingSid: string | null;
+  recordingUrl: string | null;
+  recordingStatus: string | null;
+  recordingDurationSeconds: number | null;
+  recordingChannels: number | null;
   startedAt: string | null;
   answeredAt: string | null;
   completedAt: string | null;

@@ -84,6 +84,19 @@ export function CallDetailsForm({
         </label>
       </div>
 
+      <div className="call-recording-status">
+        <span>Recording</span>
+        {call?.recordingUrl ? (
+          <div>
+            <strong>{recordingLabel(call.recordingStatus)}</strong>
+            {call.recordingDurationSeconds != null && <em>{formatDuration(call.recordingDurationSeconds)}</em>}
+            <a href={call.recordingUrl} rel="noreferrer" target="_blank">Open recording</a>
+          </div>
+        ) : (
+          <p>No recording captured yet.</p>
+        )}
+      </div>
+
       <label>
         <span>Notes</span>
         <textarea disabled={!call || isSaving} onChange={(event) => setNotes(event.target.value)} rows={4} value={notes} />
@@ -117,4 +130,21 @@ export function CallDetailsForm({
       </div>
     </form>
   );
+}
+
+function recordingLabel(status: string | null) {
+  if (!status) return "Captured";
+  return status
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function formatDuration(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds < 0) return "";
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return remainder ? `${minutes}m ${remainder}s` : `${minutes}m`;
 }

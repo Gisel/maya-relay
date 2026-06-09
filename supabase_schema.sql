@@ -67,6 +67,11 @@ create table if not exists public.calls (
   follow_up_status text not null default 'none' check (follow_up_status in ('none', 'needed', 'scheduled', 'done')),
   recap text,
   transcription text,
+  recording_sid text,
+  recording_url text,
+  recording_status text,
+  recording_duration_seconds integer,
+  recording_channels integer,
   started_at timestamptz not null default now(),
   answered_at timestamptz,
   completed_at timestamptz,
@@ -111,6 +116,10 @@ create unique index if not exists calls_twilio_call_sid_idx
   on public.calls (twilio_call_sid)
   where twilio_call_sid is not null;
 
+create index if not exists calls_recording_sid_idx
+  on public.calls (recording_sid)
+  where recording_sid is not null;
+
 create index if not exists calls_conversation_started_idx
   on public.calls (conversation_id, started_at desc);
 
@@ -142,7 +151,12 @@ alter table public.conversations
 alter table public.calls
   add column if not exists follow_up_status text not null default 'none',
   add column if not exists recap text,
-  add column if not exists transcription text;
+  add column if not exists transcription text,
+  add column if not exists recording_sid text,
+  add column if not exists recording_url text,
+  add column if not exists recording_status text,
+  add column if not exists recording_duration_seconds integer,
+  add column if not exists recording_channels integer;
 
 do $$
 begin

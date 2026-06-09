@@ -1678,6 +1678,49 @@ button {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.call-recording-status {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #475366;
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+}
+
+.call-recording-status > span {
+  color: #475366;
+  font-size: 13px;
+  font-weight: 560;
+}
+
+.call-recording-status div {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.call-recording-status strong {
+  color: #172033;
+  font-size: 14px;
+}
+
+.call-recording-status em,
+.call-recording-status p {
+  color: #667085;
+  font-size: 13px;
+  font-style: normal;
+  margin: 0;
+}
+
+.call-recording-status a {
+  color: #2f6fa8;
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
 .drawer-form select {
   appearance: none;
   background:

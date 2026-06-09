@@ -382,6 +382,11 @@ class FakeRepository:
             "follow_up_status": "none",
             "recap": None,
             "transcription": None,
+            "recording_sid": None,
+            "recording_url": None,
+            "recording_status": None,
+            "recording_duration_seconds": None,
+            "recording_channels": None,
             "answered_at": None,
             "completed_at": None,
             "created_at": datetime.now(UTC).isoformat(),
@@ -403,6 +408,27 @@ class FakeRepository:
                 call["answered_at"] = datetime.now(UTC).isoformat()
             if status == "completed":
                 call["completed_at"] = datetime.now(UTC).isoformat()
+            return call
+        return None
+
+    def update_call_recording_by_sid(
+        self,
+        *,
+        twilio_call_sid: str,
+        recording_sid: str | None,
+        recording_url: str | None,
+        recording_status: str | None,
+        recording_duration_seconds: int | None,
+        recording_channels: int | None,
+    ) -> dict[str, Any] | None:
+        for call in self.calls:
+            if call["twilio_call_sid"] != twilio_call_sid:
+                continue
+            call["recording_sid"] = recording_sid
+            call["recording_url"] = recording_url
+            call["recording_status"] = recording_status
+            call["recording_duration_seconds"] = recording_duration_seconds
+            call["recording_channels"] = recording_channels
             return call
         return None
 
