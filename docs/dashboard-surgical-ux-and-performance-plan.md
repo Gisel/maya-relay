@@ -288,6 +288,14 @@ Current state:
 - `recap` exists in the `calls` table, is editable manually, and can be generated from a saved transcript through `POST /api/calls/{call_id}/recap`.
 - recording metadata exists in the `calls` table and is displayed when Twilio sends it.
 
+Production validation, June 8, 2026:
+
+- Incoming voicemail call logging works through the Twilio Studio incoming-call HTTP hook.
+- Twilio voicemail recording metadata reaches Maya Relay through the Recording Status Callback.
+- Call Details shows recording status, duration, Open Recording, and an authenticated audio player.
+- AssemblyAI transcription successfully fills `calls.transcription` from the captured recording.
+- OpenAI recap generation successfully fills `calls.recap` from the saved transcription.
+
 Recommended meaning:
 
 - Notes: human operator notes.
