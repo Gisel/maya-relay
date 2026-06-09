@@ -15,13 +15,14 @@ def make_client(
     twilio_auth_token: str = "",
     admin_password: str = "",
     assemblyai_api_key: str = "",
+    openai_api_key: str = "",
 ) -> tuple[TestClient, FakeRepository, FakeSender]:
     settings = Settings(
         FRANCISCO_PHONE="+15551234567",
         MAYA_BUSINESS_NUMBER="+13852208404",
         VERIFY_TWILIO_SIGNATURE=verify_twilio_signature,
         ENABLE_AI_TRIAGE=False,
-        OPENAI_API_KEY="",
+        OPENAI_API_KEY=openai_api_key,
         OPENAI_MODEL="gpt-5-mini",
         ASSEMBLYAI_API_KEY=assemblyai_api_key,
         ADMIN_PASSWORD=admin_password,
@@ -760,6 +761,69 @@ def test_api_transcribes_call_recording_and_saves_text(monkeypatch):
     assert response.status_code == 200
     assert response.json()["call"]["transcription"] == "Please call me back about the order."
     assert repository.calls[0]["transcription"] == "Please call me back about the order."
+
+
+def test_api_generates_call_recap_from_transcription(monkeypatch):
+    client, repository, _ = make_client(admin_password="secret", openai_api_key="openai-key")
+    repository.create_call(
+        conversation_id="conversation-1",
+        direction="inbound",
+        call_type="inbound",
+        customer_phone="+15550000001",
+        employee_phone="+15551234567",
+        twilio_call_sid="CAfake1",
+        status="completed",
+    )
+    repository.calls[0]["transcription"] = "I need flyers ready for pickup this Friday."
+
+    def fake_post(url, headers=None, json=None, timeout=None):
+        assert url == "https://api.openai.com/v1/responses"
+        assert headers == {
+            "Authorization": "Bearer openai-key",
+            "Content-Type": "application/json",
+        }
+        assert json["model"] == "gpt-5-mini"
+        assert "I need flyers ready for pickup this Friday." in json["input"]
+        assert timeout == 20
+
+        class FakeResponse:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {"output_text": "- Customer needs flyers ready for Friday pickup.\n- Confirm quantity and file details."}
+
+        return FakeResponse()
+
+    monkeypatch.setattr("app.routes.api.requests.post", fake_post)
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    response = client.post("/api/calls/call-1/recap", headers={"cookie": cookie})
+
+    assert response.status_code == 200
+    assert response.json()["call"]["recap"] == "- Customer needs flyers ready for Friday pickup.\n- Confirm quantity and file details."
+    assert repository.calls[0]["recap"] == "- Customer needs flyers ready for Friday pickup.\n- Confirm quantity and file details."
+
+
+def test_api_requires_transcription_before_call_recap():
+    client, repository, _ = make_client(admin_password="secret", openai_api_key="openai-key")
+    repository.create_call(
+        conversation_id="conversation-1",
+        direction="inbound",
+        call_type="inbound",
+        customer_phone="+15550000001",
+        employee_phone="+15551234567",
+        twilio_call_sid="CAfake1",
+        status="completed",
+    )
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    response = client.post("/api/calls/call-1/recap", headers={"cookie": cookie})
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Transcription is required before generating a recap."
 
 
 def test_api_starts_click_to_call_bridge():

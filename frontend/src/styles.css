@@ -1736,6 +1736,14 @@ button {
   justify-content: space-between;
 }
 
+.call-textarea-field {
+  color: #475366;
+  display: grid;
+  font-size: 13px;
+  font-weight: 560;
+  gap: 7px;
+}
+
 .text-action-button {
   background: transparent;
   border: 0;

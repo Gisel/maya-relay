@@ -285,7 +285,7 @@ Current state:
 - `notes` exists in the `calls` table and is editable in the Calls workspace.
 - `transcription` exists in the `calls` table and is editable manually.
 - If `ASSEMBLYAI_API_KEY` is configured, Call Details can transcribe a captured recording through `POST /api/calls/{call_id}/transcribe`.
-- `recap` exists in the `calls` table and is editable manually.
+- `recap` exists in the `calls` table, is editable manually, and can be generated from a saved transcript through `POST /api/calls/{call_id}/recap`.
 - recording metadata exists in the `calls` table and is displayed when Twilio sends it.
 
 Recommended meaning:
@@ -299,4 +299,4 @@ Automation path:
 1. Confirm Twilio recording capture works in production.
 2. Use Maya Relay proxy playback when Francisco needs to listen to the original recording.
 3. Use AssemblyAI transcription from Call Details to save transcript into `calls.transcription`.
-4. Generate and save recap into `calls.recap` after transcript quality is confirmed.
+4. Use OpenAI recap generation from Call Details to save a short internal summary into `calls.recap`.

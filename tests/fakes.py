@@ -356,6 +356,19 @@ class FakeRepository:
             return call
         return None
 
+    def update_call_recap(
+        self,
+        *,
+        call_id: str,
+        recap: str | None,
+    ) -> dict[str, Any] | None:
+        for call in self.calls:
+            if call["id"] != call_id:
+                continue
+            call["recap"] = recap
+            return call
+        return None
+
     def get_recent_active_call(
         self,
         *,

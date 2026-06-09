@@ -161,6 +161,14 @@ class RelayRepository(Protocol):
     ) -> dict[str, Any] | None:
         ...
 
+    def update_call_recap(
+        self,
+        *,
+        call_id: str,
+        recap: str | None,
+    ) -> dict[str, Any] | None:
+        ...
+
     def get_recent_active_call(
         self,
         *,
@@ -702,6 +710,22 @@ class SupabaseRelayRepository:
         result = (
             self.client.table("calls")
             .update({"transcription": transcription})
+            .eq("id", call_id)
+            .execute()
+        )
+        if not result.data:
+            return None
+        return result.data[0]
+
+    def update_call_recap(
+        self,
+        *,
+        call_id: str,
+        recap: str | None,
+    ) -> dict[str, Any] | None:
+        result = (
+            self.client.table("calls")
+            .update({"recap": recap})
             .eq("id", call_id)
             .execute()
         )

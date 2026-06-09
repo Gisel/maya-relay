@@ -309,3 +309,9 @@ export function transcribeCall(callId: string) {
     method: "POST",
   });
 }
+
+export function generateCallRecap(callId: string) {
+  return request<UpdateCallDetailsResponse>(`/api/calls/${callId}/recap`, {
+    method: "POST",
+  });
+}

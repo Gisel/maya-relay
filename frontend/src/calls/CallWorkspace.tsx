@@ -36,6 +36,7 @@ function callStatusTone(status?: string | null) {
 export function CallWorkspace({
   calls,
   isLoadingDetail,
+  onGenerateCallRecap,
   onSaveCallDetails,
   onSelectCall,
   onTranscribeCall,
@@ -44,6 +45,7 @@ export function CallWorkspace({
 }: {
   calls: CallRecord[];
   isLoadingDetail: boolean;
+  onGenerateCallRecap: (callId: string) => Promise<void>;
   onSaveCallDetails: (callId: string, payload: CallDetailsPayload) => Promise<void>;
   onSelectCall: (callId: string) => void;
   onTranscribeCall: (callId: string) => Promise<void>;
@@ -163,6 +165,7 @@ export function CallWorkspace({
           <CallDetailsForm
             call={editableCall}
             compactActions
+            onGenerateRecap={onGenerateCallRecap}
             onSave={onSaveCallDetails}
             onTranscribe={onTranscribeCall}
           />

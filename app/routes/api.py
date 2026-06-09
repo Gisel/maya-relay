@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
+from app.ai_triage import _extract_response_text
 from app.attachments import AttachmentStore
 from app.auth import SESSION_COOKIE, admin_enabled, require_admin, session_value
 from app.config import Settings, get_settings, normalize_phone_number
@@ -485,6 +486,31 @@ def api_transcribe_call(
     return {"call": _serialize_call(updated_call)}
 
 
+@router.post("/calls/{call_id}/recap")
+def api_generate_call_recap(
+    call_id: str,
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    repository: RelayRepository = Depends(get_repository),
+) -> dict[str, Any]:
+    require_admin(request, settings)
+    if not settings.openai_api_key:
+        raise HTTPException(status_code=503, detail="OPENAI_API_KEY is required to generate call recaps.")
+
+    call = repository.get_call(call_id)
+    if call is None:
+        raise HTTPException(status_code=404)
+    transcription = str(call.get("transcription") or "").strip()
+    if not transcription:
+        raise HTTPException(status_code=400, detail="Transcription is required before generating a recap.")
+
+    recap = _generate_call_recap_with_openai(settings, call=call, transcription=transcription)
+    updated_call = repository.update_call_recap(call_id=call_id, recap=recap)
+    if updated_call is None:
+        raise HTTPException(status_code=404)
+    return {"call": _serialize_call(updated_call)}
+
+
 def _start_click_to_call(
     *,
     request: Request,
@@ -604,6 +630,49 @@ def _transcribe_audio_with_assemblyai(settings: Settings, audio_content: bytes) 
         raise HTTPException(status_code=502, detail="Could not transcribe the call recording.") from exc
 
     raise HTTPException(status_code=504, detail="Transcription is still processing. Try again in a moment.")
+
+
+def _generate_call_recap_with_openai(settings: Settings, *, call: dict[str, Any], transcription: str) -> str:
+    prompt = (
+        f"Call direction: {call.get('direction') or 'unknown'}\n"
+        f"Customer phone: {call.get('customer_phone') or 'unknown'}\n"
+        f"Outcome: {call.get('outcome') or 'not set'}\n"
+        f"Follow-up status: {call.get('follow_up_status') or 'none'}\n"
+        "\nTranscript:\n"
+        f"{transcription[:12000]}"
+    )
+    try:
+        response = requests.post(
+            "https://api.openai.com/v1/responses",
+            headers={
+                "Authorization": f"Bearer {settings.openai_api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": settings.openai_model,
+                "instructions": (
+                    "You summarize customer phone calls for Maya Graphics and Signs. "
+                    "Write an internal recap for Francisco. Use 3 to 5 concise bullets. "
+                    "Include the customer's request, any promised next step, missing details, "
+                    "and urgency if it is clear. Do not invent prices, commitments, or timelines. "
+                    "If the transcript is unclear or mostly silence, say that directly."
+                ),
+                "input": prompt,
+                "max_output_tokens": 500,
+                "reasoning": {"effort": "low"},
+                "text": {"verbosity": "low"},
+            },
+            timeout=20,
+        )
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        logger.exception("Could not generate call recap with OpenAI.")
+        raise HTTPException(status_code=502, detail="Could not generate the call recap.") from exc
+
+    recap = _extract_response_text(response.json())
+    if not recap:
+        raise HTTPException(status_code=502, detail="OpenAI did not return a call recap.")
+    return recap.strip()
 
 
 def _serialize_conversation_list_item(conversation: dict[str, Any]) -> dict[str, Any]:

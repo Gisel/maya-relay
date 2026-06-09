@@ -34,6 +34,7 @@ import {
   Metrics,
   QuickResponse,
   callConversationCustomer,
+  generateCallRecap,
   getCalls,
   getConversationDetail,
   getConversations,
@@ -452,12 +453,14 @@ function CallDetailsDrawer({
   call,
   open,
   onClose,
+  onGenerateRecap,
   onSave,
   onTranscribe,
 }: {
   call: CallRecord | null;
   open: boolean;
   onClose: () => void;
+  onGenerateRecap: (callId: string) => Promise<void>;
   onSave: (
     callId: string,
     payload: {
@@ -481,6 +484,7 @@ function CallDetailsDrawer({
       <CallDetailsForm
         call={call}
         onCancel={onClose}
+        onGenerateRecap={onGenerateRecap}
         onSave={async (callId, payload) => {
           await onSave(callId, payload);
           onClose();
@@ -1446,6 +1450,30 @@ export function App() {
     }
   }
 
+  async function handleGenerateCallRecap(callId: string) {
+    setAppError("");
+    try {
+      const response = await generateCallRecap(callId);
+      setCalls((current) => current.map((call) => (call.id === callId ? response.call : call)));
+      setCallRows((current) =>
+        current.map((row) => (
+          row.latestCall.id === callId
+            ? {
+              ...row,
+              latestCall: response.call,
+              workflowStatus: !response.call.outcome || ["needed", "scheduled"].includes(response.call.followUpStatus)
+                ? "pending_follow_up"
+                : "done",
+            }
+            : row
+        )),
+      );
+    } catch (error) {
+      setAppError(error instanceof Error ? error.message : "Could not generate the call recap.");
+      throw error;
+    }
+  }
+
   if (isCheckingSession) {
     return (
       <main className="loading-screen">
@@ -1724,6 +1752,7 @@ export function App() {
           <CallWorkspace
             calls={calls}
             isLoadingDetail={isLoadingDetail}
+            onGenerateCallRecap={handleGenerateCallRecap}
             onSaveCallDetails={handleSaveCallDetails}
             onSelectCall={setSelectedCallId}
             onTranscribeCall={handleTranscribeCall}
@@ -1802,6 +1831,7 @@ export function App() {
       <CallDetailsDrawer
         call={selectedCall}
         onClose={() => setSelectedCallId("")}
+        onGenerateRecap={handleGenerateCallRecap}
         onSave={handleSaveCallDetails}
         onTranscribe={handleTranscribeCall}
         open={workspaceMode === "text" && Boolean(selectedCall)}

@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useId, useState } from "react";
 import { CallOutcome, CallRecord, FollowUpStatus, getCallRecordingUrl } from "../api";
 import { CALL_OUTCOMES, FOLLOW_UP_STATUSES } from "./callUtils";
 
@@ -14,21 +14,26 @@ export function CallDetailsForm({
   call,
   compactActions = false,
   onCancel,
+  onGenerateRecap,
   onSave,
   onTranscribe,
 }: {
   call: CallRecord | null;
   compactActions?: boolean;
   onCancel?: () => void;
+  onGenerateRecap?: (callId: string) => Promise<void>;
   onSave: (callId: string, payload: CallDetailsPayload) => Promise<void>;
   onTranscribe?: (callId: string) => Promise<void>;
 }) {
+  const recapId = useId();
+  const transcriptionId = useId();
   const [outcome, setOutcome] = useState<CallOutcome | null>(null);
   const [followUpStatus, setFollowUpStatus] = useState<FollowUpStatus>("none");
   const [notes, setNotes] = useState("");
   const [recap, setRecap] = useState("");
   const [transcription, setTranscription] = useState("");
   const [error, setError] = useState("");
+  const [isGeneratingRecap, setIsGeneratingRecap] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
 
@@ -66,6 +71,19 @@ export function CallDetailsForm({
       setError(error instanceof Error ? error.message : "Could not transcribe the call recording.");
     } finally {
       setIsTranscribing(false);
+    }
+  }
+
+  async function handleGenerateRecap() {
+    if (!call || !onGenerateRecap) return;
+    setIsGeneratingRecap(true);
+    setError("");
+    try {
+      await onGenerateRecap(call.id);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Could not generate the call recap.");
+    } finally {
+      setIsGeneratingRecap(false);
     }
   }
 
@@ -121,14 +139,32 @@ export function CallDetailsForm({
         <textarea disabled={!call || isSaving} onChange={(event) => setNotes(event.target.value)} rows={4} value={notes} />
       </label>
 
-      <label>
-        <span>Recap</span>
-        <textarea disabled={!call || isSaving} onChange={(event) => setRecap(event.target.value)} rows={4} value={recap} />
-      </label>
+      <div className="call-textarea-field">
+        <div className="call-transcription-heading">
+          <label htmlFor={recapId}>Recap</label>
+          {onGenerateRecap && (
+            <button
+              className="text-action-button"
+              disabled={!call?.transcription || isGeneratingRecap || isSaving || isTranscribing}
+              onClick={handleGenerateRecap}
+              type="button"
+            >
+              {isGeneratingRecap ? "Generating..." : "Generate recap"}
+            </button>
+          )}
+        </div>
+        <textarea
+          disabled={!call || isSaving}
+          id={recapId}
+          onChange={(event) => setRecap(event.target.value)}
+          rows={4}
+          value={recap}
+        />
+      </div>
 
-      <label>
-        <span className="call-transcription-heading">
-          Transcription
+      <div className="call-textarea-field">
+        <div className="call-transcription-heading">
+          <label htmlFor={transcriptionId}>Transcription</label>
           {onTranscribe && (
             <button
               className="text-action-button"
@@ -139,14 +175,15 @@ export function CallDetailsForm({
               {isTranscribing ? "Transcribing..." : "Transcribe recording"}
             </button>
           )}
-        </span>
+        </div>
         <textarea
           disabled={!call || isSaving || isTranscribing}
+          id={transcriptionId}
           onChange={(event) => setTranscription(event.target.value)}
           rows={6}
           value={transcription}
         />
-      </label>
+      </div>
 
       {error && <p className="form-error">{error}</p>}
       <div className="drawer-actions">
