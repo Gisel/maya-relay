@@ -1483,6 +1483,7 @@ button {
   font-size: 12px;
   font-weight: 500;
   gap: 0;
+  justify-content: center;
   line-height: 1.25;
   min-width: 0;
   text-transform: capitalize;
@@ -1584,6 +1585,11 @@ button {
 .call-timeline-copy {
   display: block;
   min-width: 0;
+}
+
+.call-timeline-item strong,
+.call-timeline-item em {
+  display: block;
 }
 
 .call-timeline-item strong,
