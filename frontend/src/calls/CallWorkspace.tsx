@@ -122,7 +122,7 @@ export function CallWorkspace({
                   <span className={`call-row-icon direction-${call.direction || "unknown"}`}>
                     <Phone size={15} />
                   </span>
-                  <span>
+                  <span className="call-timeline-copy">
                     <strong>{timelineTitle(call)}</strong>
                     <em>{call.status || "unknown"}{call.outcome ? ` - ${outcomeLabel(call.outcome)}` : ""}</em>
                   </span>
