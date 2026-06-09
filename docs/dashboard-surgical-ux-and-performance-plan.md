@@ -74,6 +74,27 @@ Visual direction to preserve:
 - Twilio Lookup fallback and contact caching.
 - Click-to-call bridge: Francisco receives call first, then Twilio bridges to customer.
 - Manual outbound call to a new number.
+- Calls workspace foundation:
+  - Text / Calls tab switcher in the left rail.
+  - Calls search.
+  - Outgoing / Incoming / All call filters.
+  - Calls list grouped by customer/conversation activity.
+  - Calls center workspace with selected customer header.
+  - Call timeline/history.
+  - Editable call details for outcome, follow-up status, notes, recap, and transcription.
+  - Call details save through `PATCH /api/calls/{call_id}`.
+  - Mobile Calls layout uses horizontal compact call pills like Text conversations.
+  - Mobile hides Latest Call Summary to preserve room for timeline/details.
+  - Right panel stays focused on Customer Profile, AI Suggested Reply, and Quick Responses.
+- Outgoing call logging:
+  - click-to-call creates a call record
+  - manual outbound call creates a call record
+  - Twilio voice status callback updates call status
+  - duplicate active call guard prevents rapid double-starts
+- Incoming call logging foundation for Twilio Studio:
+  - `POST /webhooks/twilio/voice/studio/incoming` logs inbound Studio calls without changing Maya Router routing.
+  - `POST /webhooks/twilio/voice/studio/complete` can mark Studio-routed inbound calls complete/busy/no-answer later.
+  - Optional `TWILIO_STUDIO_WEBHOOK_SECRET` protects Studio HTTP Request widgets.
 - Basic close/reopen conversation functionality.
 - Close Conversation UX:
   - confirmation before closing
@@ -95,11 +116,22 @@ Visual direction to preserve:
 
 ## Next
 
-- Add Call Logging:
-  - save call attempts/statuses
-  - show call history
-  - add call outcomes: connected, voicemail, no answer, follow-up needed
-  - later: call recap/transcription after recording, consent, and storage rules are designed
+- Validate Incoming Call Logging:
+  - wait for Railway deploy after `fb6e5ba Log inbound Studio voice calls`
+  - call the Maya number
+  - confirm Twilio Studio `log_incoming_call` widget returns Success
+  - confirm Maya Relay Calls tab -> Incoming shows the caller
+  - if not visible, inspect Railway logs and Studio execution logs
+- Add Studio completion logging:
+  - add a second Studio HTTP Request near the end of the router flow
+  - URL: `/webhooks/twilio/voice/studio/complete`
+  - pass the same `access_key`
+  - pass `CallSid`
+  - pass final status if the flow exposes it, otherwise send `completed`
+- Improve Call Details UX after functionality test:
+  - make saved notes/transcription/recap easier to review
+  - add clearer save success/error feedback if needed
+  - confirm details change correctly when selecting different timeline calls
 - Improve Manual Outbound Call:
   - create/update contact after calling a new number
   - add name
@@ -164,6 +196,71 @@ Visual direction to preserve:
   - call notes in timeline
   - follow-up reminders
   - call analytics later
+  - call recording after consent text and Twilio pricing are approved
+  - automatic transcription after recording is working
+  - AI recap generation from transcript/conversation context after transcription is stable
 - Business / Pricing:
   - refine monthly fee after real usage
   - include infrastructure, AI, support, improvements, and monitoring
+
+## Current Call Workflow Notes
+
+### Outgoing Calls
+
+Outgoing calls are logged by the backend when Maya Relay starts the call. Existing click-to-call routing is preserved:
+
+1. Maya Relay asks Twilio to call Francisco/the office first.
+2. Twilio requests `/webhooks/twilio/voice/bridge/{conversation_id}`.
+3. The bridge dials the customer.
+4. Maya Relay creates a `calls` row with `direction = outbound`.
+5. Twilio status callbacks hit `/webhooks/twilio/voice/status` and update the call record.
+
+### Incoming Calls
+
+Incoming calls are routed by the existing Twilio Studio Flow, Maya Router. Maya Relay should not replace that flow.
+
+Current integration pattern:
+
+1. Studio receives `Incoming Call`.
+2. Studio runs `log_incoming_call` as a Make HTTP Request widget near the beginning of the flow.
+3. The widget posts to:
+   - `https://maya-relay-production.up.railway.app/webhooks/twilio/voice/studio/incoming`
+4. Maya Relay logs the inbound call and returns JSON.
+5. Studio continues normal routing whether logging succeeds or fails.
+
+Required Studio HTTP parameters:
+
+- `access_key` = same value as Railway `TWILIO_STUDIO_WEBHOOK_SECRET`
+- `CallSid` = Studio call SID variable
+- `CallStatus` = `ringing`
+- `From` = caller phone variable
+- `To` = Maya/Twilio number variable
+
+Widget transitions:
+
+- Success -> continue normal router flow
+- Fail -> continue normal router flow
+
+Do not check "Authenticate with Twilio" for this widget. The request goes to Maya Relay, not Twilio's API.
+
+### Notes, Transcription, And Recap
+
+Current state:
+
+- `notes` exists in the `calls` table and is editable in the Calls workspace.
+- `transcription` exists in the `calls` table and is editable manually.
+- `recap` exists in the `calls` table and is editable manually.
+
+Recommended meaning:
+
+- Notes: human operator notes.
+- Transcription: raw transcript of what was said.
+- Recap: short summary of what matters from the call.
+
+Automation path, not started yet:
+
+1. Add call recording after consent language and pricing are approved.
+2. Receive Twilio recording callbacks.
+3. Send recording to AssemblyAI or another transcription provider.
+4. Save transcript into `calls.transcription`.
+5. Generate and save recap into `calls.recap`.
