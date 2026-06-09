@@ -459,10 +459,9 @@ test("calls tab shows grouped call activity and refreshes after starting a call"
   await expect(page.getByPlaceholder("Search calls...")).toBeVisible();
   await expect(page.getByRole("group", { name: "Call direction filter" }).getByRole("button", { name: "outgoing" })).toBeVisible();
   await expect(page.locator(".call-activity-row", { hasText: "Test Customer" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Latest call summary" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Latest call summary" })).toBeHidden();
   await expect(page.getByRole("heading", { name: "Call timeline" })).toBeVisible();
-  await expect(page.locator(".call-summary-status[aria-label='Status: completed']")).toBeVisible();
-  await expect(page.locator(".call-summary-card").getByText("45s")).toBeVisible();
+  await expect(page.locator(".call-timeline-item").first().getByText("45s")).toBeVisible();
 
   await page.getByRole("tab", { name: "Text" }).click();
   await page.getByRole("button", { name: "Call", exact: true }).click();
@@ -489,8 +488,8 @@ test("calls workspace saves outcome follow-up notes recap and transcription", as
   await workspace.getByRole("button", { name: "Save call" }).click();
 
   await expect.poll(() => requestCounts.callUpdates).toBe(1);
-  await expect(workspace.locator(".call-summary-card").getByText("Connected")).toBeVisible();
-  await expect(workspace.locator(".call-summary-card").getByText("Pending follow-up")).toBeVisible();
+  await expect(workspace.getByLabel("Outcome")).toHaveValue("connected");
+  await expect(workspace.getByLabel("Follow-up status")).toHaveValue("needed");
 });
 
 test("customer messages mark conversations as needing reply", async ({ page }) => {
