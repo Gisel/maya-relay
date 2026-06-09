@@ -1297,12 +1297,15 @@ button {
 }
 
 .workflow-pill {
+  align-items: center;
   background: #fff7db;
   border-radius: 999px;
   color: #9a6700;
   display: inline-flex;
   font-size: 12px;
   font-weight: 650;
+  justify-content: center;
+  line-height: 1;
   min-height: 24px;
   padding: 0 9px;
 }
@@ -2468,14 +2471,59 @@ button {
   }
 
   .call-activity-list {
-    align-items: stretch;
+    align-items: center;
   }
 
   .call-activity-row {
-    flex: 0 0 min(320px, calc(100vw - 28px));
+    align-items: center;
+    border: 1px solid #dfe4ec;
+    border-radius: 999px;
+    display: inline-flex;
+    flex: 0 0 auto;
+    gap: 8px;
+    justify-content: center;
     margin-bottom: 0;
-    min-height: 94px;
+    min-height: 38px;
+    padding: 0 14px;
     scroll-snap-align: start;
+    width: auto;
+  }
+
+  .call-activity-row.selected {
+    background: var(--brand-blue-soft);
+    border-color: var(--brand-blue);
+    box-shadow: inset 3px 0 0 var(--brand-blue);
+  }
+
+  .call-activity-row .call-row-icon {
+    background: transparent;
+    height: 18px;
+    width: 18px;
+  }
+
+  .call-activity-row .call-row-icon svg {
+    height: 15px;
+    width: 15px;
+  }
+
+  .call-activity-row .call-row-content {
+    display: block;
+    min-width: 0;
+  }
+
+  .call-activity-row .conversation-row-heading {
+    display: inline-flex;
+    gap: 0;
+  }
+
+  .call-activity-row .conversation-row-heading strong {
+    max-width: 170px;
+  }
+
+  .call-activity-row .conversation-row-heading em,
+  .call-row-phone,
+  .call-row-meta {
+    display: none;
   }
 
   .call-row-meta {
