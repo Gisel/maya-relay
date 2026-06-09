@@ -83,30 +83,25 @@ export function CallWorkspace({
                 <p>{callTypeLabel(latestCall)} - {callDirectionLabel(latestCall.direction)}</p>
               </div>
             </div>
-            <dl>
-              <div>
-                <dt>Status</dt>
-                <dd>{latestCall.status || "unknown"}</dd>
-              </div>
-              <div>
-                <dt>Outcome</dt>
-                <dd>{outcomeLabel(latestCall.outcome)}</dd>
-              </div>
-              <div>
-                <dt>Follow-up</dt>
-                <dd>{followUpLabel(latestCall.followUpStatus)}</dd>
-              </div>
-              <div>
-                <dt>Started</dt>
-                <dd>{callTime(latestCall)}</dd>
-              </div>
+            <p className="call-summary-meta">
+              <span>
+                <strong>Status:</strong> {latestCall.status || "unknown"}
+              </span>
+              <span>
+                <strong>Outcome:</strong> {outcomeLabel(latestCall.outcome)}
+              </span>
+              <span>
+                <strong>Follow-up:</strong> {followUpLabel(latestCall.followUpStatus)}
+              </span>
+              <span>
+                <strong>Started:</strong> {callTime(latestCall)}
+              </span>
               {duration && (
-                <div>
-                  <dt>Duration</dt>
-                  <dd>{duration}</dd>
-                </div>
+                <span>
+                  <strong>Duration:</strong> {duration}
+                </span>
               )}
-            </dl>
+            </p>
           </section>
 
           <section className="call-timeline-section">
