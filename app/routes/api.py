@@ -1,10 +1,12 @@
 import hmac
 import logging
+import time
 from typing import Any, Literal
 
+import requests
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
-from fastapi.responses import JSONResponse
 
 from app.attachments import AttachmentStore
 from app.auth import SESSION_COOKIE, admin_enabled, require_admin, session_value
@@ -433,6 +435,56 @@ def api_update_call_details(
     return {"call": _serialize_call(call)}
 
 
+@router.get("/calls/{call_id}/recording")
+def api_call_recording(
+    call_id: str,
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    repository: RelayRepository = Depends(get_repository),
+) -> Response:
+    require_admin(request, settings)
+    call = repository.get_call(call_id)
+    if call is None:
+        raise HTTPException(status_code=404)
+    recording_url = call.get("recording_url")
+    if not recording_url:
+        raise HTTPException(status_code=404, detail="No recording is available for this call.")
+    if not settings.twilio_account_sid or not settings.twilio_auth_token:
+        raise HTTPException(status_code=503, detail="Twilio credentials are required to play recordings.")
+
+    audio_response = _download_twilio_recording(settings, str(recording_url))
+    return Response(
+        content=audio_response.content,
+        media_type=audio_response.headers.get("content-type") or "audio/mpeg",
+    )
+
+
+@router.post("/calls/{call_id}/transcribe")
+def api_transcribe_call(
+    call_id: str,
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    repository: RelayRepository = Depends(get_repository),
+) -> dict[str, Any]:
+    require_admin(request, settings)
+    if not settings.assemblyai_api_key:
+        raise HTTPException(status_code=503, detail="ASSEMBLYAI_API_KEY is required for transcription.")
+
+    call = repository.get_call(call_id)
+    if call is None:
+        raise HTTPException(status_code=404)
+    recording_url = call.get("recording_url")
+    if not recording_url:
+        raise HTTPException(status_code=400, detail="No recording is available to transcribe.")
+
+    audio_response = _download_twilio_recording(settings, str(recording_url))
+    transcription = _transcribe_audio_with_assemblyai(settings, audio_response.content)
+    updated_call = repository.update_call_transcription(call_id=call_id, transcription=transcription)
+    if updated_call is None:
+        raise HTTPException(status_code=404)
+    return {"call": _serialize_call(updated_call)}
+
+
 def _start_click_to_call(
     *,
     request: Request,
@@ -480,6 +532,78 @@ def _start_click_to_call(
         "to": customer_phone,
         "employeePhone": employee_phone,
     }
+
+
+def _download_twilio_recording(settings: Settings, recording_url: str) -> requests.Response:
+    media_url = _twilio_recording_media_url(recording_url)
+    try:
+        response = requests.get(
+            media_url,
+            auth=(settings.twilio_account_sid, settings.twilio_auth_token),
+            timeout=30,
+        )
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        logger.exception("Could not download Twilio recording.")
+        raise HTTPException(status_code=502, detail="Could not download the Twilio recording.") from exc
+    return response
+
+
+def _twilio_recording_media_url(recording_url: str) -> str:
+    cleaned = recording_url.strip()
+    if cleaned.endswith(".mp3") or cleaned.endswith(".wav"):
+        return cleaned
+    if cleaned.endswith(".json"):
+        return f"{cleaned[:-5]}.mp3"
+    return f"{cleaned}.mp3"
+
+
+def _transcribe_audio_with_assemblyai(settings: Settings, audio_content: bytes) -> str:
+    headers = {"Authorization": settings.assemblyai_api_key}
+    try:
+        upload_response = requests.post(
+            "https://api.assemblyai.com/v2/upload",
+            headers=headers,
+            data=audio_content,
+            timeout=60,
+        )
+        upload_response.raise_for_status()
+        upload_url = upload_response.json().get("upload_url")
+        if not upload_url:
+            raise HTTPException(status_code=502, detail="AssemblyAI did not return an upload URL.")
+
+        transcript_response = requests.post(
+            "https://api.assemblyai.com/v2/transcript",
+            headers={**headers, "Content-Type": "application/json"},
+            json={"audio_url": upload_url},
+            timeout=30,
+        )
+        transcript_response.raise_for_status()
+        transcript_id = transcript_response.json().get("id")
+        if not transcript_id:
+            raise HTTPException(status_code=502, detail="AssemblyAI did not return a transcript ID.")
+
+        for _ in range(20):
+            status_response = requests.get(
+                f"https://api.assemblyai.com/v2/transcript/{transcript_id}",
+                headers=headers,
+                timeout=30,
+            )
+            status_response.raise_for_status()
+            payload = status_response.json()
+            status = payload.get("status")
+            if status == "completed":
+                return str(payload.get("text") or "").strip()
+            if status == "error":
+                raise HTTPException(status_code=502, detail=payload.get("error") or "AssemblyAI transcription failed.")
+            time.sleep(3)
+    except HTTPException:
+        raise
+    except requests.RequestException as exc:
+        logger.exception("Could not transcribe call recording with AssemblyAI.")
+        raise HTTPException(status_code=502, detail="Could not transcribe the call recording.") from exc
+
+    raise HTTPException(status_code=504, detail="Transcription is still processing. Try again in a moment.")
 
 
 def _serialize_conversation_list_item(conversation: dict[str, Any]) -> dict[str, Any]:

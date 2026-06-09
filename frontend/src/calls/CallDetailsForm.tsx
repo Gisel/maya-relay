@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { CallOutcome, CallRecord, FollowUpStatus } from "../api";
+import { CallOutcome, CallRecord, FollowUpStatus, getCallRecordingUrl } from "../api";
 import { CALL_OUTCOMES, FOLLOW_UP_STATUSES } from "./callUtils";
 
 export type CallDetailsPayload = {
@@ -15,11 +15,13 @@ export function CallDetailsForm({
   compactActions = false,
   onCancel,
   onSave,
+  onTranscribe,
 }: {
   call: CallRecord | null;
   compactActions?: boolean;
   onCancel?: () => void;
   onSave: (callId: string, payload: CallDetailsPayload) => Promise<void>;
+  onTranscribe?: (callId: string) => Promise<void>;
 }) {
   const [outcome, setOutcome] = useState<CallOutcome | null>(null);
   const [followUpStatus, setFollowUpStatus] = useState<FollowUpStatus>("none");
@@ -28,6 +30,7 @@ export function CallDetailsForm({
   const [transcription, setTranscription] = useState("");
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
 
   useEffect(() => {
     if (!call) return;
@@ -50,6 +53,19 @@ export function CallDetailsForm({
       setError(error instanceof Error ? error.message : "Could not save call details.");
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function handleTranscribe() {
+    if (!call || !onTranscribe) return;
+    setIsTranscribing(true);
+    setError("");
+    try {
+      await onTranscribe(call.id);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Could not transcribe the call recording.");
+    } finally {
+      setIsTranscribing(false);
     }
   }
 
@@ -90,7 +106,10 @@ export function CallDetailsForm({
           <div>
             <strong>{recordingLabel(call.recordingStatus)}</strong>
             {call.recordingDurationSeconds != null && <em>{formatDuration(call.recordingDurationSeconds)}</em>}
-            <a href={call.recordingUrl} rel="noreferrer" target="_blank">Open recording</a>
+            <a href={getCallRecordingUrl(call.id)} rel="noreferrer" target="_blank">Open recording</a>
+            <audio controls preload="none" src={getCallRecordingUrl(call.id)}>
+              <a href={getCallRecordingUrl(call.id)}>Open recording</a>
+            </audio>
           </div>
         ) : (
           <p>No recording captured yet.</p>
@@ -108,9 +127,21 @@ export function CallDetailsForm({
       </label>
 
       <label>
-        <span>Transcription</span>
+        <span className="call-transcription-heading">
+          Transcription
+          {onTranscribe && (
+            <button
+              className="text-action-button"
+              disabled={!call?.recordingUrl || isSaving || isTranscribing}
+              onClick={handleTranscribe}
+              type="button"
+            >
+              {isTranscribing ? "Transcribing..." : "Transcribe recording"}
+            </button>
+          )}
+        </span>
         <textarea
-          disabled={!call || isSaving}
+          disabled={!call || isSaving || isTranscribing}
           onChange={(event) => setTranscription(event.target.value)}
           rows={6}
           value={transcription}

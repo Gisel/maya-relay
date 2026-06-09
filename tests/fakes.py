@@ -252,6 +252,12 @@ class FakeRepository:
             if call["conversation_id"] == conversation_id
         ][:limit]
 
+    def get_call(self, call_id: str) -> dict[str, Any] | None:
+        for call in self.calls:
+            if call["id"] == call_id:
+                return call
+        return None
+
     def list_call_conversations(
         self,
         *,
@@ -333,6 +339,19 @@ class FakeRepository:
             call["follow_up_status"] = follow_up_status
             call["notes"] = notes
             call["recap"] = recap
+            call["transcription"] = transcription
+            return call
+        return None
+
+    def update_call_transcription(
+        self,
+        *,
+        call_id: str,
+        transcription: str | None,
+    ) -> dict[str, Any] | None:
+        for call in self.calls:
+            if call["id"] != call_id:
+                continue
             call["transcription"] = transcription
             return call
         return None
@@ -429,6 +448,9 @@ class FakeRepository:
             call["recording_status"] = recording_status
             call["recording_duration_seconds"] = recording_duration_seconds
             call["recording_channels"] = recording_channels
+            if recording_status == "completed" and not call.get("outcome"):
+                call["outcome"] = "voicemail"
+                call["follow_up_status"] = "needed"
             return call
         return None
 

@@ -38,6 +38,7 @@ export function CallWorkspace({
   isLoadingDetail,
   onSaveCallDetails,
   onSelectCall,
+  onTranscribeCall,
   selectedCall,
   selectedRow,
 }: {
@@ -45,6 +46,7 @@ export function CallWorkspace({
   isLoadingDetail: boolean;
   onSaveCallDetails: (callId: string, payload: CallDetailsPayload) => Promise<void>;
   onSelectCall: (callId: string) => void;
+  onTranscribeCall: (callId: string) => Promise<void>;
   selectedCall: CallRecord | null;
   selectedRow: CallConversationListItem | null;
 }) {
@@ -158,7 +160,12 @@ export function CallWorkspace({
             <h2>Call details</h2>
             <p>{editableCall ? `${callTypeLabel(editableCall)} - ${cleanPhone(editableCall.customerPhone)}` : "Choose a call"}</p>
           </div>
-          <CallDetailsForm call={editableCall} compactActions onSave={onSaveCallDetails} />
+          <CallDetailsForm
+            call={editableCall}
+            compactActions
+            onSave={onSaveCallDetails}
+            onTranscribe={onTranscribeCall}
+          />
         </section>
       </div>
     </section>

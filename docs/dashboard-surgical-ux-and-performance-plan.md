@@ -97,8 +97,9 @@ Visual direction to preserve:
   - Optional `TWILIO_STUDIO_WEBHOOK_SECRET` protects Studio HTTP Request widgets.
 - Recording capture foundation:
   - `POST /webhooks/twilio/voice/recording` stores Twilio recording metadata on the matching call by `CallSid`.
-  - Call Details shows recording status and an Open Recording link when Twilio provides `RecordingUrl`.
-  - Transcription remains manual until a transcription provider workflow is connected.
+  - Completed recordings auto-mark untouched calls as `Voicemail` with `Pending follow-up`.
+  - Call Details shows recording status, a Maya Relay audio player, and an Open Recording link when Twilio provides `RecordingUrl`.
+  - Call Details can send a captured recording to AssemblyAI and save the result into `transcription`.
 - Basic close/reopen conversation functionality.
 - Close Conversation UX:
   - confirmation before closing
@@ -261,7 +262,8 @@ Current state:
   - `RecordingDuration`
   - `RecordingChannels`
 - The callback matches recordings to calls by `CallSid`.
-- Call Details displays recording status and an Open Recording link when recording metadata exists.
+- Call Details displays recording status, a Maya Relay audio player, and an Open Recording link when recording metadata exists.
+- Completed recordings auto-mark calls as Voicemail/Pending follow-up only when no manual outcome was already saved.
 
 Twilio Studio setup for voicemail:
 
@@ -274,7 +276,7 @@ Important:
 
 - The Record Voicemail widget captures voicemail-style caller audio.
 - Full two-party call recording is a separate setting on the widgets that connect/dial the call.
-- Twilio recording URLs may require Twilio authentication for playback; if direct browser playback is blocked, add a Maya Relay proxy endpoint before transcription automation.
+- Twilio recording URLs require Twilio authentication for reliable playback, so Maya Relay proxies recording audio through `GET /api/calls/{call_id}/recording`.
 
 ### Notes, Transcription, And Recap
 
@@ -282,6 +284,7 @@ Current state:
 
 - `notes` exists in the `calls` table and is editable in the Calls workspace.
 - `transcription` exists in the `calls` table and is editable manually.
+- If `ASSEMBLYAI_API_KEY` is configured, Call Details can transcribe a captured recording through `POST /api/calls/{call_id}/transcribe`.
 - `recap` exists in the `calls` table and is editable manually.
 - recording metadata exists in the `calls` table and is displayed when Twilio sends it.
 
@@ -291,10 +294,9 @@ Recommended meaning:
 - Transcription: raw transcript of what was said.
 - Recap: short summary of what matters from the call.
 
-Automation path, not started yet:
+Automation path:
 
 1. Confirm Twilio recording capture works in production.
-2. Add secure download/proxy for Twilio recordings if direct access is blocked.
-3. Send recording to AssemblyAI or another transcription provider.
-4. Save transcript into `calls.transcription`.
-5. Generate and save recap into `calls.recap`.
+2. Use Maya Relay proxy playback when Francisco needs to listen to the original recording.
+3. Use AssemblyAI transcription from Call Details to save transcript into `calls.transcription`.
+4. Generate and save recap into `calls.recap` after transcript quality is confirmed.

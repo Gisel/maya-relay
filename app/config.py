@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     enable_ai_triage: bool = Field(default=False, alias="ENABLE_AI_TRIAGE")
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-5-mini", alias="OPENAI_MODEL")
+    assemblyai_api_key: str = Field(default="", alias="ASSEMBLYAI_API_KEY")
     admin_password: str = Field(default="", alias="ADMIN_PASSWORD")
     app_base_url: str = Field(default="", alias="APP_BASE_URL")
 

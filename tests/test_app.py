@@ -9,7 +9,12 @@ from tests.fakes import FakeAttachmentStore, FakeRepository, FakeSender, FakeVoi
 
 
 def make_client(
-    *, verify_twilio_signature: bool = False, twilio_auth_token: str = "", admin_password: str = ""
+    *,
+    verify_twilio_signature: bool = False,
+    twilio_account_sid: str = "",
+    twilio_auth_token: str = "",
+    admin_password: str = "",
+    assemblyai_api_key: str = "",
 ) -> tuple[TestClient, FakeRepository, FakeSender]:
     settings = Settings(
         FRANCISCO_PHONE="+15551234567",
@@ -18,8 +23,9 @@ def make_client(
         ENABLE_AI_TRIAGE=False,
         OPENAI_API_KEY="",
         OPENAI_MODEL="gpt-5-mini",
+        ASSEMBLYAI_API_KEY=assemblyai_api_key,
         ADMIN_PASSWORD=admin_password,
-        TWILIO_ACCOUNT_SID="",
+        TWILIO_ACCOUNT_SID=twilio_account_sid,
         TWILIO_AUTH_TOKEN=twilio_auth_token,
         TWILIO_MESSAGING_SERVICE_SID="",
         SUPABASE_URL="",
@@ -643,6 +649,119 @@ def test_api_updates_call_details():
     assert repository.calls[0]["outcome"] == "connected"
 
 
+def test_api_streams_call_recording_through_twilio_proxy(monkeypatch):
+    client, repository, _ = make_client(
+        admin_password="secret",
+        twilio_account_sid="ACfake",
+        twilio_auth_token="token",
+    )
+    repository.create_call(
+        conversation_id="conversation-1",
+        direction="inbound",
+        call_type="inbound",
+        customer_phone="+15550000001",
+        employee_phone="+15551234567",
+        twilio_call_sid="CAfake1",
+        status="completed",
+    )
+    repository.calls[0]["recording_url"] = "https://api.twilio.com/2010-04-01/Accounts/ACfake/Recordings/REfake1"
+    repository.calls[0]["recording_status"] = "completed"
+    calls: list[dict[str, object]] = []
+
+    class FakeResponse:
+        content = b"fake audio"
+        headers = {"content-type": "audio/mpeg"}
+
+        def raise_for_status(self):
+            return None
+
+    def fake_get(url, auth=None, timeout=None, headers=None):
+        calls.append({"url": url, "auth": auth, "timeout": timeout, "headers": headers})
+        return FakeResponse()
+
+    monkeypatch.setattr("app.routes.api.requests.get", fake_get)
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    response = client.get("/api/calls/call-1/recording", headers={"cookie": cookie})
+
+    assert response.status_code == 200
+    assert response.content == b"fake audio"
+    assert response.headers["content-type"].startswith("audio/mpeg")
+    assert calls == [
+        {
+            "url": "https://api.twilio.com/2010-04-01/Accounts/ACfake/Recordings/REfake1.mp3",
+            "auth": ("ACfake", "token"),
+            "timeout": 30,
+            "headers": None,
+        }
+    ]
+
+
+def test_api_transcribes_call_recording_and_saves_text(monkeypatch):
+    client, repository, _ = make_client(
+        admin_password="secret",
+        twilio_account_sid="ACfake",
+        twilio_auth_token="token",
+        assemblyai_api_key="assembly-key",
+    )
+    repository.create_call(
+        conversation_id="conversation-1",
+        direction="inbound",
+        call_type="inbound",
+        customer_phone="+15550000001",
+        employee_phone="+15551234567",
+        twilio_call_sid="CAfake1",
+        status="completed",
+    )
+    repository.calls[0]["recording_url"] = "https://api.twilio.com/2010-04-01/Accounts/ACfake/Recordings/REfake1"
+
+    class FakeAudioResponse:
+        content = b"fake audio"
+        headers = {"content-type": "audio/mpeg"}
+
+        def raise_for_status(self):
+            return None
+
+    class FakeJsonResponse:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self.payload
+
+    def fake_get(url, auth=None, timeout=None, headers=None):
+        if auth:
+            return FakeAudioResponse()
+        assert url == "https://api.assemblyai.com/v2/transcript/transcript-1"
+        assert headers == {"Authorization": "assembly-key"}
+        return FakeJsonResponse({"status": "completed", "text": "Please call me back about the order."})
+
+    def fake_post(url, headers=None, data=None, json=None, timeout=None):
+        if url == "https://api.assemblyai.com/v2/upload":
+            assert headers == {"Authorization": "assembly-key"}
+            assert data == b"fake audio"
+            return FakeJsonResponse({"upload_url": "https://assembly.example/upload/audio"})
+        assert url == "https://api.assemblyai.com/v2/transcript"
+        assert headers == {"Authorization": "assembly-key", "Content-Type": "application/json"}
+        assert json == {"audio_url": "https://assembly.example/upload/audio"}
+        return FakeJsonResponse({"id": "transcript-1"})
+
+    monkeypatch.setattr("app.routes.api.requests.get", fake_get)
+    monkeypatch.setattr("app.routes.api.requests.post", fake_post)
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    response = client.post("/api/calls/call-1/transcribe", headers={"cookie": cookie})
+
+    assert response.status_code == 200
+    assert response.json()["call"]["transcription"] == "Please call me back about the order."
+    assert repository.calls[0]["transcription"] == "Please call me back about the order."
+
+
 def test_api_starts_click_to_call_bridge():
     client, repository, _ = make_client(admin_password="secret")
     repository.get_or_create_customer_conversation(
@@ -921,6 +1040,8 @@ def test_twilio_voice_recording_status_updates_call_log_and_records_event():
     assert repository.calls[0]["recording_status"] == "completed"
     assert repository.calls[0]["recording_duration_seconds"] == 37
     assert repository.calls[0]["recording_channels"] == 1
+    assert repository.calls[0]["outcome"] == "voicemail"
+    assert repository.calls[0]["follow_up_status"] == "needed"
     assert repository.call_events == [
         {
             "id": "call-event-1",

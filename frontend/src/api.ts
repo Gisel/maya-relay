@@ -299,3 +299,13 @@ export function updateCallDetails(
     body: JSON.stringify(payload),
   });
 }
+
+export function getCallRecordingUrl(callId: string) {
+  return `/api/calls/${callId}/recording`;
+}
+
+export function transcribeCall(callId: string) {
+  return request<UpdateCallDetailsResponse>(`/api/calls/${callId}/transcribe`, {
+    method: "POST",
+  });
+}

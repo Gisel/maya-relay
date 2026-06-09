@@ -128,6 +128,9 @@ class RelayRepository(Protocol):
     def list_calls_for_conversation(self, conversation_id: str, limit: int = 20) -> list[dict[str, Any]]:
         ...
 
+    def get_call(self, call_id: str) -> dict[str, Any] | None:
+        ...
+
     def list_call_conversations(
         self,
         *,
@@ -146,6 +149,14 @@ class RelayRepository(Protocol):
         follow_up_status: str,
         notes: str | None,
         recap: str | None,
+        transcription: str | None,
+    ) -> dict[str, Any] | None:
+        ...
+
+    def update_call_transcription(
+        self,
+        *,
+        call_id: str,
         transcription: str | None,
     ) -> dict[str, Any] | None:
         ...
@@ -553,6 +564,23 @@ class SupabaseRelayRepository:
         )
         return result.data
 
+    def get_call(self, call_id: str) -> dict[str, Any] | None:
+        result = (
+            self.client.table("calls")
+            .select(
+                "id, conversation_id, direction, call_type, customer_phone, employee_phone, twilio_call_sid, "
+                "status, outcome, notes, follow_up_status, recap, transcription, "
+                "recording_sid, recording_url, recording_status, recording_duration_seconds, recording_channels, "
+                "started_at, answered_at, completed_at, created_at, updated_at"
+            )
+            .eq("id", call_id)
+            .limit(1)
+            .execute()
+        )
+        if not result.data:
+            return None
+        return result.data[0]
+
     def list_call_conversations(
         self,
         *,
@@ -665,6 +693,22 @@ class SupabaseRelayRepository:
             return None
         return result.data[0]
 
+    def update_call_transcription(
+        self,
+        *,
+        call_id: str,
+        transcription: str | None,
+    ) -> dict[str, Any] | None:
+        result = (
+            self.client.table("calls")
+            .update({"transcription": transcription})
+            .eq("id", call_id)
+            .execute()
+        )
+        if not result.data:
+            return None
+        return result.data[0]
+
     def get_recent_active_call(
         self,
         *,
@@ -769,7 +813,17 @@ class SupabaseRelayRepository:
         )
         if not result.data:
             return None
-        return result.data[0]
+        call = result.data[0]
+        if recording_status == "completed" and not call.get("outcome"):
+            result = (
+                self.client.table("calls")
+                .update({"outcome": "voicemail", "follow_up_status": "needed"})
+                .eq("twilio_call_sid", twilio_call_sid)
+                .execute()
+            )
+            if result.data:
+                return result.data[0]
+        return call
 
     def create_call_event(
         self,

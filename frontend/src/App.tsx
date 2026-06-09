@@ -43,6 +43,7 @@ import {
   logout,
   sendReply,
   startNewCall,
+  transcribeCall,
   updateCallDetails,
   updateConversationStatus,
 } from "./api";
@@ -452,6 +453,7 @@ function CallDetailsDrawer({
   open,
   onClose,
   onSave,
+  onTranscribe,
 }: {
   call: CallRecord | null;
   open: boolean;
@@ -466,6 +468,7 @@ function CallDetailsDrawer({
       transcription: string;
     },
   ) => Promise<void>;
+  onTranscribe: (callId: string) => Promise<void>;
 }) {
   return (
     <Drawer
@@ -482,6 +485,7 @@ function CallDetailsDrawer({
           await onSave(callId, payload);
           onClose();
         }}
+        onTranscribe={onTranscribe}
       />
     </Drawer>
   );
@@ -1418,6 +1422,30 @@ export function App() {
     );
   }
 
+  async function handleTranscribeCall(callId: string) {
+    setAppError("");
+    try {
+      const response = await transcribeCall(callId);
+      setCalls((current) => current.map((call) => (call.id === callId ? response.call : call)));
+      setCallRows((current) =>
+        current.map((row) => (
+          row.latestCall.id === callId
+            ? {
+              ...row,
+              latestCall: response.call,
+              workflowStatus: !response.call.outcome || ["needed", "scheduled"].includes(response.call.followUpStatus)
+                ? "pending_follow_up"
+                : "done",
+            }
+            : row
+        )),
+      );
+    } catch (error) {
+      setAppError(error instanceof Error ? error.message : "Could not transcribe the call recording.");
+      throw error;
+    }
+  }
+
   if (isCheckingSession) {
     return (
       <main className="loading-screen">
@@ -1698,6 +1726,7 @@ export function App() {
             isLoadingDetail={isLoadingDetail}
             onSaveCallDetails={handleSaveCallDetails}
             onSelectCall={setSelectedCallId}
+            onTranscribeCall={handleTranscribeCall}
             selectedCall={selectedCall}
             selectedRow={selectedCallRow}
           />
@@ -1774,6 +1803,7 @@ export function App() {
         call={selectedCall}
         onClose={() => setSelectedCallId("")}
         onSave={handleSaveCallDetails}
+        onTranscribe={handleTranscribeCall}
         open={workspaceMode === "text" && Boolean(selectedCall)}
       />
     </div>

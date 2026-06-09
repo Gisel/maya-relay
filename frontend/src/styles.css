@@ -1721,6 +1721,37 @@ button {
   text-decoration: none;
 }
 
+.call-recording-status audio {
+  flex: 1 1 100%;
+  height: 34px;
+  max-width: 480px;
+  min-width: 220px;
+}
+
+.call-transcription-heading {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  justify-content: space-between;
+}
+
+.text-action-button {
+  background: transparent;
+  border: 0;
+  color: #2f6fa8;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0;
+}
+
+.text-action-button:disabled {
+  color: #98a2b6;
+  cursor: not-allowed;
+}
+
 .drawer-form select {
   appearance: none;
   background:
