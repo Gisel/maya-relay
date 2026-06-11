@@ -340,6 +340,62 @@ def test_update_call_status_by_sid_sets_status_timestamps():
     assert stored["completed_at"] is not None
 
 
+def test_update_call_recording_does_not_mark_completed_live_call_as_voicemail():
+    repository, client = build_repository()
+    repository.create_call(
+        conversation_id="conversation-1",
+        direction="inbound",
+        call_type="inbound",
+        customer_phone="+15550000001",
+        employee_phone="+15551234567",
+        twilio_call_sid="CA123",
+        status="completed",
+    )
+
+    call = repository.update_call_recording_by_sid(
+        twilio_call_sid="CA123",
+        recording_sid="RE123",
+        recording_url="https://api.twilio.com/2010-04-01/Accounts/AC123/Recordings/RE123",
+        recording_status="completed",
+        recording_duration_seconds=42,
+        recording_channels=2,
+    )
+
+    stored = client.rows("calls")[0]
+    assert call is not None
+    assert stored["recording_sid"] == "RE123"
+    assert stored["recording_status"] == "completed"
+    assert stored["outcome"] is None
+    assert stored["follow_up_status"] == "none"
+
+
+def test_update_call_recording_marks_uncompleted_inbound_recording_as_voicemail():
+    repository, client = build_repository()
+    repository.create_call(
+        conversation_id="conversation-1",
+        direction="inbound",
+        call_type="inbound",
+        customer_phone="+15550000001",
+        employee_phone="+15551234567",
+        twilio_call_sid="CA123",
+        status="ringing",
+    )
+
+    call = repository.update_call_recording_by_sid(
+        twilio_call_sid="CA123",
+        recording_sid="RE123",
+        recording_url="https://api.twilio.com/2010-04-01/Accounts/AC123/Recordings/RE123",
+        recording_status="completed",
+        recording_duration_seconds=42,
+        recording_channels=1,
+    )
+
+    stored = client.rows("calls")[0]
+    assert call is not None
+    assert stored["outcome"] == "voicemail"
+    assert stored["follow_up_status"] == "needed"
+
+
 def test_update_call_details_stores_outcome_notes_and_follow_up_fields():
     repository, client = build_repository()
     repository.create_call(

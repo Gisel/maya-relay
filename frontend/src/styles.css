@@ -1744,6 +1744,12 @@ button {
   gap: 7px;
 }
 
+.call-details-form textarea {
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
 .text-action-button {
   background: transparent;
   border: 0;

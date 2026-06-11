@@ -838,7 +838,7 @@ class SupabaseRelayRepository:
         if not result.data:
             return None
         call = result.data[0]
-        if recording_status == "completed" and not call.get("outcome"):
+        if recording_status == "completed" and not call.get("outcome") and call.get("status") != "completed":
             result = (
                 self.client.table("calls")
                 .update({"outcome": "voicemail", "follow_up_status": "needed"})

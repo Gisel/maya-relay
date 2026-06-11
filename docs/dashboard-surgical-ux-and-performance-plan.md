@@ -97,9 +97,13 @@ Visual direction to preserve:
   - Optional `TWILIO_STUDIO_WEBHOOK_SECRET` protects Studio HTTP Request widgets.
 - Recording capture foundation:
   - `POST /webhooks/twilio/voice/recording` stores Twilio recording metadata on the matching call by `CallSid`.
+  - Studio live-call recordings can also be fetched from Twilio after `/webhooks/twilio/voice/studio/complete` when Studio does not expose a recording callback URL.
   - Completed recordings auto-mark untouched calls as `Voicemail` with `Pending follow-up`.
+  - Completed connected-call recordings do not auto-mark the call as voicemail.
   - Call Details shows recording status, a Maya Relay audio player, and an Open Recording link when Twilio provides `RecordingUrl`.
   - Call Details can send a captured recording to AssemblyAI and save the result into `transcription`.
+  - Completed recordings can automatically transcribe through AssemblyAI and generate an OpenAI recap when keys are configured.
+  - `ENABLE_CALL_RECORDING_AUTOMATION=false` can disable automatic transcription/recap if needed.
 - Basic close/reopen conversation functionality.
 - Close Conversation UX:
   - confirmation before closing
@@ -121,28 +125,30 @@ Visual direction to preserve:
 
 ## Next
 
-- Validate Recording Capture:
-  - wait for Railway deploy after the recording webhook commit
-  - add the Recording Status Callback URL to the Studio Record Voicemail widget
-  - leave Studio "Transcribe Audio To Text" off for now
-  - call the Maya number and leave a voicemail
-  - confirm Call Details shows recording status and an Open Recording link
-  - if not visible, inspect Railway logs and Studio execution logs
 - Add Studio completion logging:
   - add a second Studio HTTP Request near the end of the router flow
   - URL: `/webhooks/twilio/voice/studio/complete`
   - pass the same `access_key`
   - pass `CallSid`
   - pass final status if the flow exposes it, otherwise send `completed`
-- Improve Call Details UX after functionality test:
+  - required for live connected-call recording sync when Studio only exposes the Start Recording toggle
+- Validate automatic recording processing:
+  - leave another voicemail after Railway deploy
+  - confirm transcription and recap appear without clicking the buttons
+  - place one answered inbound call after enabling Connect Call To recording
+  - confirm the answered inbound call receives transcript/recap after Studio completion
+  - confirm manual buttons still work as fallback
+- Improve Call Details UX after live use:
+  - soften notes/transcription/recap typography
   - make saved notes/transcription/recap easier to review
   - add clearer save success/error feedback if needed
   - confirm details change correctly when selecting different timeline calls
+- Decide outbound two-party recording:
+  - confirm consent language and Twilio pricing before enabling `<Dial record>` for bridged outbound calls
+  - once approved, send outbound recordings to the same recording callback so automation covers them too
 - Improve Manual Outbound Call:
   - create/update contact after calling a new number
   - add name
-  - add notes
-  - add call outcome
 - Add Customer Profile basics:
   - notes
   - visible customer history

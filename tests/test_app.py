@@ -1032,6 +1032,107 @@ def test_twilio_studio_incoming_voice_complete_updates_inbound_call():
     ]
 
 
+def test_twilio_studio_complete_fetches_live_call_recording_and_auto_processes(monkeypatch):
+    client, repository, _ = make_client(
+        twilio_account_sid="ACfake",
+        twilio_auth_token="token",
+        assemblyai_api_key="assembly-key",
+        openai_api_key="openai-key",
+    )
+    repository.create_call(
+        conversation_id="conversation-1",
+        direction="inbound",
+        call_type="inbound",
+        customer_phone="+15550000009",
+        employee_phone="+15551234567",
+        twilio_call_sid="CAinbound",
+        status="ringing",
+    )
+
+    class FakeAudioResponse:
+        content = b"fake live call audio"
+        headers = {"content-type": "audio/mpeg"}
+
+        def raise_for_status(self):
+            return None
+
+    class FakeJsonResponse:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self.payload
+
+    def fake_get(url, auth=None, timeout=None, headers=None):
+        if url.endswith("/Calls/CAinbound/Recordings.json"):
+            assert auth == ("ACfake", "token")
+            return FakeJsonResponse(
+                {
+                    "recordings": [
+                        {
+                            "sid": "RElive",
+                            "uri": "/2010-04-01/Accounts/ACfake/Recordings/RElive.json",
+                            "status": "completed",
+                            "duration": "84",
+                            "channels": "2",
+                        }
+                    ]
+                }
+            )
+        if url == "https://api.twilio.com/2010-04-01/Accounts/ACfake/Recordings/RElive.mp3":
+            assert auth == ("ACfake", "token")
+            return FakeAudioResponse()
+        assert url == "https://api.assemblyai.com/v2/transcript/transcript-live"
+        assert headers == {"Authorization": "assembly-key"}
+        return FakeJsonResponse({"status": "completed", "text": "I need a quote for a lobby sign."})
+
+    def fake_post(url, headers=None, data=None, json=None, timeout=None):
+        if url == "https://api.assemblyai.com/v2/upload":
+            assert headers == {"Authorization": "assembly-key"}
+            assert data == b"fake live call audio"
+            return FakeJsonResponse({"upload_url": "https://assembly.example/upload/live-audio"})
+        if url == "https://api.assemblyai.com/v2/transcript":
+            assert headers == {"Authorization": "assembly-key", "Content-Type": "application/json"}
+            assert json == {"audio_url": "https://assembly.example/upload/live-audio"}
+            return FakeJsonResponse({"id": "transcript-live"})
+        assert url == "https://api.openai.com/v1/responses"
+        assert headers == {
+            "Authorization": "Bearer openai-key",
+            "Content-Type": "application/json",
+        }
+        assert "I need a quote for a lobby sign." in json["input"]
+        return FakeJsonResponse({"output_text": "- Customer needs a quote for a lobby sign."})
+
+    monkeypatch.setattr("app.routes.twilio_voice.requests.get", fake_get)
+    monkeypatch.setattr("app.routes.api.requests.get", fake_get)
+    monkeypatch.setattr("app.routes.api.requests.post", fake_post)
+
+    response = client.post(
+        "/webhooks/twilio/voice/studio/complete",
+        data={
+            "CallSid": "CAinbound",
+            "DialCallSid": "CAofficeleg",
+            "DialCallStatus": "completed",
+        },
+    )
+
+    assert response.status_code == 204
+    call = repository.calls[0]
+    assert call["status"] == "completed"
+    assert call["recording_sid"] == "RElive"
+    assert call["recording_url"] == "https://api.twilio.com/2010-04-01/Accounts/ACfake/Recordings/RElive.json"
+    assert call["recording_status"] == "completed"
+    assert call["recording_duration_seconds"] == 84
+    assert call["recording_channels"] == 2
+    assert call["outcome"] is None
+    assert call["follow_up_status"] == "none"
+    assert call["transcription"] == "I need a quote for a lobby sign."
+    assert call["recap"] == "- Customer needs a quote for a lobby sign."
+
+
 def test_twilio_voice_status_updates_call_log_and_records_event():
     client, repository, _ = make_client()
     repository.create_call(
@@ -1123,6 +1224,86 @@ def test_twilio_voice_recording_status_updates_call_log_and_records_event():
             },
         }
     ]
+
+
+def test_twilio_voice_completed_recording_auto_transcribes_and_recaps(monkeypatch):
+    client, repository, _ = make_client(
+        twilio_account_sid="ACfake",
+        twilio_auth_token="token",
+        assemblyai_api_key="assembly-key",
+        openai_api_key="openai-key",
+    )
+    repository.create_call(
+        conversation_id="conversation-1",
+        direction="inbound",
+        call_type="inbound",
+        customer_phone="+15550000009",
+        employee_phone="+15551234567",
+        twilio_call_sid="CAinbound",
+        status="ringing",
+    )
+
+    class FakeAudioResponse:
+        content = b"fake audio"
+        headers = {"content-type": "audio/mpeg"}
+
+        def raise_for_status(self):
+            return None
+
+    class FakeJsonResponse:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self.payload
+
+    def fake_get(url, auth=None, timeout=None, headers=None):
+        if auth:
+            assert url == "https://api.twilio.com/2010-04-01/Accounts/ACfake/Recordings/REfake1.mp3"
+            assert auth == ("ACfake", "token")
+            return FakeAudioResponse()
+        assert url == "https://api.assemblyai.com/v2/transcript/transcript-1"
+        assert headers == {"Authorization": "assembly-key"}
+        return FakeJsonResponse({"status": "completed", "text": "Please call me back about a sign quote."})
+
+    def fake_post(url, headers=None, data=None, json=None, timeout=None):
+        if url == "https://api.assemblyai.com/v2/upload":
+            assert headers == {"Authorization": "assembly-key"}
+            assert data == b"fake audio"
+            return FakeJsonResponse({"upload_url": "https://assembly.example/upload/audio"})
+        if url == "https://api.assemblyai.com/v2/transcript":
+            assert headers == {"Authorization": "assembly-key", "Content-Type": "application/json"}
+            assert json == {"audio_url": "https://assembly.example/upload/audio"}
+            return FakeJsonResponse({"id": "transcript-1"})
+        assert url == "https://api.openai.com/v1/responses"
+        assert headers == {
+            "Authorization": "Bearer openai-key",
+            "Content-Type": "application/json",
+        }
+        assert "Please call me back about a sign quote." in json["input"]
+        return FakeJsonResponse({"output_text": "- Customer wants a callback about a sign quote."})
+
+    monkeypatch.setattr("app.routes.api.requests.get", fake_get)
+    monkeypatch.setattr("app.routes.api.requests.post", fake_post)
+
+    response = client.post(
+        "/webhooks/twilio/voice/recording",
+        data={
+            "CallSid": "CAinbound",
+            "RecordingSid": "REfake1",
+            "RecordingUrl": "https://api.twilio.com/2010-04-01/Accounts/ACfake/Recordings/REfake1",
+            "RecordingStatus": "completed",
+            "RecordingDuration": "37",
+            "RecordingChannels": "1",
+        },
+    )
+
+    assert response.status_code == 204
+    assert repository.calls[0]["transcription"] == "Please call me back about a sign quote."
+    assert repository.calls[0]["recap"] == "- Customer wants a callback about a sign quote."
 
 
 def test_twilio_sms_webhook_acknowledges_with_empty_twiml():

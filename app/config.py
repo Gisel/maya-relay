@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     verify_twilio_signature: bool = Field(default=False, alias="VERIFY_TWILIO_SIGNATURE")
     enable_twilio_lookup: bool = Field(default=False, alias="ENABLE_TWILIO_LOOKUP")
     enable_ai_triage: bool = Field(default=False, alias="ENABLE_AI_TRIAGE")
+    enable_call_recording_automation: bool = Field(default=True, alias="ENABLE_CALL_RECORDING_AUTOMATION")
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-5-mini", alias="OPENAI_MODEL")
     assemblyai_api_key: str = Field(default="", alias="ASSEMBLYAI_API_KEY")

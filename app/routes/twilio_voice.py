@@ -1,13 +1,16 @@
 import logging
+import time
 from typing import Any
 
-from fastapi import APIRouter, Depends, Form, Request
+import requests
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request
 from fastapi.responses import PlainTextResponse, Response
 from twilio.twiml.voice_response import VoiceResponse
 
 from app.config import Settings, get_settings, normalize_phone_number
 from app.db import RelayRepository
 from app.dependencies import get_repository
+from app.routes.api import _download_twilio_recording, _generate_call_recap_with_openai, _transcribe_audio_with_assemblyai
 from app.routes.twilio_sms import _validate_twilio_request
 
 
@@ -132,6 +135,7 @@ async def studio_incoming_voice_call(
 @router.post("/studio/complete")
 async def studio_incoming_voice_complete(
     request: Request,
+    background_tasks: BackgroundTasks,
     settings: Settings = Depends(get_settings),
     repository: RelayRepository = Depends(get_repository),
 ) -> Response:
@@ -156,6 +160,14 @@ async def studio_incoming_voice_complete(
             call_status=status,
             payload=payload,
         )
+        if settings.enable_call_recording_automation and call and call.get("id") and call_sid and status == "completed":
+            background_tasks.add_task(
+                _sync_studio_recording,
+                settings,
+                repository,
+                str(call["id"]),
+                call_sid,
+            )
     except Exception:
         logger.exception("Failed to complete Studio inbound voice call.")
 
@@ -165,6 +177,7 @@ async def studio_incoming_voice_complete(
 @router.post("/recording")
 async def voice_recording_status(
     request: Request,
+    background_tasks: BackgroundTasks,
     settings: Settings = Depends(get_settings),
     repository: RelayRepository = Depends(get_repository),
 ) -> Response:
@@ -201,10 +214,126 @@ async def voice_recording_status(
             call_status=recording_status or None,
             payload=payload,
         )
+        if (
+            settings.enable_call_recording_automation
+            and call
+            and call.get("id")
+            and recording_status == "completed"
+            and recording_url
+        ):
+            background_tasks.add_task(
+                _automate_completed_recording,
+                settings,
+                repository,
+                str(call["id"]),
+            )
     except Exception:
         logger.exception("Failed to persist Twilio recording status for CallSid %s", call_sid)
 
     return Response(status_code=204)
+
+
+def _automate_completed_recording(settings: Settings, repository: RelayRepository, call_id: str) -> None:
+    call = repository.get_call(call_id)
+    if not call:
+        return
+    recording_url = str(call.get("recording_url") or "").strip()
+    if not recording_url:
+        return
+
+    transcription = str(call.get("transcription") or "").strip()
+    if not transcription:
+        if not settings.assemblyai_api_key:
+            logger.info("Skipping automatic call transcription for %s because ASSEMBLYAI_API_KEY is not configured.", call_id)
+            return
+        try:
+            audio_response = _download_twilio_recording(settings, recording_url)
+            transcription = _transcribe_audio_with_assemblyai(settings, audio_response.content)
+            updated_call = repository.update_call_transcription(call_id=call_id, transcription=transcription)
+            call = updated_call or call
+        except Exception:
+            logger.exception("Automatic call transcription failed for call %s.", call_id)
+            return
+
+    if call.get("recap"):
+        return
+    if not settings.openai_api_key:
+        logger.info("Skipping automatic call recap for %s because OPENAI_API_KEY is not configured.", call_id)
+        return
+    try:
+        recap = _generate_call_recap_with_openai(settings, call=call, transcription=transcription)
+        repository.update_call_recap(call_id=call_id, recap=recap)
+    except Exception:
+        logger.exception("Automatic call recap failed for call %s.", call_id)
+
+
+def _sync_studio_recording(settings: Settings, repository: RelayRepository, call_id: str, call_sid: str) -> None:
+    if not settings.twilio_account_sid or not settings.twilio_auth_token:
+        logger.info("Skipping Studio recording sync for %s because Twilio credentials are not configured.", call_id)
+        return
+
+    recording = _fetch_latest_twilio_recording_for_call(settings, call_sid)
+    if not recording:
+        return
+
+    call = repository.update_call_recording_by_sid(
+        twilio_call_sid=call_sid,
+        recording_sid=str(recording.get("sid") or "") or None,
+        recording_url=_recording_url(settings, recording),
+        recording_status=str(recording.get("status") or "") or None,
+        recording_duration_seconds=_int_value(recording.get("duration")),
+        recording_channels=_int_value(recording.get("channels")),
+    )
+    if call and call.get("id"):
+        _automate_completed_recording(settings, repository, str(call["id"]))
+
+
+def _fetch_latest_twilio_recording_for_call(settings: Settings, call_sid: str) -> dict[str, Any] | None:
+    url = (
+        f"https://api.twilio.com/2010-04-01/Accounts/{settings.twilio_account_sid}"
+        f"/Calls/{call_sid}/Recordings.json"
+    )
+    for attempt in range(3):
+        try:
+            response = requests.get(url, auth=(settings.twilio_account_sid, settings.twilio_auth_token), timeout=30)
+            response.raise_for_status()
+        except requests.RequestException:
+            logger.exception("Could not fetch Twilio recordings for CallSid %s.", call_sid)
+            return None
+
+        recordings = response.json().get("recordings") or []
+        completed_recordings = [
+            recording
+            for recording in recordings
+            if str(recording.get("status") or "").lower() == "completed"
+        ]
+        if completed_recordings:
+            return completed_recordings[0]
+        if attempt < 2:
+            time.sleep(3)
+    logger.info("No completed Twilio recording found yet for CallSid %s.", call_sid)
+    return None
+
+
+def _recording_url(settings: Settings, recording: dict[str, Any]) -> str | None:
+    url = str(recording.get("media_url") or recording.get("uri") or "").strip()
+    if not url:
+        recording_sid = str(recording.get("sid") or "").strip()
+        if not recording_sid:
+            return None
+        return f"https://api.twilio.com/2010-04-01/Accounts/{settings.twilio_account_sid}/Recordings/{recording_sid}"
+    if url.startswith("/"):
+        return f"https://api.twilio.com{url}"
+    return url
+
+
+def _int_value(value: Any) -> int | None:
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _inbound_dial_status(dial_call_status: str) -> str:

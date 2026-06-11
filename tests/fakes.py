@@ -461,7 +461,7 @@ class FakeRepository:
             call["recording_status"] = recording_status
             call["recording_duration_seconds"] = recording_duration_seconds
             call["recording_channels"] = recording_channels
-            if recording_status == "completed" and not call.get("outcome"):
+            if recording_status == "completed" and not call.get("outcome") and call.get("status") != "completed":
                 call["outcome"] = "voicemail"
                 call["follow_up_status"] = "needed"
             return call
