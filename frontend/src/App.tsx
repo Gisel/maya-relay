@@ -623,7 +623,7 @@ export function App() {
   const [callRows, setCallRows] = useState<CallConversationListItem[]>([]);
   const [selectedCallRowId, setSelectedCallRowId] = useState("");
   const [callSearch, setCallSearch] = useState("");
-  const [callDirectionFilter, setCallDirectionFilter] = useState<CallDirectionFilter>("outgoing");
+  const [callDirectionFilter, setCallDirectionFilter] = useState<CallDirectionFilter>("all");
   const [isLoadingCalls, setIsLoadingCalls] = useState(false);
   const [isSearchingCalls, setIsSearchingCalls] = useState(false);
   const [isLoadingMoreCalls, setIsLoadingMoreCalls] = useState(false);
