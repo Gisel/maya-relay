@@ -308,7 +308,7 @@ def _fetch_latest_twilio_recording_for_call(settings: Settings, call_sid: str) -
             if str(recording.get("status") or "").lower() == "completed"
         ]
         if completed_recordings:
-            return completed_recordings[0]
+            return max(completed_recordings, key=lambda recording: _int_value(recording.get("duration")) or 0)
         if attempt < 2:
             time.sleep(3)
     logger.info("No completed Twilio recording found yet for CallSid %s.", call_sid)

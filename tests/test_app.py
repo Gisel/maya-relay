@@ -748,7 +748,10 @@ def test_api_transcribes_call_recording_and_saves_text(monkeypatch):
             return FakeJsonResponse({"upload_url": "https://assembly.example/upload/audio"})
         assert url == "https://api.assemblyai.com/v2/transcript"
         assert headers == {"Authorization": "assembly-key", "Content-Type": "application/json"}
-        assert json == {"audio_url": "https://assembly.example/upload/audio"}
+        assert json == {
+            "audio_url": "https://assembly.example/upload/audio",
+            "speech_models": ["universal-3-pro", "universal-2"],
+        }
         return FakeJsonResponse({"id": "transcript-1"})
 
     monkeypatch.setattr("app.routes.api.requests.get", fake_get)
@@ -1073,6 +1076,13 @@ def test_twilio_studio_complete_fetches_live_call_recording_and_auto_processes(m
                 {
                     "recordings": [
                         {
+                            "sid": "REshort",
+                            "uri": "/2010-04-01/Accounts/ACfake/Recordings/REshort.json",
+                            "status": "completed",
+                            "duration": "31",
+                            "channels": "2",
+                        },
+                        {
                             "sid": "RElive",
                             "uri": "/2010-04-01/Accounts/ACfake/Recordings/RElive.json",
                             "status": "completed",
@@ -1096,7 +1106,10 @@ def test_twilio_studio_complete_fetches_live_call_recording_and_auto_processes(m
             return FakeJsonResponse({"upload_url": "https://assembly.example/upload/live-audio"})
         if url == "https://api.assemblyai.com/v2/transcript":
             assert headers == {"Authorization": "assembly-key", "Content-Type": "application/json"}
-            assert json == {"audio_url": "https://assembly.example/upload/live-audio"}
+            assert json == {
+                "audio_url": "https://assembly.example/upload/live-audio",
+                "speech_models": ["universal-3-pro", "universal-2"],
+            }
             return FakeJsonResponse({"id": "transcript-live"})
         assert url == "https://api.openai.com/v1/responses"
         assert headers == {
@@ -1276,7 +1289,10 @@ def test_twilio_voice_completed_recording_auto_transcribes_and_recaps(monkeypatc
             return FakeJsonResponse({"upload_url": "https://assembly.example/upload/audio"})
         if url == "https://api.assemblyai.com/v2/transcript":
             assert headers == {"Authorization": "assembly-key", "Content-Type": "application/json"}
-            assert json == {"audio_url": "https://assembly.example/upload/audio"}
+            assert json == {
+                "audio_url": "https://assembly.example/upload/audio",
+                "speech_models": ["universal-3-pro", "universal-2"],
+            }
             return FakeJsonResponse({"id": "transcript-1"})
         assert url == "https://api.openai.com/v1/responses"
         assert headers == {

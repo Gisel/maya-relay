@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-5-mini", alias="OPENAI_MODEL")
     assemblyai_api_key: str = Field(default="", alias="ASSEMBLYAI_API_KEY")
+    assemblyai_poll_timeout_seconds: int = Field(default=600, alias="ASSEMBLYAI_POLL_TIMEOUT_SECONDS")
+    assemblyai_poll_interval_seconds: int = Field(default=3, alias="ASSEMBLYAI_POLL_INTERVAL_SECONDS")
     admin_password: str = Field(default="", alias="ADMIN_PASSWORD")
     app_base_url: str = Field(default="", alias="APP_BASE_URL")
 

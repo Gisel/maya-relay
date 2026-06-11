@@ -601,7 +601,10 @@ def _transcribe_audio_with_assemblyai(settings: Settings, audio_content: bytes) 
         transcript_response = requests.post(
             "https://api.assemblyai.com/v2/transcript",
             headers={**headers, "Content-Type": "application/json"},
-            json={"audio_url": upload_url},
+            json={
+                "audio_url": upload_url,
+                "speech_models": ["universal-3-pro", "universal-2"],
+            },
             timeout=30,
         )
         transcript_response.raise_for_status()
@@ -609,7 +612,9 @@ def _transcribe_audio_with_assemblyai(settings: Settings, audio_content: bytes) 
         if not transcript_id:
             raise HTTPException(status_code=502, detail="AssemblyAI did not return a transcript ID.")
 
-        for _ in range(20):
+        poll_interval_seconds = max(settings.assemblyai_poll_interval_seconds, 1)
+        deadline = time.monotonic() + max(settings.assemblyai_poll_timeout_seconds, poll_interval_seconds)
+        while time.monotonic() < deadline:
             status_response = requests.get(
                 f"https://api.assemblyai.com/v2/transcript/{transcript_id}",
                 headers=headers,
@@ -622,7 +627,7 @@ def _transcribe_audio_with_assemblyai(settings: Settings, audio_content: bytes) 
                 return str(payload.get("text") or "").strip()
             if status == "error":
                 raise HTTPException(status_code=502, detail=payload.get("error") or "AssemblyAI transcription failed.")
-            time.sleep(3)
+            time.sleep(poll_interval_seconds)
     except HTTPException:
         raise
     except requests.RequestException as exc:
