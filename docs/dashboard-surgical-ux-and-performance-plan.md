@@ -1,6 +1,6 @@
 # Maya Relay Dashboard Surgical UX and Performance Plan
 
-Date: 2026-06-08
+Date: 2026-06-11
 
 This document is the working 360 functionality list for Maya Relay. It captures what is done, what is next, and what remains pending so we do not lose track while testing, shipping, and adding functionality surgically.
 
@@ -79,6 +79,8 @@ Visual direction to preserve:
   - Calls search.
   - Outgoing / Incoming / All call filters.
   - Calls list grouped by customer/conversation activity.
+  - Calls tab defaults to All so recent inbound and outbound calls are visible together.
+  - Calls tab refreshes automatically every 15 seconds while open.
   - Calls center workspace with selected customer header.
   - Call timeline/history.
   - Editable call details for outcome, follow-up status, notes, recap, and transcription.
@@ -95,6 +97,7 @@ Visual direction to preserve:
   - `POST /webhooks/twilio/voice/studio/incoming` logs inbound Studio calls without changing Maya Router routing.
   - `POST /webhooks/twilio/voice/studio/complete` can mark Studio-routed inbound calls complete/busy/no-answer later.
   - Optional `TWILIO_STUDIO_WEBHOOK_SECRET` protects Studio HTTP Request widgets.
+  - Studio completion widgets are configured per live-call path so connected inbound calls can be marked completed.
 - Recording capture foundation:
   - `POST /webhooks/twilio/voice/recording` stores Twilio recording metadata on the matching call by `CallSid`.
   - Studio live-call recordings can also be fetched from Twilio after `/webhooks/twilio/voice/studio/complete` when Studio does not expose a recording callback URL.
@@ -103,7 +106,18 @@ Visual direction to preserve:
   - Call Details shows recording status, a Maya Relay audio player, and an Open Recording link when Twilio provides `RecordingUrl`.
   - Call Details can send a captured recording to AssemblyAI and save the result into `transcription`.
   - Completed recordings can automatically transcribe through AssemblyAI and generate an OpenAI recap when keys are configured.
+  - Live inbound recording automation chooses the longest completed Twilio recording when multiple recordings exist for the same call.
+  - AssemblyAI requests now explicitly use `universal-3-pro` with fallback to `universal-2`.
+  - AssemblyAI polling now waits up to 10 minutes by default for longer call recordings.
   - `ENABLE_CALL_RECORDING_AUTOMATION=false` can disable automatic transcription/recap if needed.
+- Inbound call recording consent blurb added in Twilio Studio before recording connected calls.
+- Inbound connected-call recording enabled in Twilio Studio for the selected live-call paths.
+- Custom root domain setup started:
+  - GoDaddy nameservers moved to Cloudflare for `mayagraphics.co`.
+  - Cloudflare root CNAME points to Railway.
+  - Railway ownership TXT record added.
+  - Railway is validating domain ownership.
+  - App root `/` redirects to `/app` so the custom domain opens the operator dashboard.
 - Basic close/reopen conversation functionality.
 - Close Conversation UX:
   - confirmation before closing
@@ -125,19 +139,18 @@ Visual direction to preserve:
 
 ## Next
 
-- Add Studio completion logging:
-  - add a second Studio HTTP Request near the end of the router flow
-  - URL: `/webhooks/twilio/voice/studio/complete`
-  - pass the same `access_key`
-  - pass `CallSid`
-  - pass final status if the flow exposes it, otherwise send `completed`
-  - required for live connected-call recording sync when Studio only exposes the Start Recording toggle
-- Validate automatic recording processing:
-  - leave another voicemail after Railway deploy
-  - confirm transcription and recap appear without clicking the buttons
-  - place one answered inbound call after enabling Connect Call To recording
-  - confirm the answered inbound call receives transcript/recap after Studio completion
-  - confirm manual buttons still work as fallback
+- Validate deployed inbound call recording automation:
+  - wait for Railway deployment from commit `5e39ef1`
+  - place one answered inbound call after deploy
+  - confirm Maya Relay stores the longest/full Twilio recording, not the short ring/early segment
+  - confirm transcript and recap appear without clicking manual buttons
+  - confirm manual Transcribe recording and Generate recap buttons still work as fallback
+- Finish custom domain validation:
+  - wait for Railway to finish validating `mayagraphics.co`
+  - keep Cloudflare root CNAME and TXT as DNS only until Railway is active
+  - deploy the root `/` to `/app` redirect
+  - test `https://mayagraphics.co/app`
+  - test `https://mayagraphics.co/` redirects to `/app`
 - Improve Call Details UX after live use:
   - soften notes/transcription/recap typography
   - make saved notes/transcription/recap easier to review
@@ -149,6 +162,14 @@ Visual direction to preserve:
 - Improve Manual Outbound Call:
   - create/update contact after calling a new number
   - add name
+  - add notes
+  - add call outcome
+- Continue small operational polish:
+  - attachment preview polish only if needed
+  - mobile/header/customer action polish only if needed
+
+## Pending
+
 - Add Customer Profile basics:
   - notes
   - visible customer history
@@ -168,12 +189,6 @@ Visual direction to preserve:
   - preserve manual names
   - blank values do not erase existing names
   - use uploaded contacts before paid Twilio Lookup
-- Continue small operational polish:
-  - attachment preview polish only if needed
-  - mobile/header/customer action polish only if needed
-
-## Pending
-
 - Scalable client/conversation loading model:
   - conversations remain paginated and activity-ordered
   - contact/client search remains separate from conversation browsing
@@ -208,9 +223,8 @@ Visual direction to preserve:
   - call notes in timeline
   - follow-up reminders
   - call analytics later
-  - call recording after consent text and Twilio pricing are approved
-  - automatic transcription after recording is working
-  - AI recap generation from transcript/conversation context after transcription is stable
+  - optional outbound two-party recording only after consent workflow is approved
+  - richer recap generation from transcript plus conversation context
 - Business / Pricing:
   - refine monthly fee after real usage
   - include infrastructure, AI, support, improvements, and monitoring
@@ -270,6 +284,9 @@ Current state:
 - The callback matches recordings to calls by `CallSid`.
 - Call Details displays recording status, a Maya Relay audio player, and an Open Recording link when recording metadata exists.
 - Completed recordings auto-mark calls as Voicemail/Pending follow-up only when no manual outcome was already saved.
+- Completed connected-call recordings do not auto-mark as voicemail.
+- For Studio connected calls, Maya Relay can fetch recordings from Twilio after `/webhooks/twilio/voice/studio/complete`.
+- If Twilio returns multiple completed recordings for one call, Maya Relay uses the longest completed recording.
 
 Twilio Studio setup for voicemail:
 
@@ -282,6 +299,7 @@ Important:
 
 - The Record Voicemail widget captures voicemail-style caller audio.
 - Full two-party call recording is a separate setting on the widgets that connect/dial the call.
+- Connected inbound call recording is enabled only after the consent blurb.
 - Twilio recording URLs require Twilio authentication for reliable playback, so Maya Relay proxies recording audio through `GET /api/calls/{call_id}/recording`.
 
 ### Notes, Transcription, And Recap
@@ -293,14 +311,18 @@ Current state:
 - If `ASSEMBLYAI_API_KEY` is configured, Call Details can transcribe a captured recording through `POST /api/calls/{call_id}/transcribe`.
 - `recap` exists in the `calls` table, is editable manually, and can be generated from a saved transcript through `POST /api/calls/{call_id}/recap`.
 - recording metadata exists in the `calls` table and is displayed when Twilio sends it.
+- Automatic recording processing can transcribe completed recordings and generate recaps without pressing the manual buttons.
+- AssemblyAI transcription uses `universal-3-pro` with fallback to `universal-2`.
+- AssemblyAI polling waits up to 10 minutes by default for longer recordings.
 
-Production validation, June 8, 2026:
+Production validation:
 
 - Incoming voicemail call logging works through the Twilio Studio incoming-call HTTP hook.
 - Twilio voicemail recording metadata reaches Maya Relay through the Recording Status Callback.
 - Call Details shows recording status, duration, Open Recording, and an authenticated audio player.
 - AssemblyAI transcription successfully fills `calls.transcription` from the captured recording.
 - OpenAI recap generation successfully fills `calls.recap` from the saved transcription.
+- Inbound connected-call recording and automatic processing are implemented and deployed; final live validation is next.
 
 Recommended meaning:
 
@@ -310,7 +332,9 @@ Recommended meaning:
 
 Automation path:
 
-1. Confirm Twilio recording capture works in production.
-2. Use Maya Relay proxy playback when Francisco needs to listen to the original recording.
-3. Use AssemblyAI transcription from Call Details to save transcript into `calls.transcription`.
-4. Use OpenAI recap generation from Call Details to save a short internal summary into `calls.recap`.
+1. Twilio records voicemail or consented connected inbound call audio.
+2. Twilio recording callback or Studio completion sync stores the recording metadata.
+3. Maya Relay chooses the longest completed recording for the call.
+4. AssemblyAI transcribes the recording automatically when configured.
+5. OpenAI generates a short internal recap automatically when configured.
+6. Manual Transcribe recording and Generate recap buttons remain available as fallback.

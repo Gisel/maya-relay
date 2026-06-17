@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.routes import admin, api, health, twilio_sms, twilio_voice
@@ -16,6 +16,11 @@ def create_app() -> FastAPI:
     app.include_router(twilio_voice.router)
     app.include_router(api.router)
     app.include_router(admin.router)
+
+    @app.get("/", include_in_schema=False)
+    def root_redirect() -> RedirectResponse:
+        return RedirectResponse(url="/app", status_code=307)
+
     if FRONTEND_DIST.exists():
         assets_dir = FRONTEND_DIST / "assets"
         if assets_dir.exists():

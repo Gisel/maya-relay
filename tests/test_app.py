@@ -61,6 +61,15 @@ def test_health():
     assert response.json() == {"status": "ok"}
 
 
+def test_root_redirects_to_app():
+    client, _, _ = make_client()
+
+    response = client.get("/", follow_redirects=False)
+
+    assert response.status_code == 307
+    assert response.headers["location"] == "/app"
+
+
 def test_readiness_reports_required_config_presence():
     client, _, _ = make_client()
 
