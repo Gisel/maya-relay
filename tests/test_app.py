@@ -623,6 +623,127 @@ def test_api_calls_groups_by_conversation_and_filters_direction_search_and_pagin
     assert paged.json()["pagination"]["nextOffset"] == 1
 
 
+def test_api_contacts_requires_auth():
+    client, _, _ = make_client(admin_password="secret")
+
+    response = client.get("/api/contacts")
+
+    assert response.status_code == 401
+
+
+def test_api_contacts_searches_and_returns_profile_hints():
+    client, repository, _ = make_client(admin_password="secret")
+    repository.upsert_contact_display_name("+15550000001", "Maria Lopez")
+    repository.update_contact_profile(
+        contact_id="contact-1",
+        display_name="Maria Lopez",
+        notes="Prefers pickup reminders.",
+    )
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    repository.create_call(
+        conversation_id="conversation-1",
+        direction="outbound",
+        call_type="conversation_call",
+        customer_phone="+15550000001",
+        employee_phone="+15551234567",
+        twilio_call_sid="CAcontact",
+        status="completed",
+    )
+    repository.upsert_contact_display_name("+15550000002", "Other Client")
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    response = client.get("/api/contacts?q=pickup&limit=10", headers={"cookie": cookie})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["pagination"] == {
+        "limit": 10,
+        "offset": 0,
+        "nextOffset": None,
+        "hasMore": False,
+    }
+    assert payload["items"] == [
+        {
+            "id": "contact-1",
+            "phone": "+15550000001",
+            "displayName": "Maria Lopez",
+            "lookupName": None,
+            "name": "Maria Lopez",
+            "notes": "Prefers pickup reminders.",
+            "lastActivityAt": repository.calls[0]["created_at"],
+            "openConversationId": "conversation-1",
+            "lastConversationId": "conversation-1",
+            "latestCallId": "call-1",
+        }
+    ]
+
+
+def test_api_updates_contact_profile():
+    client, repository, _ = make_client(admin_password="secret")
+    repository.update_contact_lookup_name("+15550000001", "Lookup Name")
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    response = client.patch(
+        "/api/contacts/contact-1",
+        json={"displayName": "Manual Name", "notes": "Likes proofs by text."},
+        headers={"cookie": cookie},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["contact"] == {
+        "id": "contact-1",
+        "phone": "+15550000001",
+        "displayName": "Manual Name",
+        "lookupName": "Lookup Name",
+        "name": "Manual Name",
+        "notes": "Likes proofs by text.",
+    }
+    assert repository.contacts[0].display_name == "Manual Name"
+    assert repository.contacts[0].lookup_name == "Lookup Name"
+    assert repository.contacts[0].notes == "Likes proofs by text."
+
+
+def test_api_contact_patch_preserves_omitted_fields():
+    client, repository, _ = make_client(admin_password="secret")
+    repository.upsert_contact_display_name("+15550000001", "Manual Name")
+    repository.update_contact_profile(
+        contact_id="contact-1",
+        display_name="Manual Name",
+        notes="Original notes.",
+    )
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    response = client.patch(
+        "/api/contacts/contact-1",
+        json={"notes": "Updated notes."},
+        headers={"cookie": cookie},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["contact"]["displayName"] == "Manual Name"
+    assert response.json()["contact"]["notes"] == "Updated notes."
+
+
+def test_api_update_contact_returns_404_for_missing_contact():
+    client, _, _ = make_client(admin_password="secret")
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    response = client.patch(
+        "/api/contacts/missing",
+        json={"displayName": "Missing", "notes": "No row."},
+        headers={"cookie": cookie},
+    )
+
+    assert response.status_code == 404
+
+
 def test_api_updates_call_details():
     client, repository, _ = make_client(admin_password="secret")
     repository.create_call(

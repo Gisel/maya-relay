@@ -4,6 +4,8 @@ Date: 2026-06-11
 
 This document is the working 360 functionality list for Maya Relay. It captures what is done, what is next, and what remains pending so we do not lose track while testing, shipping, and adding functionality surgically.
 
+Detailed production-slice contracts now live in [production-slice-plan.md](production-slice-plan.md). Use that plan before coding new feature work: every slice needs scope, out-of-scope, data/API/UI contracts, tests, risks, and acceptance criteria.
+
 ## Non-Negotiables
 
 - Do not delete or disable existing functionality.
@@ -13,6 +15,7 @@ This document is the working 360 functionality list for Maya Relay. It captures 
 - Prefer small, isolated commits with one concern per change.
 - Verify frontend changes with `npm run build` and e2e tests when UI behavior can be affected.
 - Verify backend changes with `.venv/bin/python -m pytest`.
+- Do not label broad MVP work as done unless production acceptance criteria are met.
 
 ## Styling And CSS Token Rule
 
@@ -116,7 +119,8 @@ Visual direction to preserve:
   - GoDaddy nameservers moved to Cloudflare for `mayagraphics.co`.
   - Cloudflare root CNAME points to Railway.
   - Railway ownership TXT record added.
-  - Railway is validating domain ownership.
+- Custom root domain is live:
+  - `https://mayagraphics.co/app` loads the operator dashboard.
   - App root `/` redirects to `/app` so the custom domain opens the operator dashboard.
 - Basic close/reopen conversation functionality.
 - Close Conversation UX:
@@ -140,17 +144,10 @@ Visual direction to preserve:
 ## Next
 
 - Validate deployed inbound call recording automation:
-  - wait for Railway deployment from commit `5e39ef1`
   - place one answered inbound call after deploy
   - confirm Maya Relay stores the longest/full Twilio recording, not the short ring/early segment
   - confirm transcript and recap appear without clicking manual buttons
   - confirm manual Transcribe recording and Generate recap buttons still work as fallback
-- Finish custom domain validation:
-  - wait for Railway to finish validating `mayagraphics.co`
-  - keep Cloudflare root CNAME and TXT as DNS only until Railway is active
-  - deploy the root `/` to `/app` redirect
-  - test `https://mayagraphics.co/app`
-  - test `https://mayagraphics.co/` redirects to `/app`
 - Improve Call Details UX after live use:
   - soften notes/transcription/recap typography
   - make saved notes/transcription/recap easier to review
@@ -164,6 +161,31 @@ Visual direction to preserve:
   - add name
   - add notes
   - add call outcome
+- Build Customer / Contact production slice:
+  - editable contact name
+  - phone number visible
+  - customer notes
+  - bounded recent message/call history
+- Build Contact / Client Search production slice:
+  - backend endpoint
+  - dashboard UI
+  - search by phone/name
+  - bounded/paginated results
+- Build CSV Import production slice:
+  - upload CSV with `phone_number`, `display_name`
+  - upsert contacts
+  - blank names do not overwrite
+  - imported names used before paid Twilio Lookup
+- Build WhatsApp quick template drafts:
+  - quote follow-up
+  - proof ready
+  - pickup reminder
+  - payment reminder
+  - active conversation drafts only; no business-initiated template tooling yet
+- Build Observability MVP:
+  - recent failed Twilio sends
+  - recent recording/transcription/recap failures where available
+  - plain-English error hints where easy
 - Continue small operational polish:
   - attachment preview polish only if needed
   - mobile/header/customer action polish only if needed
@@ -195,10 +217,9 @@ Visual direction to preserve:
   - conversation details load only when selected
   - avoid loading all clients and all conversations at once
 - Production Auth / Users:
-  - real user accounts
-  - roles
-  - admin vs operator access
-  - Supabase Auth later
+  - keep current admin password for Saturday scope
+  - improve current session handling only if a specific issue is found
+  - real user accounts, roles, admin/operator split, and Supabase Auth later
 - Observability:
   - structured logs
   - failed delivery view

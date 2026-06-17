@@ -5,6 +5,7 @@ create table if not exists public.contacts (
   phone_number text not null unique,
   display_name text,
   lookup_name text,
+  notes text,
   lookup_checked_at timestamptz,
   created_at timestamptz not null default now()
 );
@@ -142,7 +143,16 @@ alter table public.messages
 alter table public.contacts
   add column if not exists display_name text,
   add column if not exists lookup_name text,
+  add column if not exists notes text,
   add column if not exists lookup_checked_at timestamptz;
+
+create index if not exists contacts_display_name_idx
+  on public.contacts (display_name)
+  where display_name is not null;
+
+create index if not exists contacts_lookup_name_idx
+  on public.contacts (lookup_name)
+  where lookup_name is not null;
 
 alter table public.conversations
   add column if not exists conversation_code text,

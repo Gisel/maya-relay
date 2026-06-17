@@ -21,6 +21,12 @@ class FakeRepository:
                 return contact
         return None
 
+    def get_contact_by_id(self, contact_id: str) -> Contact | None:
+        for contact in self.contacts:
+            if contact.id == contact_id:
+                return contact
+        return None
+
     def get_or_create_contact(self, phone_number: str) -> Contact:
         existing = self.get_contact(phone_number)
         if existing is not None:
@@ -36,6 +42,7 @@ class FakeRepository:
             phone_number=existing.phone_number,
             display_name=existing.display_name,
             lookup_name=lookup_name,
+            notes=existing.notes,
         )
         self.contacts = [updated if contact.phone_number == phone_number else contact for contact in self.contacts]
         return updated
@@ -47,9 +54,70 @@ class FakeRepository:
             phone_number=existing.phone_number,
             display_name=display_name,
             lookup_name=existing.lookup_name,
+            notes=existing.notes,
         )
         self.contacts = [updated if contact.phone_number == phone_number else contact for contact in self.contacts]
         return updated
+
+    def update_contact_profile(
+        self,
+        *,
+        contact_id: str,
+        display_name: str | None,
+        notes: str | None,
+    ) -> Contact | None:
+        for index, contact in enumerate(self.contacts):
+            if contact.id != contact_id:
+                continue
+            updated = Contact(
+                id=contact.id,
+                phone_number=contact.phone_number,
+                display_name=display_name,
+                lookup_name=contact.lookup_name,
+                notes=notes,
+            )
+            self.contacts[index] = updated
+            return updated
+        return None
+
+    def search_contacts(
+        self,
+        *,
+        q: str = "",
+        limit: int = 25,
+        offset: int = 0,
+    ) -> tuple[list[dict[str, Any]], bool]:
+        needle = q.strip().lower()
+        rows: list[dict[str, Any]] = []
+        for contact in self.contacts:
+            if needle and needle not in " ".join(
+                str(value)
+                for value in (contact.phone_number, contact.display_name, contact.lookup_name, contact.notes)
+                if value
+            ).lower():
+                continue
+            conversations = [conversation for conversation in self.conversations if conversation.customer_phone == contact.phone_number]
+            calls = [call for call in self.calls if call.get("customer_phone") == contact.phone_number]
+            open_conversation = next((conversation for conversation in reversed(conversations) if conversation.status == "open"), None)
+            latest_conversation = conversations[-1] if conversations else None
+            latest_call = calls[-1] if calls else None
+            rows.append(
+                {
+                    "id": contact.id,
+                    "phone_number": contact.phone_number,
+                    "display_name": contact.display_name,
+                    "lookup_name": contact.lookup_name,
+                    "name": contact.best_name,
+                    "notes": contact.notes,
+                    "created_at": "",
+                    "last_activity_at": (latest_call or {}).get("created_at") or "",
+                    "open_conversation_id": open_conversation.id if open_conversation else None,
+                    "last_conversation_id": latest_conversation.id if latest_conversation else None,
+                    "latest_call_id": (latest_call or {}).get("id"),
+                }
+            )
+        page_rows = rows[offset: offset + limit + 1]
+        return page_rows[:limit], len(page_rows) > limit
 
     def get_or_create_customer_conversation(
         self,

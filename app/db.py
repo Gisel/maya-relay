@@ -26,6 +26,7 @@ def _contact_from_row(row: dict[str, Any]) -> Contact:
         phone_number=row["phone_number"],
         display_name=row.get("display_name"),
         lookup_name=row.get("lookup_name"),
+        notes=row.get("notes"),
     )
 
 
@@ -37,6 +38,9 @@ class RelayRepository(Protocol):
     def get_contact(self, phone_number: str) -> Contact | None:
         ...
 
+    def get_contact_by_id(self, contact_id: str) -> Contact | None:
+        ...
+
     def get_or_create_contact(self, phone_number: str) -> Contact:
         ...
 
@@ -44,6 +48,24 @@ class RelayRepository(Protocol):
         ...
 
     def upsert_contact_display_name(self, phone_number: str, display_name: str) -> Contact:
+        ...
+
+    def update_contact_profile(
+        self,
+        *,
+        contact_id: str,
+        display_name: str | None,
+        notes: str | None,
+    ) -> Contact | None:
+        ...
+
+    def search_contacts(
+        self,
+        *,
+        q: str = "",
+        limit: int = 25,
+        offset: int = 0,
+    ) -> tuple[list[dict[str, Any]], bool]:
         ...
 
     def get_or_create_customer_conversation(
@@ -273,8 +295,20 @@ class SupabaseRelayRepository:
     def get_contact(self, phone_number: str) -> Contact | None:
         result = (
             self.client.table("contacts")
-            .select("id, phone_number, display_name, lookup_name")
+            .select("id, phone_number, display_name, lookup_name, notes")
             .eq("phone_number", phone_number)
+            .limit(1)
+            .execute()
+        )
+        if not result.data:
+            return None
+        return _contact_from_row(result.data[0])
+
+    def get_contact_by_id(self, contact_id: str) -> Contact | None:
+        result = (
+            self.client.table("contacts")
+            .select("id, phone_number, display_name, lookup_name, notes")
+            .eq("id", contact_id)
             .limit(1)
             .execute()
         )
@@ -318,6 +352,96 @@ class SupabaseRelayRepository:
             .execute()
         )
         return _contact_from_row(result.data[0])
+
+    def update_contact_profile(
+        self,
+        *,
+        contact_id: str,
+        display_name: str | None,
+        notes: str | None,
+    ) -> Contact | None:
+        result = (
+            self.client.table("contacts")
+            .update(
+                {
+                    "display_name": display_name,
+                    "notes": notes,
+                }
+            )
+            .eq("id", contact_id)
+            .execute()
+        )
+        if not result.data:
+            return None
+        return _contact_from_row(result.data[0])
+
+    def search_contacts(
+        self,
+        *,
+        q: str = "",
+        limit: int = 25,
+        offset: int = 0,
+    ) -> tuple[list[dict[str, Any]], bool]:
+        safe_limit = max(limit, 1)
+        safe_offset = max(offset, 0)
+        search_limit = safe_limit + safe_offset + 1
+        contact_scan_limit = max(search_limit * 5, 500 if q.strip() else search_limit)
+        contacts = (
+            self.client.table("contacts")
+            .select("id, phone_number, display_name, lookup_name, notes, created_at")
+            .order("created_at", desc=True)
+            .limit(contact_scan_limit)
+            .execute()
+            .data
+        )
+        needle = q.strip().lower()
+        if needle:
+            contacts = [contact for contact in contacts if _contact_matches(contact, needle)]
+
+        phones = sorted({contact["phone_number"] for contact in contacts})
+        conversations_by_phone: dict[str, list[dict[str, Any]]] = {phone: [] for phone in phones}
+        calls_by_phone: dict[str, list[dict[str, Any]]] = {phone: [] for phone in phones}
+
+        if phones:
+            conversations = (
+                self.client.table("conversations")
+                .select(
+                    "id, customer_phone, assigned_employee, customer_channel, "
+                    "conversation_code, status, created_at, updated_at"
+                )
+                .in_("customer_phone", phones)
+                .order("updated_at", desc=True)
+                .limit(max(len(phones) * 5, 1))
+                .execute()
+                .data
+            )
+            for conversation in conversations:
+                conversations_by_phone.setdefault(conversation["customer_phone"], []).append(conversation)
+
+            calls = (
+                self.client.table("calls")
+                .select("id, conversation_id, customer_phone, status, outcome, created_at, updated_at, started_at")
+                .in_("customer_phone", phones)
+                .order("created_at", desc=True)
+                .limit(max(len(phones) * 5, 1))
+                .execute()
+                .data
+            )
+            for call in calls:
+                calls_by_phone.setdefault(call["customer_phone"], []).append(call)
+
+        rows = [
+            _contact_search_row(
+                contact,
+                conversations_by_phone.get(contact["phone_number"], []),
+                calls_by_phone.get(contact["phone_number"], []),
+            )
+            for contact in contacts
+        ]
+        rows.sort(key=lambda row: row.get("last_activity_at") or row.get("created_at") or "", reverse=True)
+        page_rows = rows[safe_offset: safe_offset + safe_limit + 1]
+        has_more = len(page_rows) > safe_limit
+        return page_rows[:safe_limit], has_more
 
     def get_latest_employee_conversation(self, employee_phone: str) -> Conversation | None:
         result = (
@@ -929,3 +1053,48 @@ def _call_conversation_matches(row: dict[str, Any], needle: str) -> bool:
         if value
     ).lower()
     return needle in haystack
+
+
+def _contact_matches(contact: dict[str, Any], needle: str) -> bool:
+    haystack = " ".join(
+        str(value)
+        for value in (
+            contact.get("phone_number"),
+            contact.get("display_name"),
+            contact.get("lookup_name"),
+            contact.get("notes"),
+        )
+        if value
+    ).lower()
+    return needle in haystack
+
+
+def _contact_search_row(
+    contact: dict[str, Any],
+    conversations: list[dict[str, Any]],
+    calls: list[dict[str, Any]],
+) -> dict[str, Any]:
+    sorted_conversations = sorted(conversations, key=lambda row: row.get("updated_at") or "", reverse=True)
+    sorted_calls = sorted(calls, key=lambda row: row.get("created_at") or row.get("started_at") or "", reverse=True)
+    open_conversation = next((conversation for conversation in sorted_conversations if conversation.get("status") == "open"), None)
+    latest_conversation = sorted_conversations[0] if sorted_conversations else None
+    latest_call = sorted_calls[0] if sorted_calls else None
+    conversation_activity = (latest_conversation or {}).get("updated_at") or (latest_conversation or {}).get("created_at")
+    call_activity = (latest_call or {}).get("created_at") or (latest_call or {}).get("started_at")
+    last_activity_at = max(
+        [str(value) for value in (conversation_activity, call_activity, contact.get("created_at")) if value],
+        default=None,
+    )
+    return {
+        "id": contact.get("id"),
+        "phone_number": contact.get("phone_number"),
+        "display_name": contact.get("display_name"),
+        "lookup_name": contact.get("lookup_name"),
+        "name": contact.get("display_name") or contact.get("lookup_name"),
+        "notes": contact.get("notes"),
+        "created_at": contact.get("created_at"),
+        "last_activity_at": last_activity_at,
+        "open_conversation_id": (open_conversation or {}).get("id"),
+        "last_conversation_id": (latest_conversation or {}).get("id"),
+        "latest_call_id": (latest_call or {}).get("id"),
+    }

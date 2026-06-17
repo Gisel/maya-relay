@@ -60,6 +60,7 @@ class InMemorySupabaseClient:
         if table_name == "contacts":
             row.setdefault("display_name", None)
             row.setdefault("lookup_name", None)
+            row.setdefault("notes", None)
             row.setdefault("lookup_checked_at", None)
 
         if table_name == "conversations":

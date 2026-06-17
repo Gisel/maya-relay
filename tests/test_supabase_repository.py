@@ -25,6 +25,21 @@ def test_get_contact_returns_existing_row_by_phone_number():
     assert contact.lookup_name is None
 
 
+def test_get_contact_by_id_returns_existing_row():
+    repository, client = build_repository()
+    client.seed(
+        "contacts",
+        [{"id": "contact-1", "phone_number": "+15550000001", "display_name": "Maria Lopez", "notes": "VIP"}],
+    )
+
+    contact = repository.get_contact_by_id("contact-1")
+
+    assert contact is not None
+    assert contact.phone_number == "+15550000001"
+    assert contact.display_name == "Maria Lopez"
+    assert contact.notes == "VIP"
+
+
 def test_get_or_create_contact_creates_once_then_reuses_row():
     repository, client = build_repository()
 
@@ -77,6 +92,127 @@ def test_upsert_contact_display_name_preserves_lookup_name():
     assert contact.lookup_name == "Lookup Name"
     assert stored["display_name"] == "Manual Name"
     assert stored["lookup_name"] == "Lookup Name"
+
+
+def test_update_contact_profile_stores_display_name_and_notes_without_erasing_lookup_name():
+    repository, client = build_repository()
+    client.seed(
+        "contacts",
+        [{"id": "contact-1", "phone_number": "+15550000001", "display_name": None, "lookup_name": "Lookup Name"}],
+    )
+
+    contact = repository.update_contact_profile(
+        contact_id="contact-1",
+        display_name="Manual Name",
+        notes="Prefers WhatsApp updates.",
+    )
+
+    stored = client.rows("contacts")[0]
+    assert contact is not None
+    assert contact.display_name == "Manual Name"
+    assert contact.lookup_name == "Lookup Name"
+    assert contact.notes == "Prefers WhatsApp updates."
+    assert stored["lookup_name"] == "Lookup Name"
+    assert stored["notes"] == "Prefers WhatsApp updates."
+
+
+def test_update_contact_profile_returns_none_for_missing_contact():
+    repository, _ = build_repository()
+
+    contact = repository.update_contact_profile(
+        contact_id="missing",
+        display_name="Missing",
+        notes="No row.",
+    )
+
+    assert contact is None
+
+
+def test_search_contacts_matches_name_phone_notes_and_returns_conversation_hints():
+    repository, client = build_repository()
+    client.seed(
+        "contacts",
+        [
+            {
+                "id": "contact-1",
+                "phone_number": "+15550000001",
+                "display_name": "Maria Lopez",
+                "lookup_name": "Lookup Maria",
+                "notes": "Prefers pickup reminders.",
+                "created_at": "2026-06-04T00:00:01+00:00",
+            },
+            {
+                "id": "contact-2",
+                "phone_number": "+15550000002",
+                "display_name": None,
+                "lookup_name": "Signs Client",
+                "notes": None,
+                "created_at": "2026-06-04T00:00:02+00:00",
+            },
+        ],
+    )
+    client.seed(
+        "conversations",
+        [
+            {
+                "id": "conversation-old",
+                "customer_phone": "+15550000001",
+                "assigned_employee": "+15551234567",
+                "status": "closed",
+                "updated_at": "2026-06-04T00:00:03+00:00",
+            },
+            {
+                "id": "conversation-open",
+                "customer_phone": "+15550000001",
+                "assigned_employee": "+15551234567",
+                "status": "open",
+                "updated_at": "2026-06-04T00:00:04+00:00",
+            },
+        ],
+    )
+    client.seed(
+        "calls",
+        [
+            {
+                "id": "call-1",
+                "conversation_id": "conversation-open",
+                "direction": "outbound",
+                "call_type": "conversation_call",
+                "customer_phone": "+15550000001",
+                "status": "completed",
+                "created_at": "2026-06-04T00:00:05+00:00",
+            }
+        ],
+    )
+
+    rows, has_more = repository.search_contacts(q="pickup", limit=10, offset=0)
+
+    assert has_more is False
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["id"] == "contact-1"
+    assert row["name"] == "Maria Lopez"
+    assert row["open_conversation_id"] == "conversation-open"
+    assert row["last_conversation_id"] == "conversation-open"
+    assert row["latest_call_id"] == "call-1"
+    assert row["last_activity_at"] == "2026-06-04T00:00:05+00:00"
+
+
+def test_search_contacts_paginates_results():
+    repository, client = build_repository()
+    client.seed(
+        "contacts",
+        [
+            {"id": "contact-1", "phone_number": "+15550000001", "display_name": "Client One"},
+            {"id": "contact-2", "phone_number": "+15550000002", "display_name": "Client Two"},
+            {"id": "contact-3", "phone_number": "+15550000003", "display_name": "Client Three"},
+        ],
+    )
+
+    rows, has_more = repository.search_contacts(q="client", limit=2, offset=0)
+
+    assert len(rows) == 2
+    assert has_more is True
 
 
 def test_get_or_create_customer_conversation_creates_contact_and_open_conversation_once():

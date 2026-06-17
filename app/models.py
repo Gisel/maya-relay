@@ -22,6 +22,7 @@ class Contact:
     phone_number: str
     display_name: str | None = None
     lookup_name: str | None = None
+    notes: str | None = None
 
     @property
     def best_name(self) -> str | None:

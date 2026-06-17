@@ -27,6 +27,11 @@ class ConversationUpdate(BaseModel):
     status: Literal["open", "closed"] | None = None
 
 
+class ContactUpdate(BaseModel):
+    displayName: str | None = None
+    notes: str | None = None
+
+
 class NewCallRequest(BaseModel):
     phone_number: str
     display_name: str | None = None
@@ -190,6 +195,60 @@ def api_conversations(
             "hasMore": has_more,
         },
     }
+
+
+@router.get("/contacts")
+def api_contacts(
+    request: Request,
+    q: str = "",
+    limit: int = 25,
+    offset: int = 0,
+    settings: Settings = Depends(get_settings),
+    repository: RelayRepository = Depends(get_repository),
+) -> dict[str, Any]:
+    require_admin(request, settings)
+    safe_limit = min(max(limit, 1), 50)
+    safe_offset = max(offset, 0)
+    contacts, has_more = repository.search_contacts(q=q, limit=safe_limit, offset=safe_offset)
+    return {
+        "items": [_serialize_contact_search_item(contact) for contact in contacts],
+        "pagination": {
+            "limit": safe_limit,
+            "offset": safe_offset,
+            "nextOffset": safe_offset + safe_limit if has_more else None,
+            "hasMore": has_more,
+        },
+    }
+
+
+@router.patch("/contacts/{contact_id}")
+def api_update_contact(
+    contact_id: str,
+    payload: ContactUpdate,
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    repository: RelayRepository = Depends(get_repository),
+) -> dict[str, Any]:
+    require_admin(request, settings)
+    existing = repository.get_contact_by_id(contact_id)
+    if existing is None:
+        raise HTTPException(status_code=404)
+    contact = repository.update_contact_profile(
+        contact_id=contact_id,
+        display_name=(
+            _clean_optional_text(payload.displayName)
+            if "displayName" in payload.model_fields_set
+            else existing.display_name
+        ),
+        notes=(
+            _clean_optional_text(payload.notes)
+            if "notes" in payload.model_fields_set
+            else existing.notes
+        ),
+    )
+    if contact is None:
+        raise HTTPException(status_code=404)
+    return {"contact": _serialize_contact(contact)}
 
 
 @router.get("/conversations/{conversation_id}")
@@ -726,6 +785,32 @@ def _serialize_customer(conversation: dict[str, Any]) -> dict[str, Any]:
         "displayName": display_name,
         "lookupName": lookup_name,
         "name": best_name,
+    }
+
+
+def _serialize_contact(contact: Any) -> dict[str, Any]:
+    return {
+        "id": contact.id,
+        "phone": contact.phone_number,
+        "displayName": contact.display_name,
+        "lookupName": contact.lookup_name,
+        "name": contact.best_name,
+        "notes": contact.notes,
+    }
+
+
+def _serialize_contact_search_item(contact: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": contact.get("id"),
+        "phone": contact.get("phone_number"),
+        "displayName": contact.get("display_name"),
+        "lookupName": contact.get("lookup_name"),
+        "name": contact.get("name"),
+        "notes": contact.get("notes"),
+        "lastActivityAt": contact.get("last_activity_at"),
+        "openConversationId": contact.get("open_conversation_id"),
+        "lastConversationId": contact.get("last_conversation_id"),
+        "latestCallId": contact.get("latest_call_id"),
     }
 
 
