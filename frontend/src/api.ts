@@ -140,6 +140,22 @@ export type QuickResponse = {
   requiresActiveWindow?: boolean;
 };
 
+export type CustomerActionRequest = {
+  id: string;
+  conversationId: string;
+  contactId: string | null;
+  type: "proof" | "assets" | string;
+  status: "pending" | "approved" | "changes_requested" | "submitted" | "expired" | "canceled" | string;
+  title: string | null;
+  operatorNote: string | null;
+  expiresAt: string | null;
+  completedAt: string | null;
+  canceledAt: string | null;
+  createdBy: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
 export type ConversationsResponse = {
   metrics: Metrics;
   conversations: ConversationListItem[];
@@ -155,6 +171,7 @@ export type ConversationDetailResponse = {
   conversation: ConversationDetail;
   messages: Message[];
   calls: CallRecord[];
+  customerActions: CustomerActionRequest[];
   suggestedReply: string;
 };
 
@@ -241,6 +258,12 @@ export type OperationalStatusResponse = {
 
 export type ReplyResponse = {
   status: "sent" | "duplicate";
+  message: Message;
+};
+
+export type ProofRequestResponse = {
+  proofRequest: CustomerActionRequest;
+  publicUrl: string;
   message: Message;
 };
 
@@ -381,6 +404,21 @@ export function sendReply(conversationId: string, body: string, files: File[], c
   return request<ReplyResponse>(`/api/conversations/${conversationId}/reply`, {
     method: "POST",
     body: form,
+  });
+}
+
+export function createProofRequest(
+  conversationId: string,
+  payload: {
+    proofUrl: string;
+    title?: string | null;
+    operatorNote?: string | null;
+    customerMessage?: string | null;
+  },
+) {
+  return request<ProofRequestResponse>(`/api/conversations/${conversationId}/proof-requests`, {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }
 

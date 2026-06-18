@@ -717,7 +717,8 @@ button {
 }
 
 .conversation-status-action,
-.conversation-call-action {
+.conversation-call-action,
+.conversation-proof-action {
   align-items: center;
   background: #ffffff;
   border: 1px solid #d7dde7;
@@ -737,13 +738,20 @@ button {
   color: var(--brand-blue-dark);
 }
 
+.conversation-proof-action {
+  background: #f0fbf4;
+  border-color: #bde8ca;
+  color: #146a3a;
+}
+
 .conversation-status-action.is-close-action {
   border-color: #f4b4ad;
   color: #b42318;
 }
 
 .conversation-status-action:disabled,
-.conversation-call-action:disabled {
+.conversation-call-action:disabled,
+.conversation-proof-action:disabled {
   background: #eef1f5;
   color: #98a2b6;
   cursor: not-allowed;
@@ -1186,6 +1194,58 @@ button {
 
 .settings-surface {
   max-width: 560px;
+}
+
+.proof-request-surface {
+  max-width: 560px;
+}
+
+.proof-request-form {
+  max-height: min(680px, calc(100vh - 172px));
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-gutter: stable;
+}
+
+.proof-recipient-card {
+  align-items: center;
+  background: #f7f9fc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #344054;
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+  padding: 11px 12px;
+}
+
+.proof-recipient-card svg {
+  color: #146a3a;
+  flex: 0 0 auto;
+}
+
+.proof-recipient-card div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.proof-recipient-card strong,
+.proof-recipient-card span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.proof-recipient-card strong {
+  color: #172033;
+  font-size: 14px;
+}
+
+.proof-recipient-card span {
+  color: #68748a;
+  font-size: 13px;
+  font-weight: 560;
 }
 
 .settings-section {

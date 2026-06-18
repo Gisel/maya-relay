@@ -31,6 +31,7 @@ import {
   ContactImportResponse,
   ContactProfile,
   ContactSearchItem,
+  createProofRequest,
   DeliveryStatus,
   FollowUpStatus,
   Message,
@@ -61,6 +62,8 @@ import { CallWorkspace } from "./calls/CallWorkspace";
 import { WorkspaceMode, WorkspaceTabs } from "./calls/WorkspaceTabs";
 import { CustomerProfileSummary } from "./customers/CustomerProfileSummary";
 import { EditCustomerProfileModal } from "./customers/EditCustomerProfileModal";
+import { ProofActionButton } from "./customerActions/ProofActionButton";
+import { ProofRequestModal } from "./customerActions/ProofRequestModal";
 import { QuickResponsesPanel } from "./messaging/QuickResponsesPanel";
 import { UnifiedSearchResults } from "./search/UnifiedSearchResults";
 import { ContactCsvImport } from "./settings/ContactCsvImport";
@@ -658,6 +661,9 @@ export function App() {
   const [profileError, setProfileError] = useState("");
   const [profileStatus, setProfileStatus] = useState("");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isProofRequestOpen, setIsProofRequestOpen] = useState(false);
+  const [isSendingProofRequest, setIsSendingProofRequest] = useState(false);
+  const [proofRequestError, setProofRequestError] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<ConversationStatusFilter>("open");
   const [draft, setDraft] = useState("");
@@ -1399,6 +1405,43 @@ export function App() {
     }
   }
 
+  async function handleSendProofRequest(payload: {
+    proofUrl: string;
+    title: string;
+    customerMessage: string;
+    operatorNote: string;
+  }) {
+    if (!selectedId) return;
+    setIsSendingProofRequest(true);
+    setProofRequestError("");
+    setAppError("");
+    setCallStatus("");
+    try {
+      const response = await createProofRequest(selectedId, {
+        proofUrl: payload.proofUrl,
+        title: payload.title || null,
+        customerMessage: payload.customerMessage || null,
+        operatorNote: payload.operatorNote || null,
+      });
+      setMessages((current) => {
+        const withoutDuplicate = current.filter((message) => message.id !== response.message.id);
+        return [...withoutDuplicate, response.message];
+      });
+      setCallStatus("Proof request sent.");
+      setIsProofRequestOpen(false);
+      await refreshDetail(selectedId, { force: true });
+      await loadConversations(selectedId);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setIsAuthenticated(false);
+      } else {
+        setProofRequestError(error instanceof Error ? error.message : "Could not send the proof request.");
+      }
+    } finally {
+      setIsSendingProofRequest(false);
+    }
+  }
+
   async function updateActiveConversationStatus(nextStatus: ConversationStatus) {
     if (!selectedId || !activeConversation) {
       closeAuditLog("status update aborted", {
@@ -1856,6 +1899,13 @@ export function App() {
                 </p>
                 <div className="conversation-header-actions">
                   <StatusPill status={status} />
+                  <ProofActionButton
+                    disabled={!selectedId || status !== "open" || isSendingProofRequest}
+                    onClick={() => {
+                      setProofRequestError("");
+                      setIsProofRequestOpen(true);
+                    }}
+                  />
                   <button
                     className="conversation-call-action"
                     disabled={!selectedId || isCallingCustomer}
@@ -2013,6 +2063,20 @@ export function App() {
         open={isProfileEditorOpen}
         phone={contextDisplayPhone}
         status={profileStatus}
+      />
+      <ProofRequestModal
+        channel={channel}
+        customerName={customerName}
+        customerPhone={displayPhone}
+        error={proofRequestError}
+        isSending={isSendingProofRequest}
+        onClose={() => {
+          if (isSendingProofRequest) return;
+          setProofRequestError("");
+          setIsProofRequestOpen(false);
+        }}
+        onSend={handleSendProofRequest}
+        open={isProofRequestOpen}
       />
       <SettingsModal onClose={() => setIsSettingsOpen(false)} open={isSettingsOpen}>
         <OperationalStatusView />
