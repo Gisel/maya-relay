@@ -230,10 +230,21 @@ function DeliveryPill({ status }: { status: DeliveryStatus }) {
   );
 }
 
+function proofDecisionClass(message: Message) {
+  const normalizedBody = message.body.toLowerCase();
+  if (normalizedBody.startsWith("proof approved by customer")) {
+    return "is-approved";
+  }
+  if (normalizedBody.startsWith("proof changes requested by customer")) {
+    return "is-changes-requested";
+  }
+  return "";
+}
+
 function MessageBubble({ message, onMediaLoad }: { message: Message; onMediaLoad: () => void }) {
   if (message.direction === "system") {
     return (
-      <article className="message-bubble system-event">
+      <article className={`message-bubble system-event ${proofDecisionClass(message)}`}>
         <p>{message.body}</p>
         <footer>
           <span>{formatDate(message.createdAt)}</span>

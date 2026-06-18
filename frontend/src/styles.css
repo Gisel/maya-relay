@@ -171,7 +171,7 @@ button {
 .public-proof-brand strong {
   color: #172033;
   font-size: 24px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0;
 }
 
@@ -191,6 +191,7 @@ button {
 
 .public-proof-heading h1 {
   font-size: 30px;
+  font-weight: 700;
   line-height: 1.08;
   margin: 6px 0 0;
 }
@@ -198,7 +199,7 @@ button {
 .section-kicker {
   color: #98a2b3;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: .08em;
   margin: 0;
   text-transform: uppercase;
@@ -208,7 +209,7 @@ button {
   border-radius: 999px;
   flex: 0 0 auto;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   padding: 8px 12px;
 }
 
@@ -258,7 +259,7 @@ button {
   align-items: center;
   color: var(--brand-blue-dark);
   display: inline-flex;
-  font-weight: 800;
+  font-weight: 650;
   gap: 8px;
   justify-self: start;
   text-decoration: none;
@@ -307,7 +308,7 @@ button {
   border-radius: 8px;
   color: #ffffff;
   display: inline-flex;
-  font-weight: 800;
+  font-weight: 700;
   gap: 8px;
   justify-content: center;
   min-height: 46px;
@@ -1033,13 +1034,33 @@ button {
   max-width: min(560px, 86%);
 }
 
+.message-bubble.system-event.is-approved {
+  background: #eefaf3;
+  border-color: #a8dfbc;
+  color: #176a3b;
+}
+
+.message-bubble.system-event.is-changes-requested {
+  background: #fff7ed;
+  border-color: #f7c98b;
+  color: #8a4b00;
+}
+
 .message-bubble.system-event p {
-  font-weight: 650;
+  font-weight: 520;
   white-space: pre-wrap;
 }
 
 .message-bubble.system-event footer {
   color: #8a95a8;
+}
+
+.message-bubble.system-event.is-approved footer {
+  color: #4f8f68;
+}
+
+.message-bubble.system-event.is-changes-requested footer {
+  color: #9a6a2f;
 }
 
 .conversation-panel.channel-whatsapp .message-bubble.outbound {
