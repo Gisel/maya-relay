@@ -338,7 +338,7 @@ button {
 .public-proof-changes-form label {
   color: #475366;
   display: grid;
-  font-weight: 700;
+  font-weight: 560;
   gap: 8px;
 }
 
@@ -346,6 +346,8 @@ button {
   border: 1px solid #cdd5e1;
   border-radius: 8px;
   color: #172033;
+  font-weight: 400;
+  line-height: 1.45;
   min-width: 0;
   padding: 12px 14px;
   resize: vertical;
@@ -1478,6 +1480,16 @@ button {
   scrollbar-gutter: stable;
 }
 
+.proof-request-form input,
+.proof-request-form textarea {
+  font-weight: 400;
+}
+
+.proof-request-form input::placeholder,
+.proof-request-form textarea::placeholder {
+  font-weight: 400;
+}
+
 .proof-recipient-card {
   align-items: center;
   background: #f7f9fc;
@@ -1511,6 +1523,7 @@ button {
 .proof-recipient-card strong {
   color: #172033;
   font-size: 14px;
+  font-weight: 620;
 }
 
 .proof-recipient-card span {
@@ -2707,7 +2720,7 @@ button {
   display: inline-flex;
   flex: 0 0 auto;
   font-size: 13px;
-  font-weight: 560;
+  font-weight: 520;
   gap: 6px;
   justify-content: center;
   min-height: 32px;
@@ -2717,7 +2730,7 @@ button {
 .file-picker-name {
   color: #68748a;
   font-size: 13px;
-  font-weight: 560;
+  font-weight: 400;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2726,6 +2739,7 @@ button {
 
 .file-picker-name.has-file {
   color: #172033;
+  font-weight: 500;
 }
 
 .drawer-form .file-picker-input {
