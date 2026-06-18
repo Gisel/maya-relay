@@ -178,6 +178,12 @@ Feature goal:
 
 Give the operator a reliable customer profile inside the dashboard without turning Maya Relay into a full CRM yet.
 
+Current status:
+
+- Backend/API foundation is implemented.
+- The first dashboard placement was reverted because it crowded the active details panel and risked existing operator workflows.
+- Frontend integration must be treated as a new scoped UX slice, not as a quick right-panel insertion.
+
 In scope:
 
 - Editable contact display name.
@@ -185,7 +191,7 @@ In scope:
 - Customer notes.
 - Recent message and call history visible.
 - Use contact display name before Twilio Lookup name.
-- Keep the UI compact in the existing right panel or selected customer area.
+- Keep the UI compact and subordinate to the existing conversation/call workflow.
 
 Out of scope:
 
@@ -205,8 +211,8 @@ Data contract:
 
 API contract:
 
-- Add or extend a contact endpoint:
-  - `GET /api/contacts/{contact_id}` or include profile in conversation detail.
+- Implemented endpoints:
+  - `GET /api/contacts?q=&limit=&offset=`
   - `PATCH /api/contacts/{contact_id}` with optional `displayName` and `notes`.
 - Response should include:
   - `id`
@@ -214,14 +220,14 @@ API contract:
   - `displayName`
   - `lookupName`
   - `notes`
-  - `recentMessages`
-  - `recentCalls`
 - Auth: same current admin session.
 
 UI contract:
 
-- Show customer name, phone, notes, and recent history in the dashboard.
-- Edit name and notes without leaving the conversation/call workflow.
+- Existing dashboard details panel must continue showing customer name, phone, AI Suggested Reply, and Quick Responses.
+- Edit name and notes through an explicit edit action, drawer, or modal.
+- Do not place large forms above AI Suggested Reply or Quick Responses in the default right panel.
+- Recent history may be shown only if bounded and visually secondary.
 - Save state is clear.
 - Empty notes/history states are quiet and professional.
 
@@ -229,7 +235,8 @@ Tests:
 
 - Repository tests for contact update and notes persistence.
 - API tests for authorized update, validation, and response shape.
-- Frontend/e2e test for editing contact name/notes if UI changes.
+- Frontend/e2e test for editing contact name/notes when UI is reintroduced.
+- Regression test that existing center-column messages still render.
 
 Risks:
 
@@ -242,7 +249,7 @@ Acceptance criteria:
 - Operator can edit and save a contact name.
 - Operator can edit and save customer notes.
 - Phone number remains visible.
-- Recent messages/calls are visible without loading the entire database.
+- Recent messages/calls are visible only if included in the accepted UI slice; otherwise they remain pending.
 - Manual name is used in conversation/call display.
 
 ### Slice C2: Contact / Client Search
@@ -251,10 +258,15 @@ Feature goal:
 
 Allow operators to find contacts/clients by name or phone without redesigning the whole dashboard.
 
+Current status:
+
+- Backend/API foundation is implemented.
+- Dashboard UI is pending after reverting the first placement.
+
 In scope:
 
 - Backend search endpoint.
-- Basic dashboard UI entry point.
+- Basic dashboard UI entry point that does not disrupt conversation search.
 - Search by phone/name.
 - Results show display name, lookup name, phone, and recent activity hint.
 - Selecting a result opens the relevant conversation/contact context when available.
@@ -288,15 +300,17 @@ API contract:
 
 UI contract:
 
-- Add a small search surface to the existing dashboard.
-- No massive layout redesign.
+- Add a focused search surface to the existing dashboard.
+- Do not replace or crowd the existing conversation search.
+- Do not place global contact search inside the default active conversation details stack.
 - Empty, loading, and error states are visible.
 
 Tests:
 
 - Repository search tests.
 - API search tests for name, phone, pagination, and auth.
-- Frontend/e2e smoke test if UI is added.
+- Frontend/e2e smoke test when UI is added.
+- Regression test that existing conversation search still works.
 
 Risks:
 
@@ -318,6 +332,11 @@ Acceptance criteria:
 Feature goal:
 
 Import customer names from CSV so Maya Relay can use known contacts before paid Twilio Lookup.
+
+Current status:
+
+- Backend/API foundation is implemented and tested.
+- The first dashboard upload placement was reverted because it had poor feedback and belonged in an admin/import surface, not the active conversation details panel.
 
 In scope:
 
@@ -357,17 +376,20 @@ API contract:
 
 UI contract:
 
-- Simple import surface in dashboard/admin area.
+- Simple import surface in dashboard/admin area, settings area, or dedicated drawer/modal.
+- Do not place CSV import controls in the active conversation details panel.
 - Show required columns.
 - Show summary after upload.
 - Show row errors in a readable, bounded way.
+- Show progress/loading, success, skipped/invalid row counts, and error feedback.
 
 Tests:
 
 - CSV parser tests for valid rows, blank names, invalid phone, missing columns.
 - Repository upsert tests.
 - API upload tests.
-- Optional e2e smoke if UI is added.
+- Frontend/e2e smoke when UI is added.
+- Regression test that the Text/Calls rail, center message timeline, composer, and details toggle are unchanged.
 
 Risks:
 

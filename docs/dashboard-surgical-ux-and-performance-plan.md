@@ -141,21 +141,28 @@ Visual direction to preserve:
 - CSS token rule documented for future frontend styling.
 - `.env` / Railway variables remain source of truth.
 - Customer / Contact production slice:
-  - editable contact name
-  - phone number visible
-  - customer notes
-  - contact search by name/phone
-  - bounded contact search results
+  - backend contact profile/search contract
+  - editable contact name and notes via API
+  - phone number visible in existing dashboard summary
+  - contact search by name/phone via API
+  - bounded contact search results via API
 - CSV Contact Import production slice:
-  - dashboard upload UI
   - backend endpoint and tests
   - accepts CSV with `phone_number`, `display_name`
   - upserts contacts conservatively
   - blank names do not overwrite
   - imported names used before paid Twilio Lookup
+  - initial dashboard upload UI was reverted because it crowded the operator details panel and did not meet UX acceptance criteria
 
 ## Next
 
+- Rebuild Customer/Profile/Search/Import frontend as a scoped UX slice:
+  - preserve the existing Text/Calls rail, center message timeline, composer, details toggle, AI Suggested Reply, and Quick Responses
+  - keep the right panel lightweight by default; do not place CSV import or broad search inside the active conversation details stack
+  - add profile editing through an explicit Edit action, drawer, or modal
+  - add contact search as a separate focused operator action, not a replacement for conversation search
+  - add CSV import under an admin/settings/import surface with clear progress, success, skipped, and invalid-row feedback
+  - verify with Playwright that existing messages still render in the center column before calling the slice done
 - Validate deployed inbound call recording automation:
   - place one answered inbound call after deploy
   - confirm Maya Relay stores the longest/full Twilio recording, not the short ring/early segment
@@ -193,25 +200,25 @@ Visual direction to preserve:
 
 ## Pending
 
-- Add Customer Profile basics:
-  - notes
-  - visible customer history
-  - contact information foundation
+- Customer Profile frontend integration:
+  - editable name and notes through a focused edit surface
+  - visible customer history without crowding the active conversation panel
+  - clear save/loading/error feedback
 - Add WhatsApp Templates:
   - quote follow-up
   - proof ready
   - pickup reminder
   - payment reminder
-- Add Contact / Client Search foundation:
-  - backend endpoint
-  - tests
-  - no major UI disruption yet
-- Add CSV Contact Import:
-  - `phone_number`
-  - `display_name`
-  - preserve manual names
-  - blank values do not erase existing names
-  - use uploaded contacts before paid Twilio Lookup
+- Contact / Client Search frontend:
+  - use the existing backend endpoint
+  - search by phone/name
+  - open the related active/recent conversation when available
+  - do not disrupt the existing conversation search
+- CSV Contact Import frontend:
+  - use the existing backend endpoint
+  - accept `phone_number` and `display_name`
+  - show created/updated/skipped counts and row-level errors
+  - do not place import controls in the active conversation details panel
 - Scalable client/conversation loading model:
   - conversations remain paginated and activity-ordered
   - contact/client search remains separate from conversation browsing
