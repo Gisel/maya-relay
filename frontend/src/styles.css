@@ -1025,6 +1025,23 @@ button {
   justify-self: end;
 }
 
+.message-bubble.system-event {
+  background: #f7f9fc;
+  border-color: #dfe6f0;
+  color: #475366;
+  justify-self: center;
+  max-width: min(560px, 86%);
+}
+
+.message-bubble.system-event p {
+  font-weight: 650;
+  white-space: pre-wrap;
+}
+
+.message-bubble.system-event footer {
+  color: #8a95a8;
+}
+
 .conversation-panel.channel-whatsapp .message-bubble.outbound {
   background: var(--brand-green);
   border-color: var(--brand-green);

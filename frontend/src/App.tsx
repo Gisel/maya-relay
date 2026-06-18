@@ -171,7 +171,12 @@ function needsReply(conversation: ConversationListItem) {
 }
 
 function isCustomerVisibleMessage(message: Message) {
-  return message.direction !== "system";
+  return message.direction !== "system" || isProofDecisionMessage(message);
+}
+
+function isProofDecisionMessage(message: Message) {
+  const body = message.body.trim();
+  return body.startsWith("Proof approved by customer.") || body.startsWith("Proof changes requested by customer:");
 }
 
 function formatDate(value: string | null | undefined) {
@@ -226,6 +231,16 @@ function DeliveryPill({ status }: { status: DeliveryStatus }) {
 }
 
 function MessageBubble({ message, onMediaLoad }: { message: Message; onMediaLoad: () => void }) {
+  if (message.direction === "system") {
+    return (
+      <article className="message-bubble system-event">
+        <p>{message.body}</p>
+        <footer>
+          <span>{formatDate(message.createdAt)}</span>
+        </footer>
+      </article>
+    );
+  }
   const isOutbound = message.direction === "employee_to_customer";
   const body = displayMessageBody(message);
 
