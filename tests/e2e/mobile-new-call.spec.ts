@@ -675,7 +675,7 @@ test("customer profile edits happen from the right-panel pencil without hiding m
   await page.getByRole("button", { name: "Close customer notes" }).click();
 });
 
-test("WhatsApp draft responses only appear for WhatsApp conversations", async ({ page }) => {
+test("channel-specific responses appear in the single quick responses list", async ({ page }) => {
   await mockMayaRelayApi(page);
 
   await page.goto("/app/");
@@ -683,7 +683,7 @@ test("WhatsApp draft responses only appear for WhatsApp conversations", async ({
   await page.getByRole("button", { name: "Details" }).click();
 
   await expect(page.getByRole("heading", { name: "Quick Responses" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "WhatsApp Drafts" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Quote follow-up" })).toHaveCount(0);
   await page.getByRole("button", { name: "Close details panel" }).click();
 
   await page.getByRole("button", { name: "Load more" }).click();
@@ -691,7 +691,8 @@ test("WhatsApp draft responses only appear for WhatsApp conversations", async ({
   await expect(page.getByRole("article").getByText("Can you follow up on my quote?")).toBeVisible();
   await page.getByRole("button", { name: "Details" }).click();
 
-  await expect(page.getByRole("heading", { name: "WhatsApp Drafts" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Quick Responses" })).toHaveCount(1);
+  await expect(page.getByRole("heading", { name: "WhatsApp Drafts" })).toHaveCount(0);
   await page.getByRole("button", { name: "Quote follow-up" }).click();
 
   await expect(page.getByLabel("Reply message")).toHaveValue("Hi - following up on your quote request.");

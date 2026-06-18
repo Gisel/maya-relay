@@ -1440,16 +1440,22 @@ button {
   scrollbar-gutter: stable;
 }
 
-.context-scroll-area::-webkit-scrollbar {
+.context-panel::-webkit-scrollbar,
+.context-scroll-area::-webkit-scrollbar,
+.intent-box p::-webkit-scrollbar {
   width: 8px;
 }
 
-.context-scroll-area::-webkit-scrollbar-thumb {
+.context-panel::-webkit-scrollbar-thumb,
+.context-scroll-area::-webkit-scrollbar-thumb,
+.intent-box p::-webkit-scrollbar-thumb {
   background: #cfd7e5;
   border-radius: 999px;
 }
 
-.context-scroll-area::-webkit-scrollbar-track {
+.context-panel::-webkit-scrollbar-track,
+.context-scroll-area::-webkit-scrollbar-track,
+.intent-box p::-webkit-scrollbar-track {
   background: transparent;
 }
 
@@ -2505,6 +2511,8 @@ button {
 
   .context-panel {
     border-left: 1px solid #dce3ee;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
   }
 
   .metrics-row,
@@ -2682,6 +2690,8 @@ button {
 
   .context-panel {
     padding: 18px 18px;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
   }
 
   .context-section {

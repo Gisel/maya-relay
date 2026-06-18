@@ -26,43 +26,22 @@ function responseIcon(response: QuickResponse, index: number) {
 }
 
 export function QuickResponsesPanel({ channel, responses, onUseResponse }: QuickResponsesPanelProps) {
-  const quickResponses = responses.filter(
-    (response) => responseGroup(response) === "quick_response" && channelAllows(response, channel),
-  );
-  const whatsappDrafts = channel === "whatsapp"
-    ? responses.filter((response) => responseGroup(response) === "whatsapp_draft" && channelAllows(response, channel))
-    : [];
+  const availableResponses = responses.filter((response) => {
+    const group = responseGroup(response);
+    return (group === "quick_response" || group === "whatsapp_draft") && channelAllows(response, channel);
+  });
 
   return (
-    <>
-      <section className="context-section">
-        <h2>Quick Responses</h2>
-        <div className="quick-responses">
-          {quickResponses.map((response, index) => (
-            <button key={response.id} onClick={() => onUseResponse(response.body)} type="button">
-              {responseIcon(response, index)}
-              <span>{response.label}</span>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {whatsappDrafts.length > 0 && (
-        <section className="context-section">
-          <h2>
-            <MessageSquareText size={18} />
-            WhatsApp Drafts
-          </h2>
-          <div className="quick-responses whatsapp-drafts">
-            {whatsappDrafts.map((response, index) => (
-              <button key={response.id} onClick={() => onUseResponse(response.body)} type="button">
-                {responseIcon(response, index)}
-                <span>{response.label}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-    </>
+    <section className="context-section">
+      <h2>Quick Responses</h2>
+      <div className="quick-responses">
+        {availableResponses.map((response, index) => (
+          <button key={response.id} onClick={() => onUseResponse(response.body)} type="button">
+            {responseIcon(response, index)}
+            <span>{response.label}</span>
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }
