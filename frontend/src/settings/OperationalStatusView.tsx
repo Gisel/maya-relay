@@ -76,49 +76,51 @@ export function OperationalStatusView() {
             </span>
           </div>
 
-          {status.messageFailures.length > 0 && (
-            <div className="status-issue-group">
-              <h4>Failed Twilio sends</h4>
-              {status.messageFailures.map((issue) => (
-                <article className="status-issue-card" key={issue.id}>
-                  <header>
-                    <AlertTriangle size={15} />
-                    <strong>{customerLabel(issue.customerName, issue.customerPhone)}</strong>
-                    <em>{relativeDate(issue.createdAt)}</em>
-                  </header>
-                  <p>{issue.bodyPreview || "No message body"}</p>
-                  <small>
-                    {issue.deliveryStatus || "failed"}
-                    {issue.deliveryErrorCode ? ` · ${issue.deliveryErrorCode}` : ""}
-                    {issue.conversationCode ? ` · #${issue.conversationCode}` : ""}
-                  </small>
-                  <span>{issue.hint}</span>
-                </article>
-              ))}
-            </div>
-          )}
+          <div className="status-issue-scroll" aria-label="Operational issue list">
+            {status.messageFailures.length > 0 && (
+              <div className="status-issue-group">
+                <h4>Failed Twilio sends</h4>
+                {status.messageFailures.map((issue) => (
+                  <article className="status-issue-card" key={issue.id}>
+                    <header>
+                      <AlertTriangle size={15} />
+                      <strong>{customerLabel(issue.customerName, issue.customerPhone)}</strong>
+                      <em>{relativeDate(issue.createdAt)}</em>
+                    </header>
+                    <p>{issue.bodyPreview || "No message body"}</p>
+                    <small>
+                      {issue.deliveryStatus || "failed"}
+                      {issue.deliveryErrorCode ? ` · ${issue.deliveryErrorCode}` : ""}
+                      {issue.conversationCode ? ` · #${issue.conversationCode}` : ""}
+                    </small>
+                    <span>{issue.hint}</span>
+                  </article>
+                ))}
+              </div>
+            )}
 
-          {status.callAttention.length > 0 && (
-            <div className="status-issue-group">
-              <h4>Call recording and AI</h4>
-              {status.callAttention.map((issue) => (
-                <article className="status-issue-card" key={`${issue.kind}-${issue.id}`}>
-                  <header>
-                    <AlertTriangle size={15} />
-                    <strong>{issueTitle(issue.kind)}</strong>
-                    <em>{relativeDate(issue.completedAt || issue.startedAt || issue.createdAt)}</em>
-                  </header>
-                  <p>{customerLabel(issue.customerName, issue.customerPhone)}</p>
-                  <small>
-                    {issue.status || "unknown"}
-                    {issue.recordingStatus ? ` · recording ${issue.recordingStatus}` : ""}
-                    {issue.conversationCode ? ` · #${issue.conversationCode}` : ""}
-                  </small>
-                  <span>{issue.hint}</span>
-                </article>
-              ))}
-            </div>
-          )}
+            {status.callAttention.length > 0 && (
+              <div className="status-issue-group">
+                <h4>Call recording and AI</h4>
+                {status.callAttention.map((issue) => (
+                  <article className="status-issue-card" key={`${issue.kind}-${issue.id}`}>
+                    <header>
+                      <AlertTriangle size={15} />
+                      <strong>{issueTitle(issue.kind)}</strong>
+                      <em>{relativeDate(issue.completedAt || issue.startedAt || issue.createdAt)}</em>
+                    </header>
+                    <p>{customerLabel(issue.customerName, issue.customerPhone)}</p>
+                    <small>
+                      {issue.status || "unknown"}
+                      {issue.recordingStatus ? ` · recording ${issue.recordingStatus}` : ""}
+                      {issue.conversationCode ? ` · #${issue.conversationCode}` : ""}
+                    </small>
+                    <span>{issue.hint}</span>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
         </>
       )}
     </section>

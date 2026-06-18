@@ -655,6 +655,7 @@ test("settings CSV import gives import feedback without moving profile controls 
   await expect(settings.getByText("Failed Twilio sends")).toBeVisible();
   await expect(settings.getByText("Carrier filtering")).toBeVisible();
   await expect(settings.getByText("Recording missing")).toBeVisible();
+  await expect(settings.locator(".status-issue-scroll")).toBeVisible();
   await expect.poll(() => requestCounts.operationalStatus).toBeGreaterThan(0);
   await expect(settings.getByRole("heading", { name: "CSV Import" })).toBeVisible();
 
