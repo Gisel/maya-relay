@@ -179,7 +179,7 @@ def test_unknown_token_is_not_found():
 
 
 def test_customer_action_token_secret_requires_explicit_secret_in_production():
-    settings = Settings(APP_ENV="production")
+    settings = Settings(APP_ENV="production", CUSTOMER_ACTION_TOKEN_SECRET="")
 
     with pytest.raises(RuntimeError):
         customer_action_token_secret(settings)

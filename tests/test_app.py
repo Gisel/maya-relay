@@ -1844,19 +1844,19 @@ def test_api_creates_sends_public_proof_request_and_exposes_conversation_action_
     )
     unauthenticated = client.post(
         "/api/conversations/conversation-1/proof-requests",
-        json={"proofUrl": "https://files.example/proof.pdf"},
+        files={"proof_file": ("proof.pdf", b"fake proof", "application/pdf")},
     )
     assert unauthenticated.status_code == 401
 
     login = client.post("/api/auth/login", json={"password": "secret"})
     response = client.post(
         "/api/conversations/conversation-1/proof-requests",
-        json={
+        data={
             "title": "Business card proof",
-            "operatorNote": "Please review before print.",
-            "customerMessage": "Please review this proof before we print.",
-            "proofUrl": "https://files.example/proof.pdf",
+            "operator_note": "Please review before print.",
+            "customer_message": "Please review this proof before we print.",
         },
+        files={"proof_file": ("proof.pdf", b"fake proof", "application/pdf")},
         headers={"cookie": login.headers["set-cookie"]},
     )
 
@@ -1879,7 +1879,13 @@ def test_api_creates_sends_public_proof_request_and_exposes_conversation_action_
         "updatedAt": None,
     }
     assert "public_token_hash" not in payload["proofRequest"]
-    assert repository.customer_action_files[0]["external_url"] == "https://files.example/proof.pdf"
+    assert repository.customer_action_files[0]["bucket"] == "attachments"
+    assert repository.customer_action_files[0]["object_path"] == "proof-requests/conversation-1/proof.pdf"
+    assert repository.customer_action_files[0]["public_url"] == "https://files.example/proof-requests/conversation-1/proof.pdf"
+    assert repository.customer_action_files[0]["external_url"] is None
+    assert repository.customer_action_files[0]["original_filename"] == "proof.pdf"
+    assert repository.customer_action_files[0]["content_type"] == "application/pdf"
+    assert repository.customer_action_files[0]["size_bytes"] == 10
     assert payload["message"]["twilioMessageSid"] == "SMfake1"
     assert sender.sent_messages[-1] == {
         "sid": "SMfake1",
@@ -1912,7 +1918,7 @@ def test_api_public_proof_request_read_and_approve_flow():
     login = client.post("/api/auth/login", json={"password": "secret"})
     created = client.post(
         "/api/conversations/conversation-1/proof-requests",
-        json={"proofUrl": "https://files.example/proof.pdf"},
+        files={"proof_file": ("proof.pdf", b"fake proof", "application/pdf")},
         headers={"cookie": login.headers["set-cookie"]},
     ).json()
     token = created["publicUrl"].rsplit("/", 1)[-1]
@@ -1926,11 +1932,11 @@ def test_api_public_proof_request_read_and_approve_flow():
         {
             "id": "customer-action-file-1",
             "role": "proof",
-            "publicUrl": None,
-            "externalUrl": "https://files.example/proof.pdf",
-            "originalFilename": None,
-            "contentType": None,
-            "sizeBytes": None,
+            "publicUrl": "https://files.example/proof-requests/conversation-1/proof.pdf",
+            "externalUrl": None,
+            "originalFilename": "proof.pdf",
+            "contentType": "application/pdf",
+            "sizeBytes": 10,
             "createdAt": repository.customer_action_files[0]["created_at"],
         }
     ]
@@ -1961,7 +1967,7 @@ def test_api_public_proof_request_changes_flow_and_invalid_token():
     login = client.post("/api/auth/login", json={"password": "secret"})
     created = client.post(
         "/api/conversations/conversation-1/proof-requests",
-        json={"proofUrl": "https://files.example/proof.pdf"},
+        files={"proof_file": ("proof.pdf", b"fake proof", "application/pdf")},
         headers={"cookie": login.headers["set-cookie"]},
     ).json()
     token = created["publicUrl"].rsplit("/", 1)[-1]
@@ -1989,7 +1995,7 @@ def test_api_proof_request_uses_whatsapp_channel_when_conversation_is_whatsapp()
 
     response = client.post(
         "/api/conversations/conversation-1/proof-requests",
-        json={"proofUrl": "https://files.example/proof.pdf"},
+        files={"proof_file": ("proof.pdf", b"fake proof", "application/pdf")},
         headers={"cookie": login.headers["set-cookie"]},
     )
 
@@ -2010,7 +2016,7 @@ def test_api_proof_request_keeps_request_when_twilio_send_fails():
 
     response = client.post(
         "/api/conversations/conversation-1/proof-requests",
-        json={"proofUrl": "https://files.example/proof.pdf"},
+        files={"proof_file": ("proof.pdf", b"fake proof", "application/pdf")},
         headers={"cookie": login.headers["set-cookie"]},
     )
 

@@ -410,15 +410,21 @@ export function sendReply(conversationId: string, body: string, files: File[], c
 export function createProofRequest(
   conversationId: string,
   payload: {
-    proofUrl: string;
+    proofFile: File;
     title?: string | null;
     operatorNote?: string | null;
     customerMessage?: string | null;
   },
 ) {
+  const form = new FormData();
+  form.set("proof_file", payload.proofFile);
+  form.set("title", payload.title ?? "");
+  form.set("operator_note", payload.operatorNote ?? "");
+  form.set("customer_message", payload.customerMessage ?? "");
+
   return request<ProofRequestResponse>(`/api/conversations/${conversationId}/proof-requests`, {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: form,
   });
 }
 

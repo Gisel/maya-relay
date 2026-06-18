@@ -1406,7 +1406,7 @@ export function App() {
   }
 
   async function handleSendProofRequest(payload: {
-    proofUrl: string;
+    proofFile: File;
     title: string;
     customerMessage: string;
     operatorNote: string;
@@ -1418,7 +1418,7 @@ export function App() {
     setCallStatus("");
     try {
       const response = await createProofRequest(selectedId, {
-        proofUrl: payload.proofUrl,
+        proofFile: payload.proofFile,
         title: payload.title || null,
         customerMessage: payload.customerMessage || null,
         operatorNote: payload.operatorNote || null,

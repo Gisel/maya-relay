@@ -12,6 +12,7 @@ from app.ai_triage import _extract_response_text
 from app.attachments import AttachmentStore
 from app.auth import SESSION_COOKIE, admin_enabled, require_admin, session_value
 from app.config import Settings, get_settings, normalize_phone_number
+from app.customer_actions import CustomerActionFileInput
 from app.db import RelayRepository
 from app.dependencies import (
     get_attachment_store,
@@ -56,13 +57,6 @@ class CallDetailsUpdate(BaseModel):
     notes: str | None = None
     recap: str | None = None
     transcription: str | None = None
-
-
-class ProofRequestCreate(BaseModel):
-    title: str | None = None
-    operatorNote: str | None = None
-    customerMessage: str | None = None
-    proofUrl: str
 
 
 class ProofRequestChanges(BaseModel):
@@ -410,30 +404,58 @@ def api_conversation_messages(
 @router.post("/conversations/{conversation_id}/proof-requests")
 def api_create_proof_request(
     conversation_id: str,
-    payload: ProofRequestCreate,
     request: Request,
+    title: str = Form(""),
+    operator_note: str = Form(""),
+    customer_message: str = Form(""),
+    proof_file: UploadFile = File(...),
     settings: Settings = Depends(get_settings),
     repository: RelayRepository = Depends(get_repository),
     sender: MessageSender = Depends(get_sender),
+    attachment_store: AttachmentStore = Depends(get_attachment_store),
     service: CustomerActionService = Depends(get_customer_action_service),
 ) -> dict[str, Any]:
     require_admin(request, settings)
     conversation = repository.get_conversation(conversation_id)
     if conversation is None:
         raise HTTPException(status_code=404)
+    uploads = read_uploads([proof_file])
+    if not uploads:
+        raise HTTPException(status_code=400, detail="Proof file is required.")
+    try:
+        stored_files = attachment_store.store_uploaded_attachments(
+            object_prefix=f"proof-requests/{conversation.id}",
+            files=uploads,
+        )
+    except Exception as exc:
+        logger.exception("Could not store proof file for conversation %s.", conversation.id)
+        raise HTTPException(status_code=502, detail="Could not store proof file.") from exc
+    if not stored_files:
+        raise HTTPException(status_code=400, detail="Proof file is required.")
+
+    stored_proof = stored_files[0]
+    proof_file_input = CustomerActionFileInput(
+        role="proof",
+        bucket=stored_proof.bucket,
+        object_path=stored_proof.object_path,
+        public_url=stored_proof.public_url,
+        original_filename=uploads[0].filename,
+        content_type=stored_proof.content_type,
+        size_bytes=len(uploads[0].content),
+    )
     try:
         result = service.create_proof_request(
             conversation_id=conversation_id,
-            title=payload.title,
-            operator_note=payload.operatorNote,
-            proof_url=payload.proofUrl,
+            title=title,
+            operator_note=operator_note,
+            proof_file=proof_file_input,
         )
     except CustomerActionValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     message_body = _proof_request_message_body(
         public_url=result["public_url"],
-        customer_message=payload.customerMessage,
+        customer_message=customer_message,
     )
     try:
         outbound_sid = sender.send_message(

@@ -1,11 +1,11 @@
-import { FormEvent, useEffect, useState } from "react";
+import { DragEvent, FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { FileCheck2, Send, X } from "lucide-react";
+import { FileCheck2, Send, Upload, X } from "lucide-react";
 
 import { Channel } from "../api";
 
 type ProofRequestPayload = {
-  proofUrl: string;
+  proofFile: File;
   title: string;
   customerMessage: string;
   operatorNote: string;
@@ -32,7 +32,8 @@ export function ProofRequestModal({
   onSend,
   open,
 }: ProofRequestModalProps) {
-  const [proofUrl, setProofUrl] = useState("");
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [isDraggingProofFile, setIsDraggingProofFile] = useState(false);
   const [title, setTitle] = useState("Proof approval");
   const [customerMessage, setCustomerMessage] = useState("");
   const [operatorNote, setOperatorNote] = useState("");
@@ -40,7 +41,8 @@ export function ProofRequestModal({
 
   useEffect(() => {
     if (!open) return;
-    setProofUrl("");
+    setProofFile(null);
+    setIsDraggingProofFile(false);
     setTitle("Proof approval");
     setCustomerMessage("");
     setOperatorNote("");
@@ -52,17 +54,38 @@ export function ProofRequestModal({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLocalError("");
-    const cleanedProofUrl = proofUrl.trim();
-    if (!/^https?:\/\/\S+$/i.test(cleanedProofUrl)) {
-      setLocalError("Enter a valid proof URL that starts with http or https.");
+    if (!proofFile) {
+      setLocalError("Choose or drop a proof file before sending.");
       return;
     }
     await onSend({
-      proofUrl: cleanedProofUrl,
+      proofFile,
       title: title.trim(),
       customerMessage: customerMessage.trim(),
       operatorNote: operatorNote.trim(),
     });
+  }
+
+  function handleDragOver(event: DragEvent<HTMLSpanElement>) {
+    event.preventDefault();
+    if (isSending) return;
+    setIsDraggingProofFile(true);
+  }
+
+  function handleDragLeave(event: DragEvent<HTMLSpanElement>) {
+    event.preventDefault();
+    setIsDraggingProofFile(false);
+  }
+
+  function handleDrop(event: DragEvent<HTMLSpanElement>) {
+    event.preventDefault();
+    setIsDraggingProofFile(false);
+    if (isSending) return;
+    const file = event.dataTransfer.files.item(0);
+    if (file) {
+      setProofFile(file);
+      setLocalError("");
+    }
   }
 
   return createPortal(
@@ -87,16 +110,27 @@ export function ProofRequestModal({
             </div>
           </div>
 
-          <label>
-            <span>Proof URL</span>
+          <label className={`file-picker-label ${isDraggingProofFile ? "is-dragging-file" : ""}`}>
+            <span>Proof file</span>
+            <span className="file-picker-control" onDragLeave={handleDragLeave} onDragOver={handleDragOver} onDrop={handleDrop}>
+              <span className="file-picker-button">
+                <Upload size={16} />
+                Choose file
+              </span>
+              <span className={`file-picker-name ${proofFile ? "has-file" : ""}`}>
+                {proofFile ? proofFile.name : "Drop a proof here or choose a file"}
+              </span>
+            </span>
             <input
               autoFocus
+              accept="image/*,.pdf"
+              className="file-picker-input"
               disabled={isSending}
-              onChange={(event) => setProofUrl(event.target.value)}
-              placeholder="https://..."
-              required
-              type="url"
-              value={proofUrl}
+              onChange={(event) => {
+                setProofFile(event.target.files?.[0] ?? null);
+                setLocalError("");
+              }}
+              type="file"
             />
           </label>
 
@@ -139,7 +173,7 @@ export function ProofRequestModal({
             <button className="ghost-button" disabled={isSending} onClick={onClose} type="button">
               Cancel
             </button>
-            <button className="send-button" disabled={!proofUrl.trim() || isSending} type="submit">
+            <button className="send-button" disabled={!proofFile || isSending} type="submit">
               <Send size={17} />
               {isSending ? "Sending..." : "Send request"}
             </button>
