@@ -2,11 +2,10 @@
 
 Date: 2026-06-17
 
-This spec defines a production-grade foundation for customer-facing action links in Maya Relay. The first three workflows are:
+This spec defines a production-grade foundation for customer-facing action links in Maya Relay. The first two operator workflows are:
 
-- Proof approval: customer can approve or request changes.
-- Request assets: operator asks the customer for files or missing job inputs.
-- Upload assets: customer uploads files through a secure public page.
+- Proof: customer can approve, reject/request changes, or leave feedback.
+- Assets: operator asks the customer to upload files or missing job inputs.
 
 The goal is to support SMS and WhatsApp with the same durable workflow, then add Twilio WhatsApp templates and richer buttons later without rebuilding the core system.
 
@@ -26,15 +25,14 @@ The goal is to support SMS and WhatsApp with the same durable workflow, then add
 The conversation header should eventually support two customer-action entry points:
 
 - `Proof`: sends a proof approval request.
-- `Request assets`: asks the customer to upload missing files or job information.
+- `Assets`: asks the customer to upload missing files or job information.
 
-The customer-facing pages expose three customer actions:
+The customer-facing pages expose two experiences:
 
-- `Approve`, for proof approval.
-- `Request changes`, for proof approval.
-- `Upload assets`, for asset requests/uploads.
+- Proof: `Approve`, `Request changes`, and optional feedback/comment.
+- Assets: `Upload assets` with optional notes.
 
-The first implementation slice should start with `Proof` because it has the clearest status model and immediate client value. `Request assets` should use the same tables, token security, public page structure, file handling, and event model.
+The first implementation slice should start with `Proof` because it has the clearest status model and immediate client value. `Assets` should use the same tables, token security, public page structure, file handling, and event model.
 
 ### Workflow 1: Proof Approval
 
@@ -46,8 +44,9 @@ Customer actions:
 
 - Approve.
 - Request changes with a comment.
+- Leave feedback before final operator follow-up.
 
-### Workflow 2: Request Assets
+### Workflow 2: Assets
 
 Operator goal:
 
@@ -58,18 +57,6 @@ Customer actions:
 - Upload files.
 - Add notes.
 - Submit assets.
-
-### Workflow 3: Upload Assets
-
-Operator goal:
-
-Give the customer a secure upload link even when the conversation is not specifically about a proof.
-
-Customer actions:
-
-- Upload one or more files.
-- Add optional notes.
-- Submit.
 
 ## In Scope For First Implementation Slice
 
@@ -107,7 +94,7 @@ One table should support proof approvals and asset requests.
 id uuid primary key
 conversation_id text not null
 contact_id uuid null
-request_type text not null -- proof_approval, asset_request, asset_upload
+request_type text not null -- proof, assets
 status text not null -- pending, approved, changes_requested, submitted, expired, canceled
 title text null
 operator_note text null
@@ -122,9 +109,8 @@ updated_at timestamptz not null
 
 Status rules:
 
-- `proof_approval`: `pending`, `approved`, `changes_requested`, `expired`, `canceled`
-- `asset_request`: `pending`, `submitted`, `expired`, `canceled`
-- `asset_upload`: `pending`, `submitted`, `expired`, `canceled`
+- `proof`: `pending`, `approved`, `changes_requested`, `expired`, `canceled`
+- `assets`: `pending`, `submitted`, `expired`, `canceled`
 
 ### `customer_action_files`
 
@@ -182,7 +168,7 @@ Creates a customer action request and sends a customer message.
 Request:
 
 - multipart form
-- `request_type`: `proof_approval | asset_request | asset_upload`
+- `request_type`: `proof | assets`
 - `title`: optional
 - `operator_note`: optional
 - `message_body`: optional override
@@ -196,7 +182,7 @@ Response:
   "request": {
     "id": "uuid",
     "conversationId": "conversation-1",
-    "requestType": "proof_approval",
+    "requestType": "proof",
     "status": "pending",
     "publicUrl": "https://mayagraphics.co/proof/token-redacted",
     "createdAt": "..."
