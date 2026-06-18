@@ -14,6 +14,9 @@ class FakeRepository:
         self.status_updates: list[dict[str, Any]] = []
         self.calls: list[dict[str, Any]] = []
         self.call_events: list[dict[str, Any]] = []
+        self.customer_action_requests: list[dict[str, Any]] = []
+        self.customer_action_files: list[dict[str, Any]] = []
+        self.customer_action_events: list[dict[str, Any]] = []
 
     def get_contact(self, phone_number: str) -> Contact | None:
         for contact in self.contacts:
@@ -630,6 +633,125 @@ class FakeRepository:
             return "transcription_missing"
         if has_transcription and not has_recap:
             return "recap_missing"
+        return None
+
+    def create_customer_action_request(
+        self,
+        *,
+        conversation_id: str,
+        contact_id: str | None,
+        request_type: str,
+        status: str,
+        title: str | None,
+        operator_note: str | None,
+        public_token_hash: str,
+        expires_at: str | None = None,
+        created_by: str | None = None,
+    ) -> dict[str, Any]:
+        request = {
+            "id": f"customer-action-request-{len(self.customer_action_requests) + 1}",
+            "conversation_id": conversation_id,
+            "contact_id": contact_id,
+            "request_type": request_type,
+            "status": status,
+            "title": title,
+            "operator_note": operator_note,
+            "public_token_hash": public_token_hash,
+            "expires_at": expires_at,
+            "completed_at": None,
+            "canceled_at": None,
+            "created_by": created_by,
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+        self.customer_action_requests.append(request)
+        return request
+
+    def create_customer_action_file(
+        self,
+        *,
+        request_id: str,
+        role: str,
+        bucket: str | None = None,
+        object_path: str | None = None,
+        public_url: str | None = None,
+        external_url: str | None = None,
+        original_filename: str | None = None,
+        content_type: str | None = None,
+        size_bytes: int | None = None,
+    ) -> dict[str, Any]:
+        file_row = {
+            "id": f"customer-action-file-{len(self.customer_action_files) + 1}",
+            "request_id": request_id,
+            "role": role,
+            "bucket": bucket,
+            "object_path": object_path,
+            "public_url": public_url,
+            "external_url": external_url,
+            "original_filename": original_filename,
+            "content_type": content_type,
+            "size_bytes": size_bytes,
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+        self.customer_action_files.append(file_row)
+        return file_row
+
+    def create_customer_action_event(
+        self,
+        *,
+        request_id: str,
+        conversation_id: str,
+        event_type: str,
+        comment: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        event = {
+            "id": f"customer-action-event-{len(self.customer_action_events) + 1}",
+            "request_id": request_id,
+            "conversation_id": conversation_id,
+            "event_type": event_type,
+            "comment": comment,
+            "metadata": metadata or {},
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+        self.customer_action_events.append(event)
+        return event
+
+    def get_customer_action_by_token_hash(self, public_token_hash: str) -> dict[str, Any] | None:
+        for request in self.customer_action_requests:
+            if request["public_token_hash"] == public_token_hash:
+                return request
+        return None
+
+    def list_customer_actions_for_conversation(self, conversation_id: str, limit: int = 20) -> list[dict[str, Any]]:
+        rows = [
+            request
+            for request in reversed(self.customer_action_requests)
+            if request["conversation_id"] == conversation_id
+        ]
+        return rows[:limit]
+
+    def list_customer_action_files(self, request_id: str) -> list[dict[str, Any]]:
+        return [file_row for file_row in self.customer_action_files if file_row["request_id"] == request_id]
+
+    def list_customer_action_events(self, request_id: str) -> list[dict[str, Any]]:
+        return [event for event in self.customer_action_events if event["request_id"] == request_id]
+
+    def update_customer_action_request_status(
+        self,
+        *,
+        request_id: str,
+        status: str,
+        completed_at: str | None = None,
+        canceled_at: str | None = None,
+    ) -> dict[str, Any] | None:
+        for request in self.customer_action_requests:
+            if request["id"] != request_id:
+                continue
+            request["status"] = status
+            request["completed_at"] = completed_at
+            request["canceled_at"] = canceled_at
+            request["updated_at"] = datetime.now(UTC).isoformat()
+            return request
         return None
 
 

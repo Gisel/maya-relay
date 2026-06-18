@@ -280,6 +280,69 @@ class RelayRepository(Protocol):
     def get_operational_status(self, *, limit: int = 10) -> dict[str, list[dict[str, Any]]]:
         ...
 
+    def create_customer_action_request(
+        self,
+        *,
+        conversation_id: str,
+        contact_id: str | None,
+        request_type: str,
+        status: str,
+        title: str | None,
+        operator_note: str | None,
+        public_token_hash: str,
+        expires_at: str | None = None,
+        created_by: str | None = None,
+    ) -> dict[str, Any]:
+        ...
+
+    def create_customer_action_file(
+        self,
+        *,
+        request_id: str,
+        role: str,
+        bucket: str | None = None,
+        object_path: str | None = None,
+        public_url: str | None = None,
+        external_url: str | None = None,
+        original_filename: str | None = None,
+        content_type: str | None = None,
+        size_bytes: int | None = None,
+    ) -> dict[str, Any]:
+        ...
+
+    def create_customer_action_event(
+        self,
+        *,
+        request_id: str,
+        conversation_id: str,
+        event_type: str,
+        comment: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        ...
+
+    def get_customer_action_by_token_hash(self, public_token_hash: str) -> dict[str, Any] | None:
+        ...
+
+    def list_customer_actions_for_conversation(self, conversation_id: str, limit: int = 20) -> list[dict[str, Any]]:
+        ...
+
+    def list_customer_action_files(self, request_id: str) -> list[dict[str, Any]]:
+        ...
+
+    def list_customer_action_events(self, request_id: str) -> list[dict[str, Any]]:
+        ...
+
+    def update_customer_action_request_status(
+        self,
+        *,
+        request_id: str,
+        status: str,
+        completed_at: str | None = None,
+        canceled_at: str | None = None,
+    ) -> dict[str, Any] | None:
+        ...
+
 
 class SupabaseRelayRepository:
     def __init__(self, client: Client):
@@ -1162,6 +1225,161 @@ class SupabaseRelayRepository:
                 for item in call_attention
             ],
         }
+
+    def create_customer_action_request(
+        self,
+        *,
+        conversation_id: str,
+        contact_id: str | None,
+        request_type: str,
+        status: str,
+        title: str | None,
+        operator_note: str | None,
+        public_token_hash: str,
+        expires_at: str | None = None,
+        created_by: str | None = None,
+    ) -> dict[str, Any]:
+        result = (
+            self.client.table("customer_action_requests")
+            .insert(
+                {
+                    "conversation_id": conversation_id,
+                    "contact_id": contact_id,
+                    "request_type": request_type,
+                    "status": status,
+                    "title": title,
+                    "operator_note": operator_note,
+                    "public_token_hash": public_token_hash,
+                    "expires_at": expires_at,
+                    "created_by": created_by,
+                }
+            )
+            .execute()
+        )
+        return result.data[0]
+
+    def create_customer_action_file(
+        self,
+        *,
+        request_id: str,
+        role: str,
+        bucket: str | None = None,
+        object_path: str | None = None,
+        public_url: str | None = None,
+        external_url: str | None = None,
+        original_filename: str | None = None,
+        content_type: str | None = None,
+        size_bytes: int | None = None,
+    ) -> dict[str, Any]:
+        result = (
+            self.client.table("customer_action_files")
+            .insert(
+                {
+                    "request_id": request_id,
+                    "role": role,
+                    "bucket": bucket,
+                    "object_path": object_path,
+                    "public_url": public_url,
+                    "external_url": external_url,
+                    "original_filename": original_filename,
+                    "content_type": content_type,
+                    "size_bytes": size_bytes,
+                }
+            )
+            .execute()
+        )
+        return result.data[0]
+
+    def create_customer_action_event(
+        self,
+        *,
+        request_id: str,
+        conversation_id: str,
+        event_type: str,
+        comment: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        result = (
+            self.client.table("customer_action_events")
+            .insert(
+                {
+                    "request_id": request_id,
+                    "conversation_id": conversation_id,
+                    "event_type": event_type,
+                    "comment": comment,
+                    "metadata": metadata or {},
+                }
+            )
+            .execute()
+        )
+        return result.data[0]
+
+    def get_customer_action_by_token_hash(self, public_token_hash: str) -> dict[str, Any] | None:
+        result = (
+            self.client.table("customer_action_requests")
+            .select("*")
+            .eq("public_token_hash", public_token_hash)
+            .limit(1)
+            .execute()
+        )
+        if not result.data:
+            return None
+        return result.data[0]
+
+    def list_customer_actions_for_conversation(self, conversation_id: str, limit: int = 20) -> list[dict[str, Any]]:
+        result = (
+            self.client.table("customer_action_requests")
+            .select("*")
+            .eq("conversation_id", conversation_id)
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return result.data
+
+    def list_customer_action_files(self, request_id: str) -> list[dict[str, Any]]:
+        result = (
+            self.client.table("customer_action_files")
+            .select("*")
+            .eq("request_id", request_id)
+            .order("created_at", desc=False)
+            .execute()
+        )
+        return result.data
+
+    def list_customer_action_events(self, request_id: str) -> list[dict[str, Any]]:
+        result = (
+            self.client.table("customer_action_events")
+            .select("*")
+            .eq("request_id", request_id)
+            .order("created_at", desc=False)
+            .execute()
+        )
+        return result.data
+
+    def update_customer_action_request_status(
+        self,
+        *,
+        request_id: str,
+        status: str,
+        completed_at: str | None = None,
+        canceled_at: str | None = None,
+    ) -> dict[str, Any] | None:
+        result = (
+            self.client.table("customer_action_requests")
+            .update(
+                {
+                    "status": status,
+                    "completed_at": completed_at,
+                    "canceled_at": canceled_at,
+                }
+            )
+            .eq("id", request_id)
+            .execute()
+        )
+        if not result.data:
+            return None
+        return result.data[0]
 
 
 def _message_search_text(messages: list[dict[str, Any]]) -> str:

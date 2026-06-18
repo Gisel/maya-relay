@@ -524,6 +524,80 @@ def test_update_message_status_updates_matching_message_only():
     assert other["delivery_status"] is None
 
 
+def test_customer_action_request_file_and_event_round_trip():
+    repository, client = build_repository()
+
+    request = repository.create_customer_action_request(
+        conversation_id="conversation-1",
+        contact_id="contact-1",
+        request_type="proof",
+        status="pending",
+        title="Proof approval",
+        operator_note="Please review.",
+        public_token_hash="token-hash-1",
+        created_by="operator@example.com",
+    )
+    file_row = repository.create_customer_action_file(
+        request_id=request["id"],
+        role="proof",
+        external_url="https://files.example/proof.pdf",
+        original_filename="proof.pdf",
+        content_type="application/pdf",
+        size_bytes=1234,
+    )
+    event = repository.create_customer_action_event(
+        request_id=request["id"],
+        conversation_id="conversation-1",
+        event_type="created",
+        comment="Created request.",
+        metadata={"source": "test"},
+    )
+
+    by_token = repository.get_customer_action_by_token_hash("token-hash-1")
+    actions = repository.list_customer_actions_for_conversation("conversation-1")
+    files = repository.list_customer_action_files(request["id"])
+    events = repository.list_customer_action_events(request["id"])
+
+    assert by_token == request
+    assert actions == [request]
+    assert files == [file_row]
+    assert events == [event]
+    assert client.rows("customer_action_requests")[0]["public_token_hash"] == "token-hash-1"
+    assert client.rows("customer_action_files")[0]["external_url"] == "https://files.example/proof.pdf"
+    assert client.rows("customer_action_events")[0]["metadata"] == {"source": "test"}
+
+
+def test_update_customer_action_request_status_returns_updated_row_and_none_for_missing():
+    repository, _ = build_repository()
+    request = repository.create_customer_action_request(
+        conversation_id="conversation-1",
+        contact_id=None,
+        request_type="proof",
+        status="pending",
+        title=None,
+        operator_note=None,
+        public_token_hash="token-hash-1",
+    )
+
+    updated = repository.update_customer_action_request_status(
+        request_id=request["id"],
+        status="approved",
+        completed_at="2026-06-18T00:00:00+00:00",
+        canceled_at=None,
+    )
+    missing = repository.update_customer_action_request_status(
+        request_id="missing",
+        status="approved",
+        completed_at="2026-06-18T00:00:00+00:00",
+        canceled_at=None,
+    )
+
+    assert updated is not None
+    assert updated["status"] == "approved"
+    assert updated["completed_at"] == "2026-06-18T00:00:00+00:00"
+    assert missing is None
+
+
 def test_create_call_stores_outbound_call_log():
     repository, client = build_repository()
 

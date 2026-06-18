@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     assemblyai_poll_interval_seconds: int = Field(default=3, alias="ASSEMBLYAI_POLL_INTERVAL_SECONDS")
     admin_password: str = Field(default="", alias="ADMIN_PASSWORD")
     app_base_url: str = Field(default="", alias="APP_BASE_URL")
+    customer_action_token_secret: str = Field(default="", alias="CUSTOMER_ACTION_TOKEN_SECRET")
 
     twilio_account_sid: str = Field(default="", alias="TWILIO_ACCOUNT_SID")
     twilio_auth_token: str = Field(default="", alias="TWILIO_AUTH_TOKEN")
