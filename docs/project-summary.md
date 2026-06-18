@@ -172,6 +172,30 @@ Features:
 - The app must respect WhatsApp's 24-hour free-form service window.
 - Approved templates will be needed later for outbound messages outside the service window.
 
+### Customer Action Workflows
+
+Proof approval is the first customer-action workflow.
+
+Current Proof status:
+
+- Operator `Proof` button exists in the conversation header.
+- Operator can upload a proof file and send a tokenized review link.
+- Supported proof upload types: PDF, PNG, JPG/JPEG.
+- Proof upload limit: 32 MB.
+- Public `/proof/{token}` page lets the customer approve or request changes.
+- Public approval/change-request actions are stored as durable customer-action events.
+- Maya Relay shows proof approval/change-request outcomes in the conversation timeline as internal system events.
+- Token security stores hashes only; raw public tokens are only sent in the customer URL.
+- SMS proof request flow has been live-smoke tested.
+
+Pending:
+
+- Live WhatsApp proof smoke test inside a fresh 24-hour WhatsApp service window.
+- Approved WhatsApp template send path for proof links outside the 24-hour service window.
+- Assets request/upload workflow.
+- Pending request list/cancel/retry UI for operators.
+- Formal frontend/e2e automation for proof flows.
+
 ### React Operator Inbox
 
 Phase 1 API foundation is implemented:

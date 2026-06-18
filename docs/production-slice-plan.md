@@ -439,6 +439,72 @@ Acceptance criteria:
 - Invalid rows are reported without crashing the whole import.
 - Imported names display before Lookup names.
 
+## Customer Action Workflow Production Slice
+
+### Slice A1: Proof Approval Close-Out
+
+Feature goal:
+
+Finish the Proof approval workflow with truthful production status, then use it as the foundation for Assets.
+
+Current status:
+
+- Database tables, indexes, RLS, and grants exist for customer-action requests, files, and events.
+- Operator `Proof` action, proof upload modal, public proof page, and conversation timeline events are implemented.
+- SMS proof flow has been live-smoke tested through approval and request-changes outcomes.
+- Backend tests and frontend build pass.
+
+Still in scope before calling the full Proof workflow production-ready:
+
+- Live WhatsApp proof smoke test inside a fresh 24-hour service window.
+- Confirm production `PUBLIC_BASE_URL` keeps proof links on `https://mayagraphics.co`.
+- Confirm invalid/oversize proof upload messages are understandable in the deployed app.
+- Add formal frontend/e2e coverage or document why it remains deferred for the next test-hardening slice.
+
+Out of scope:
+
+- WhatsApp template send path outside the 24-hour window.
+- Assets upload workflow.
+- Job/order management.
+- AI-generated proof requests.
+
+Acceptance criteria:
+
+- SMS proof request, approval, and request-changes remain working in production.
+- WhatsApp proof request works inside a fresh 24-hour WhatsApp conversation.
+- Maya Relay timeline shows proof decisions clearly.
+- No existing SMS, WhatsApp, profile, CSV import, observability, calls, or composer workflow regresses.
+- Status docs match the live result.
+
+### Slice A2: Assets Request And Upload
+
+Feature goal:
+
+Reuse the customer-action foundation to let the operator request missing customer assets and let the customer upload them through a tokenized public link.
+
+In scope:
+
+- Add `Assets` action near `Proof`.
+- Operator modal asks for instructions and sends an upload link.
+- Public `/assets/{token}` page supports drag/drop and choose-file upload.
+- Customer can add a note and submit.
+- Maya Relay conversation timeline shows assets submitted with customer note and file count.
+
+Out of scope:
+
+- Asset library management.
+- File virus scanning beyond current storage safeguards.
+- Job/order assignment.
+- AI classification of uploaded files.
+
+Acceptance criteria:
+
+- Assets request can be sent by SMS.
+- Public customer upload works on mobile.
+- Submitted assets are stored and linked to the request.
+- Maya Relay shows the submission event.
+- Proof workflow remains unchanged.
+
 ## WhatsApp Templates Production Slice
 
 ### Slice W1: Quick Template Drafts For Active Windows

@@ -6,6 +6,36 @@ Source spec: `docs/customer-action-workflows-spec.md`
 
 This plan turns the Proof and Assets customer-action workflow into implementation slices. The first build target is Proof. Assets must reuse the same foundation and should not require replacing the Proof work later.
 
+## Slice Status As Of 2026-06-18
+
+Proof approval is implemented and live-smoke tested for the SMS path.
+
+Done:
+
+- Database foundation: implemented in `supabase_schema.sql` and applied in Supabase.
+- Backend domain/API: proof create, public lookup, approve, request changes, token hashing, status transitions, and event recording are implemented.
+- File handling: operator proof upload is implemented with type and size validation. Current supported proof inputs are PDF, PNG, JPG, and JPEG up to 32 MB.
+- Messaging: proof request sends through the existing conversation channel. SMS has been live-tested. WhatsApp is supported only inside an active 24-hour WhatsApp window until approved templates are added.
+- Operator UI: `Proof` button and proof request modal are implemented in focused customer-action components.
+- Public UI: `/proof/{token}` page is implemented for review, approval, and change requests.
+- Conversation timeline: public proof decisions appear in Maya Relay as internal system events.
+- UX polish: proof modal/public proof typography and proof decision status cards were refined after live testing.
+
+Verified:
+
+- `.venv/bin/python -m pytest`: 137 passed.
+- `npm --workspace frontend run build`: passed.
+- Live SMS proof link delivered.
+- Live approval and change-request actions appeared in the Maya Relay conversation.
+
+Not done yet:
+
+- WhatsApp template send path for proof links outside the 24-hour service window.
+- Live WhatsApp proof smoke test inside a fresh 24-hour conversation.
+- Formal frontend/e2e automation; no frontend Playwright script exists yet.
+- Admin list/cancel/retry UI for pending customer-action requests.
+- Assets workflow.
+
 ## Scope Guardrails
 
 - Additive only. Do not break existing SMS, WhatsApp, calls, AI suggested replies, quick responses, customer profile, CSV import, observability, or native reply-code flows.
@@ -232,17 +262,20 @@ If conversation UI only supports messages cleanly, create `messages.direction = 
 
 ### Proof Input Options
 
-Proof request modal supports one of:
+Proof request modal currently supports:
 
 - uploaded file
+
+Deferred:
+
 - external proof URL
 
 Validation:
 
-- Require exactly one proof source in first slice.
+- Require one uploaded proof file in the current slice.
 - Reject empty file.
 - Restrict content types initially: PDF, PNG, JPG/JPEG.
-- Enforce size limit consistent with current attachment handling.
+- Enforce 32 MB proof upload limit.
 
 Storage:
 
@@ -253,7 +286,6 @@ Storage:
 ### File Acceptance Criteria
 
 - Uploaded proof can be stored and rendered/linked from public proof page.
-- External proof URL can be stored and shown.
 - Invalid file types and oversize files are rejected with clear errors.
 - No existing MMS/attachment behavior regresses.
 
@@ -314,7 +346,7 @@ Request:
 - `title`
 - `operator_note`
 - `message_body`
-- `proof_file` or `proof_url`
+- `proof_file`
 
 Response includes:
 
@@ -389,7 +421,7 @@ Header:
 Modal:
 
 - Customer name/phone read-only.
-- File upload or proof URL.
+- File upload with choose-file and drag/drop.
 - Optional note.
 - Message preview.
 - Send button.
@@ -449,10 +481,8 @@ Do not:
 
 - Schema-backed fake repository or Supabase repository coverage.
 - Token hash create/lookup.
-- Create proof request with external URL.
 - Create proof request with uploaded file.
 - Reject missing proof source.
-- Reject both proof file and proof URL.
 - Approve pending proof.
 - Approve already approved proof idempotently.
 - Reject changes request without comment.

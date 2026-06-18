@@ -9,6 +9,39 @@ This spec defines a production-grade foundation for customer-facing action links
 
 The goal is to support SMS and WhatsApp with the same durable workflow, then add Twilio WhatsApp templates and richer buttons later without rebuilding the core system.
 
+## Current Status As Of 2026-06-18
+
+Proof approval is implemented, committed, pushed, and live-smoke tested for SMS.
+
+Completed:
+
+- Supabase schema foundation exists for `customer_action_requests`, `customer_action_files`, and `customer_action_events`.
+- `Proof` action exists in the conversation header near `Open`, `Call`, and `Close`.
+- Operator can create a proof request with an uploaded proof file.
+- Backend validates proof uploads for supported file types and size.
+- Backend generates tokenized public proof links and stores only token hashes.
+- Public `/proof/{token}` page loads proof content and supports `Approve proof` and `Request changes`.
+- Customer decisions are recorded as durable action events.
+- Maya Relay conversation timeline shows customer proof decisions as internal system events.
+- `PUBLIC_BASE_URL` / request-host handling prevents localhost links in production and uses the production domain when configured.
+- Proof modal and public proof page typography have been softened after live UX testing.
+
+Verified:
+
+- Backend tests: `.venv/bin/python -m pytest` passed with 137 tests.
+- Frontend build: `npm --workspace frontend run build` passed.
+- Live SMS proof request delivered.
+- Live public proof approval updated Maya Relay.
+- Live public change request with comment updated Maya Relay.
+
+Pending before calling the broader Proof workflow fully production-ready:
+
+- Live WhatsApp proof request test inside an active 24-hour WhatsApp service window.
+- Approved WhatsApp template support for proof links outside the 24-hour window.
+- Formal frontend/e2e automation; the frontend package currently has no Playwright script.
+- Optional pending-request visibility/cancel/retry UI for operators.
+- Asset upload workflow.
+
 ## Working Rules
 
 - Additive only: do not remove or disturb current SMS, WhatsApp, calls, customer profile, CSV import, observability, or reply-code behavior.
@@ -62,7 +95,7 @@ Customer actions:
 
 - Add a `Proof` action near `Open`, `Call`, and `Close`.
 - Add a modal for creating a proof approval request.
-- Support either uploaded proof file or proof URL.
+- Support uploaded proof files. External proof URLs are deferred so proof review has one controlled file path first.
 - Add optional operator note.
 - Create a durable approval request record.
 - Generate a secure public token.
@@ -172,8 +205,8 @@ Request:
 - `title`: optional
 - `operator_note`: optional
 - `message_body`: optional override
-- `proof_file`: optional, only for proof approval
-- `proof_url`: optional, only for proof approval
+- `proof_file`: required for proof approval in the current slice
+- `proof_url`: deferred
 
 Response:
 
@@ -237,7 +270,7 @@ This action opens a modal. It does not replace existing message composer workflo
 Fields:
 
 - Customer name and phone, read-only.
-- Proof file upload or proof URL.
+- Proof file upload with choose-file and drag/drop.
 - Optional note.
 - Message preview.
 - Send approval request.
