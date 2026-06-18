@@ -61,6 +61,7 @@ class CallDetailsUpdate(BaseModel):
 class ProofRequestCreate(BaseModel):
     title: str | None = None
     operatorNote: str | None = None
+    customerMessage: str | None = None
     proofUrl: str
 
 
@@ -412,9 +413,14 @@ def api_create_proof_request(
     payload: ProofRequestCreate,
     request: Request,
     settings: Settings = Depends(get_settings),
+    repository: RelayRepository = Depends(get_repository),
+    sender: MessageSender = Depends(get_sender),
     service: CustomerActionService = Depends(get_customer_action_service),
 ) -> dict[str, Any]:
     require_admin(request, settings)
+    conversation = repository.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404)
     try:
         result = service.create_proof_request(
             conversation_id=conversation_id,
@@ -424,9 +430,44 @@ def api_create_proof_request(
         )
     except CustomerActionValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    message_body = _proof_request_message_body(
+        public_url=result["public_url"],
+        customer_message=payload.customerMessage,
+    )
+    try:
+        outbound_sid = sender.send_message(
+            to_phone=conversation.customer_phone,
+            body=message_body,
+            channel=conversation.customer_channel,
+        )
+    except Exception as exc:
+        logger.exception("Could not send proof request %s.", result["request"].get("id"))
+        raise HTTPException(status_code=502, detail="Proof request was created, but the message could not be sent.") from exc
+
+    created_message = repository.create_message(
+        conversation_id=conversation.id,
+        direction="employee_to_customer",
+        from_phone=settings.maya_business_number,
+        to_phone=conversation.customer_phone,
+        body=message_body,
+        twilio_message_sid=outbound_sid,
+    )
+    repository.create_customer_action_event(
+        request_id=result["request"]["id"],
+        conversation_id=conversation.id,
+        event_type="sent",
+        comment=None,
+        metadata={
+            "message_id": created_message["id"],
+            "twilio_message_sid": outbound_sid,
+            "channel": conversation.customer_channel,
+        },
+    )
     return {
         "proofRequest": _serialize_customer_action_request(result["request"]),
         "publicUrl": result["public_url"],
+        "message": _serialize_message(created_message),
     }
 
 
@@ -1055,6 +1096,14 @@ def _serialize_customer_action_event(event: dict[str, Any]) -> dict[str, Any]:
         "metadata": event.get("metadata") or {},
         "createdAt": event.get("created_at"),
     }
+
+
+def _proof_request_message_body(*, public_url: str, customer_message: str | None) -> str:
+    base = f"Your proof is ready. Review here: {public_url}"
+    note = _clean_optional_text(customer_message)
+    if not note:
+        return base
+    return f"{note}\n\n{base}"
 
 
 def _serialize_call_conversation(row: dict[str, Any]) -> dict[str, Any]:

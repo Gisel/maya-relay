@@ -758,6 +758,7 @@ class FakeRepository:
 class FakeSender:
     def __init__(self):
         self.sent_messages: list[dict[str, object]] = []
+        self.should_raise = False
 
     def send_sms(self, *, to_phone: str, body: str, media_urls: tuple[str, ...] = ()) -> str:
         return self.send_message(to_phone=to_phone, body=body, channel="sms", media_urls=media_urls)
@@ -770,6 +771,8 @@ class FakeSender:
         channel: Channel = "sms",
         media_urls: tuple[str, ...] = (),
     ) -> str:
+        if self.should_raise:
+            raise RuntimeError("send failed")
         sid = f"SMfake{len(self.sent_messages) + 1}"
         message: dict[str, object] = {"sid": sid, "to_phone": to_phone, "body": body}
         if channel != "sms":

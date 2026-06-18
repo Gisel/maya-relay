@@ -1836,8 +1836,8 @@ def test_unsigned_status_callback_is_rejected_when_signature_validation_is_enabl
     assert repository.status_updates == []
 
 
-def test_api_creates_public_proof_request_and_exposes_conversation_action_history():
-    client, repository, _ = make_client(admin_password="secret")
+def test_api_creates_sends_public_proof_request_and_exposes_conversation_action_history():
+    client, repository, sender = make_client(admin_password="secret")
     repository.get_or_create_customer_conversation(
         customer_phone="+15550000001",
         assigned_employee="+15551234567",
@@ -1854,6 +1854,7 @@ def test_api_creates_public_proof_request_and_exposes_conversation_action_histor
         json={
             "title": "Business card proof",
             "operatorNote": "Please review before print.",
+            "customerMessage": "Please review this proof before we print.",
             "proofUrl": "https://files.example/proof.pdf",
         },
         headers={"cookie": login.headers["set-cookie"]},
@@ -1879,6 +1880,22 @@ def test_api_creates_public_proof_request_and_exposes_conversation_action_histor
     }
     assert "public_token_hash" not in payload["proofRequest"]
     assert repository.customer_action_files[0]["external_url"] == "https://files.example/proof.pdf"
+    assert payload["message"]["twilioMessageSid"] == "SMfake1"
+    assert sender.sent_messages[-1] == {
+        "sid": "SMfake1",
+        "to_phone": "+15550000001",
+        "body": (
+            "Please review this proof before we print.\n\n"
+            f"Your proof is ready. Review here: {payload['publicUrl']}"
+        ),
+    }
+    assert repository.messages[-1]["body"] == sender.sent_messages[-1]["body"]
+    assert repository.customer_action_events[-1]["event_type"] == "sent"
+    assert repository.customer_action_events[-1]["metadata"] == {
+        "message_id": "message-1",
+        "twilio_message_sid": "SMfake1",
+        "channel": "sms",
+    }
 
     detail = client.get("/api/conversations/conversation-1", headers={"cookie": login.headers["set-cookie"]})
 
@@ -1917,7 +1934,7 @@ def test_api_public_proof_request_read_and_approve_flow():
             "createdAt": repository.customer_action_files[0]["created_at"],
         }
     ]
-    assert public_payload["events"][0]["type"] == "created"
+    assert [event["type"] for event in public_payload["events"]] == ["created", "sent"]
     assert "public_token_hash" not in public_payload
 
     approved = client.post(f"/api/proof/{token}/approve", json={"comment": "Approved."})
@@ -1959,3 +1976,46 @@ def test_api_public_proof_request_changes_flow_and_invalid_token():
     assert changes.json()["proofRequest"]["status"] == "changes_requested"
     assert repository.customer_action_events[-1]["event_type"] == "changes_requested"
     assert repository.customer_action_events[-1]["comment"] == "Please make the logo larger."
+
+
+def test_api_proof_request_uses_whatsapp_channel_when_conversation_is_whatsapp():
+    client, repository, sender = make_client(admin_password="secret")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+        customer_channel="whatsapp",
+    )
+    login = client.post("/api/auth/login", json={"password": "secret"})
+
+    response = client.post(
+        "/api/conversations/conversation-1/proof-requests",
+        json={"proofUrl": "https://files.example/proof.pdf"},
+        headers={"cookie": login.headers["set-cookie"]},
+    )
+
+    assert response.status_code == 200
+    assert sender.sent_messages[-1]["channel"] == "whatsapp"
+    assert sender.sent_messages[-1]["body"] == f"Your proof is ready. Review here: {response.json()['publicUrl']}"
+    assert repository.customer_action_events[-1]["metadata"]["channel"] == "whatsapp"
+
+
+def test_api_proof_request_keeps_request_when_twilio_send_fails():
+    client, repository, sender = make_client(admin_password="secret")
+    sender.should_raise = True
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    login = client.post("/api/auth/login", json={"password": "secret"})
+
+    response = client.post(
+        "/api/conversations/conversation-1/proof-requests",
+        json={"proofUrl": "https://files.example/proof.pdf"},
+        headers={"cookie": login.headers["set-cookie"]},
+    )
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == "Proof request was created, but the message could not be sent."
+    assert len(repository.customer_action_requests) == 1
+    assert [event["event_type"] for event in repository.customer_action_events] == ["created"]
+    assert repository.messages == []
