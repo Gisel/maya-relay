@@ -119,6 +119,32 @@ class FakeRepository:
         page_rows = rows[offset: offset + limit + 1]
         return page_rows[:limit], len(page_rows) > limit
 
+    def import_contact_display_name(
+        self,
+        *,
+        phone_number: str,
+        display_name: str,
+        overwrite: bool = False,
+    ) -> tuple[Contact, str]:
+        existing = self.get_contact(phone_number)
+        if existing is None:
+            contact = Contact(id=f"contact-{len(self.contacts) + 1}", phone_number=phone_number, display_name=display_name)
+            self.contacts.append(contact)
+            return contact, "created"
+        if existing.display_name and not overwrite:
+            return existing, "skipped"
+        if existing.display_name == display_name:
+            return existing, "skipped"
+        updated = Contact(
+            id=existing.id,
+            phone_number=existing.phone_number,
+            display_name=display_name,
+            lookup_name=existing.lookup_name,
+            notes=existing.notes,
+        )
+        self.contacts = [updated if contact.phone_number == phone_number else contact for contact in self.contacts]
+        return updated, "updated"
+
     def get_or_create_customer_conversation(
         self,
         customer_phone: str,

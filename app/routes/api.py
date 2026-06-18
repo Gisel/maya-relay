@@ -16,6 +16,7 @@ from app.db import RelayRepository
 from app.dependencies import get_attachment_store, get_repository, get_sender, get_voice_caller
 from app.models import Conversation
 from app.reply_helpers import image_attachment_urls, read_uploads, reply_body_with_attachments
+from app.services.contact_import import ContactImportValidationError, import_contacts_csv
 from app.twilio_client import MessageSender, VoiceCaller
 
 
@@ -249,6 +250,28 @@ def api_update_contact(
     if contact is None:
         raise HTTPException(status_code=404)
     return {"contact": _serialize_contact(contact)}
+
+
+@router.post("/contacts/import")
+def api_import_contacts(
+    request: Request,
+    file: UploadFile = File(...),
+    overwrite: bool = Form(False),
+    settings: Settings = Depends(get_settings),
+    repository: RelayRepository = Depends(get_repository),
+) -> dict[str, Any]:
+    require_admin(request, settings)
+    content = file.file.read()
+    try:
+        result = import_contacts_csv(content=content, repository=repository, overwrite=overwrite)
+    except ContactImportValidationError as exc:
+        raise HTTPException(status_code=400, detail=[_serialize_contact_import_error(error) for error in exc.errors])
+    return {
+        "created": result.created,
+        "updated": result.updated,
+        "skipped": result.skipped,
+        "invalidRows": [_serialize_contact_import_error(error) for error in result.invalid_rows],
+    }
 
 
 @router.get("/conversations/{conversation_id}")
@@ -811,6 +834,14 @@ def _serialize_contact_search_item(contact: dict[str, Any]) -> dict[str, Any]:
         "openConversationId": contact.get("open_conversation_id"),
         "lastConversationId": contact.get("last_conversation_id"),
         "latestCallId": contact.get("latest_call_id"),
+    }
+
+
+def _serialize_contact_import_error(error: Any) -> dict[str, Any]:
+    return {
+        "row": error.row,
+        "code": error.code,
+        "message": error.message,
     }
 
 

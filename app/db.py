@@ -68,6 +68,15 @@ class RelayRepository(Protocol):
     ) -> tuple[list[dict[str, Any]], bool]:
         ...
 
+    def import_contact_display_name(
+        self,
+        *,
+        phone_number: str,
+        display_name: str,
+        overwrite: bool = False,
+    ) -> tuple[Contact, str]:
+        ...
+
     def get_or_create_customer_conversation(
         self,
         customer_phone: str,
@@ -374,6 +383,43 @@ class SupabaseRelayRepository:
         if not result.data:
             return None
         return _contact_from_row(result.data[0])
+
+    def import_contact_display_name(
+        self,
+        *,
+        phone_number: str,
+        display_name: str,
+        overwrite: bool = False,
+    ) -> tuple[Contact, str]:
+        existing = self.get_contact(phone_number)
+        if existing is None:
+            created = (
+                self.client.table("contacts")
+                .insert(
+                    {
+                        "phone_number": phone_number,
+                        "display_name": display_name,
+                    }
+                )
+                .execute()
+            )
+            return _contact_from_row(created.data[0]), "created"
+
+        if existing.display_name and not overwrite:
+            return existing, "skipped"
+
+        if existing.display_name == display_name:
+            return existing, "skipped"
+
+        result = (
+            self.client.table("contacts")
+            .update({"display_name": display_name})
+            .eq("phone_number", phone_number)
+            .execute()
+        )
+        if not result.data:
+            return existing, "skipped"
+        return _contact_from_row(result.data[0]), "updated"
 
     def search_contacts(
         self,

@@ -128,6 +128,73 @@ def test_update_contact_profile_returns_none_for_missing_contact():
     assert contact is None
 
 
+def test_import_contact_display_name_creates_and_updates_missing_display_name():
+    repository, client = build_repository()
+    client.seed(
+        "contacts",
+        [{"phone_number": "+15550000001", "display_name": None, "lookup_name": "Lookup Name"}],
+    )
+
+    existing_contact, existing_action = repository.import_contact_display_name(
+        phone_number="+15550000001",
+        display_name="Imported Name",
+    )
+    new_contact, new_action = repository.import_contact_display_name(
+        phone_number="+15550000002",
+        display_name="New Imported Name",
+    )
+
+    rows = client.rows("contacts")
+    existing = next(row for row in rows if row["phone_number"] == "+15550000001")
+    new = next(row for row in rows if row["phone_number"] == "+15550000002")
+    assert existing_action == "updated"
+    assert existing_contact.display_name == "Imported Name"
+    assert existing["lookup_name"] == "Lookup Name"
+    assert new_action == "created"
+    assert new_contact.display_name == "New Imported Name"
+    assert new["display_name"] == "New Imported Name"
+
+
+def test_import_contact_display_name_preserves_existing_manual_name_without_overwrite():
+    repository, client = build_repository()
+    client.seed(
+        "contacts",
+        [{"phone_number": "+15550000001", "display_name": "Manual Name", "lookup_name": "Lookup Name"}],
+    )
+
+    contact, action = repository.import_contact_display_name(
+        phone_number="+15550000001",
+        display_name="Imported Name",
+        overwrite=False,
+    )
+
+    stored = client.rows("contacts")[0]
+    assert action == "skipped"
+    assert contact.display_name == "Manual Name"
+    assert stored["display_name"] == "Manual Name"
+    assert stored["lookup_name"] == "Lookup Name"
+
+
+def test_import_contact_display_name_overwrites_only_when_requested():
+    repository, client = build_repository()
+    client.seed(
+        "contacts",
+        [{"phone_number": "+15550000001", "display_name": "Manual Name", "lookup_name": "Lookup Name"}],
+    )
+
+    contact, action = repository.import_contact_display_name(
+        phone_number="+15550000001",
+        display_name="Imported Name",
+        overwrite=True,
+    )
+
+    stored = client.rows("contacts")[0]
+    assert action == "updated"
+    assert contact.display_name == "Imported Name"
+    assert stored["display_name"] == "Imported Name"
+    assert stored["lookup_name"] == "Lookup Name"
+
+
 def test_search_contacts_matches_name_phone_notes_and_returns_conversation_hints():
     repository, client = build_repository()
     client.seed(

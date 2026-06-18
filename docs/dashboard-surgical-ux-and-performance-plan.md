@@ -172,8 +172,10 @@ Visual direction to preserve:
   - search by phone/name
   - bounded/paginated results
 - Build CSV Import production slice:
-  - upload CSV with `phone_number`, `display_name`
-  - upsert contacts
+  - backend endpoint and tests are implemented
+  - frontend upload UI remains next
+  - accepts CSV with `phone_number`, `display_name`
+  - upserts contacts conservatively
   - blank names do not overwrite
   - imported names used before paid Twilio Lookup
 - Build WhatsApp quick template drafts:

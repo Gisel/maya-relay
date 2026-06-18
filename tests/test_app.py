@@ -730,6 +730,121 @@ def test_api_contact_patch_preserves_omitted_fields():
     assert response.json()["contact"]["notes"] == "Updated notes."
 
 
+def test_api_import_contacts_requires_auth():
+    client, _, _ = make_client(admin_password="secret")
+
+    response = client.post(
+        "/api/contacts/import",
+        files={"file": ("contacts.csv", b"phone_number,display_name\n+15550000001,Maria\n", "text/csv")},
+    )
+
+    assert response.status_code == 401
+
+
+def test_api_import_contacts_creates_updates_skips_and_reports_invalid_rows():
+    client, repository, _ = make_client(admin_password="secret")
+    repository.update_contact_lookup_name("+15550000001", "Lookup One")
+    repository.upsert_contact_display_name("+15550000002", "Existing Manual")
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    response = client.post(
+        "/api/contacts/import",
+        files={
+            "file": (
+                "contacts.csv",
+                (
+                    "phone_number,display_name\n"
+                    "+15550000001,Imported One\n"
+                    "+15550000002,Should Not Replace\n"
+                    "(555) 000-0003,Imported Three\n"
+                    "+15550000004,\n"
+                ).encode("utf-8"),
+                "text/csv",
+            )
+        },
+        headers={"cookie": cookie},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "created": 1,
+        "updated": 1,
+        "skipped": 1,
+        "invalidRows": [
+            {
+                "row": 5,
+                "code": "missing_display_name",
+                "message": "Display name is required.",
+            }
+        ],
+    }
+    assert repository.get_contact("+15550000001").display_name == "Imported One"
+    assert repository.get_contact("+15550000001").lookup_name == "Lookup One"
+    assert repository.get_contact("+15550000002").display_name == "Existing Manual"
+    assert repository.get_contact("+15550000003").display_name == "Imported Three"
+
+
+def test_api_import_contacts_overwrites_when_explicit():
+    client, repository, _ = make_client(admin_password="secret")
+    repository.upsert_contact_display_name("+15550000001", "Existing Manual")
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    response = client.post(
+        "/api/contacts/import",
+        data={"overwrite": "true"},
+        files={"file": ("contacts.csv", b"phone_number,display_name\n+15550000001,Imported Name\n", "text/csv")},
+        headers={"cookie": cookie},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["updated"] == 1
+    assert repository.get_contact("+15550000001").display_name == "Imported Name"
+
+
+def test_api_import_contacts_rejects_missing_columns():
+    client, _, _ = make_client(admin_password="secret")
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    response = client.post(
+        "/api/contacts/import",
+        files={"file": ("contacts.csv", b"phone,name\n+15550000001,Maria\n", "text/csv")},
+        headers={"cookie": cookie},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"][0]["code"] == "missing_columns"
+
+
+def test_imported_contact_name_is_used_before_lookup_name_in_conversations():
+    client, repository, _ = make_client(admin_password="secret")
+    repository.update_contact_lookup_name("+15550000001", "Lookup Name")
+    repository.import_contact_display_name(phone_number="+15550000001", display_name="Imported Name")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    repository.create_message(
+        conversation_id="conversation-1",
+        direction="customer_to_employee",
+        from_phone="+15550000001",
+        to_phone="+13852208404",
+        body="Hello",
+    )
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    response = client.get("/api/conversations", headers={"cookie": cookie})
+
+    assert response.status_code == 200
+    customer = response.json()["conversations"][0]["customer"]
+    assert customer["displayName"] == "Imported Name"
+    assert customer["lookupName"] == "Lookup Name"
+    assert customer["name"] == "Imported Name"
+
+
 def test_api_update_contact_returns_404_for_missing_contact():
     client, _, _ = make_client(admin_password="secret")
     login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)

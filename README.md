@@ -139,8 +139,13 @@ Current Phase 1 routes:
 - `GET /api/conversations/{conversation_id}/messages`
 - `PATCH /api/conversations/{conversation_id}`
 - `POST /api/conversations/{conversation_id}/reply`
+- `GET /api/contacts`
+- `PATCH /api/contacts/{contact_id}`
+- `POST /api/contacts/import`
 
 The reply endpoint accepts `multipart/form-data` with `body`, `client_request_id`, and optional `reply_files`. `client_request_id` is stored on the message to prevent accidental duplicate sends from browser retries or double-clicks.
+
+The contact import endpoint accepts `multipart/form-data` with a CSV `file` containing exact columns `phone_number` and `display_name`. Phone numbers are normalized before upsert. Blank display names are rejected row-by-row and never erase existing names. Existing manual/imported names are preserved unless `overwrite=true` is explicitly submitted. Imported `display_name` values take precedence over Twilio Lookup names.
 
 ## MVP Routing
 
