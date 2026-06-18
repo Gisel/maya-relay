@@ -2017,6 +2017,8 @@ def test_api_public_proof_request_read_and_approve_flow():
     assert approved.json()["proofRequest"]["status"] == "approved"
     assert repository.customer_action_events[-1]["event_type"] == "approved"
     assert repository.customer_action_events[-1]["comment"] == "Approved."
+    assert repository.messages[-1]["direction"] == "system"
+    assert repository.messages[-1]["body"] == "Proof approved by customer.\nComment: Approved."
 
     changes_after_approval = client.post(
         f"/api/proof/{token}/changes",
@@ -2024,6 +2026,7 @@ def test_api_public_proof_request_read_and_approve_flow():
     )
 
     assert changes_after_approval.status_code == 409
+    assert repository.messages[-1]["body"] == "Proof approved by customer.\nComment: Approved."
 
 
 def test_api_public_proof_request_changes_flow_and_invalid_token():
@@ -2050,6 +2053,8 @@ def test_api_public_proof_request_changes_flow_and_invalid_token():
     assert changes.json()["proofRequest"]["status"] == "changes_requested"
     assert repository.customer_action_events[-1]["event_type"] == "changes_requested"
     assert repository.customer_action_events[-1]["comment"] == "Please make the logo larger."
+    assert repository.messages[-1]["direction"] == "system"
+    assert repository.messages[-1]["body"] == "Proof changes requested by customer:\nPlease make the logo larger."
 
 
 def test_api_proof_request_uses_whatsapp_channel_when_conversation_is_whatsapp():

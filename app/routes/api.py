@@ -531,14 +531,25 @@ def api_public_proof_request(
 def api_approve_public_proof_request(
     public_token: str,
     payload: ProofRequestApproval,
+    settings: Settings = Depends(get_settings),
+    repository: RelayRepository = Depends(get_repository),
     service: CustomerActionService = Depends(get_customer_action_service),
 ) -> dict[str, Any]:
     try:
+        existing = service.get_public_proof_request(public_token=public_token)["request"]
+        previous_status = existing["status"]
         request_row = service.approve_proof_request(public_token=public_token, comment=payload.comment)
     except CustomerActionNotFound as exc:
         raise HTTPException(status_code=404) from exc
     except CustomerActionStateError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if previous_status == "pending":
+        _record_customer_action_message(
+            repository=repository,
+            settings=settings,
+            request_row=request_row,
+            body=_proof_approved_message(payload.comment),
+        )
     return {"proofRequest": _serialize_customer_action_request(request_row)}
 
 
@@ -546,9 +557,13 @@ def api_approve_public_proof_request(
 def api_request_public_proof_changes(
     public_token: str,
     payload: ProofRequestChanges,
+    settings: Settings = Depends(get_settings),
+    repository: RelayRepository = Depends(get_repository),
     service: CustomerActionService = Depends(get_customer_action_service),
 ) -> dict[str, Any]:
     try:
+        existing = service.get_public_proof_request(public_token=public_token)["request"]
+        previous_status = existing["status"]
         request_row = service.request_proof_changes(public_token=public_token, comment=payload.comment)
     except CustomerActionNotFound as exc:
         raise HTTPException(status_code=404) from exc
@@ -556,6 +571,13 @@ def api_request_public_proof_changes(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except CustomerActionStateError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if previous_status == "pending":
+        _record_customer_action_message(
+            repository=repository,
+            settings=settings,
+            request_row=request_row,
+            body=_proof_changes_message(payload.comment),
+        )
     return {"proofRequest": _serialize_customer_action_request(request_row)}
 
 
@@ -1148,6 +1170,41 @@ def _proof_request_message_body(*, public_url: str, customer_message: str | None
     if not note:
         return base
     return f"{note}\n\n{base}"
+
+
+def _record_customer_action_message(
+    *,
+    repository: RelayRepository,
+    settings: Settings,
+    request_row: dict[str, Any],
+    body: str,
+) -> None:
+    conversation = repository.get_conversation(str(request_row["conversation_id"]))
+    if conversation is None:
+        logger.warning("Could not record customer action message for missing conversation %s.", request_row["conversation_id"])
+        return
+    repository.create_message(
+        conversation_id=conversation.id,
+        direction="system",
+        from_phone=settings.maya_business_number,
+        to_phone=conversation.assigned_employee,
+        body=body,
+    )
+
+
+def _proof_approved_message(comment: str | None) -> str:
+    body = "Proof approved by customer."
+    clean_comment = _clean_optional_text(comment)
+    if clean_comment:
+        return f"{body}\nComment: {clean_comment}"
+    return body
+
+
+def _proof_changes_message(comment: str) -> str:
+    clean_comment = _clean_optional_text(comment)
+    if clean_comment:
+        return f"Proof changes requested by customer:\n{clean_comment}"
+    return "Proof changes requested by customer."
 
 
 def _serialize_call_conversation(row: dict[str, Any]) -> dict[str, Any]:
