@@ -3,6 +3,7 @@ import logging
 import mimetypes
 import time
 from typing import Any, Literal
+from urllib.parse import urlparse
 
 import requests
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
@@ -461,6 +462,7 @@ def api_create_proof_request(
             title=title,
             operator_note=operator_note,
             proof_file=proof_file_input,
+            public_base_url=_public_base_url(request, settings),
         )
     except CustomerActionValidationError as exc:
         attachment_store.delete_uploaded_attachments(stored_files)
@@ -1447,15 +1449,26 @@ def _suggested_reply(messages: list[dict[str, Any]], conversation_code: str) -> 
 
 
 def _public_base_url(request: Request, settings: Settings) -> str:
-    if settings.app_base_url.strip():
-        return settings.app_base_url.strip().rstrip("/")
-
     forwarded_proto = request.headers.get("x-forwarded-proto")
     forwarded_host = request.headers.get("x-forwarded-host") or request.headers.get("host")
     if forwarded_proto and forwarded_host:
-        return f"{forwarded_proto}://{forwarded_host}"
+        request_base_url = f"{forwarded_proto}://{forwarded_host}"
+    else:
+        request_base_url = str(request.base_url).rstrip("/")
 
-    return str(request.base_url).rstrip("/")
+    configured_base_url = settings.app_base_url.strip().rstrip("/")
+    if configured_base_url and not _is_local_base_url(configured_base_url):
+        return configured_base_url
+    if request_base_url:
+        return request_base_url
+
+    return configured_base_url or "http://localhost:8000"
+
+
+def _is_local_base_url(base_url: str) -> bool:
+    parsed = urlparse(base_url)
+    host = (parsed.hostname or "").lower()
+    return host in {"localhost", "127.0.0.1", "0.0.0.0"}
 
 
 def _voice_phone_number(phone_number: str) -> str:

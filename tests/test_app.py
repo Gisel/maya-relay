@@ -17,6 +17,7 @@ def make_client(
     twilio_account_sid: str = "",
     twilio_auth_token: str = "",
     admin_password: str = "",
+    app_base_url: str = "https://maya-relay.example",
     assemblyai_api_key: str = "",
     openai_api_key: str = "",
 ) -> tuple[TestClient, FakeRepository, FakeSender]:
@@ -34,7 +35,7 @@ def make_client(
         TWILIO_MESSAGING_SERVICE_SID="",
         SUPABASE_URL="",
         SUPABASE_SERVICE_ROLE_KEY="",
-        APP_BASE_URL="https://maya-relay.example",
+        APP_BASE_URL=app_base_url,
         CUSTOMER_ACTION_TOKEN_SECRET="test-action-secret",
     )
     repository = FakeRepository()
@@ -1951,6 +1952,29 @@ def test_api_proof_request_rejects_oversized_file_before_storage():
     assert response.json()["detail"] == "Proof file must be 32 MB or smaller."
     assert repository.customer_action_requests == []
     assert repository.customer_action_files == []
+
+
+def test_api_proof_request_uses_forwarded_host_when_configured_base_url_is_localhost():
+    client, repository, _ = make_client(admin_password="secret", app_base_url="http://localhost:8000")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    login = client.post("/api/auth/login", json={"password": "secret"})
+
+    response = client.post(
+        "/api/conversations/conversation-1/proof-requests",
+        files={"proof_file": ("proof.pdf", PROOF_PDF_BYTES, "application/pdf")},
+        headers={
+            "cookie": login.headers["set-cookie"],
+            "x-forwarded-proto": "https",
+            "x-forwarded-host": "mayagraphics.co",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["publicUrl"].startswith("https://mayagraphics.co/proof/")
+    assert "http://localhost:8000" not in repository.messages[-1]["body"]
 
 
 def test_api_public_proof_request_read_and_approve_flow():

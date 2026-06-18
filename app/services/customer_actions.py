@@ -43,6 +43,7 @@ class CustomerActionService:
         operator_note: str | None = None,
         proof_file: CustomerActionFileInput | None = None,
         proof_url: str | None = None,
+        public_base_url: str | None = None,
         created_by: str | None = None,
     ) -> dict[str, Any]:
         conversation = self.repository.get_conversation(conversation_id)
@@ -78,7 +79,11 @@ class CustomerActionService:
         return {
             "request": request,
             "public_token": token,
-            "public_url": build_public_action_url(self.settings.app_base_url, action_type="proof", token=token),
+            "public_url": build_public_action_url(
+                public_base_url or self.settings.app_base_url,
+                action_type="proof",
+                token=token,
+            ),
         }
 
     def get_public_proof_request(self, *, public_token: str) -> dict[str, Any]:
