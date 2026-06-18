@@ -670,7 +670,9 @@ test("customer profile edits happen from the right-panel pencil without hiding m
 
   await expect(page.getByRole("article").getByText("Hello")).toBeVisible();
   await expect(page.locator(".customer-profile-summary").getByText("Priority Test Customer")).toBeVisible();
-  await expect(page.locator(".customer-profile-summary").getByText("Needs a printed proof before pickup.")).toBeVisible();
+  await page.getByRole("button", { name: "View customer notes" }).click();
+  await expect(page.getByRole("dialog", { name: "Customer notes" }).getByText("Needs a printed proof before pickup.")).toBeVisible();
+  await page.getByRole("button", { name: "Close customer notes" }).click();
 });
 
 test("WhatsApp draft responses only appear for WhatsApp conversations", async ({ page }) => {

@@ -1973,7 +1973,7 @@ export function App() {
               <Sparkles size={18} />
               AI Suggested Reply
             </h2>
-            <div className="intent-box">
+            <div className={`intent-box ${suggestedReply ? "has-suggestion" : "is-empty"}`}>
               <span>{suggestedReply ? "Ready" : "No suggestion"}</span>
               <p>{suggestedReply || "No AI suggestion is available for this conversation yet."}</p>
               {suggestedReply && (

@@ -1018,11 +1018,11 @@ button {
 
 .context-section {
   border-bottom: 1px solid #edf0f4;
-  padding: 0 0 22px;
+  padding: 0 0 18px;
 }
 
 .context-section + .context-section {
-  padding-top: 24px;
+  padding-top: 18px;
 }
 
 .context-section h2 {
@@ -1033,7 +1033,7 @@ button {
   font-weight: 560;
   gap: 8px;
   letter-spacing: 0.08em;
-  margin: 0 0 14px;
+  margin: 0 0 12px;
   text-transform: uppercase;
 }
 
@@ -1042,7 +1042,7 @@ button {
   display: flex;
   gap: 10px;
   justify-content: space-between;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .context-section-heading h2 {
@@ -1066,11 +1066,17 @@ button {
   cursor: not-allowed;
 }
 
+.profile-action-buttons {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
 .context-section > strong {
   display: block;
   font-size: 16px;
   font-weight: 620;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   overflow-wrap: anywhere;
 }
 
@@ -1079,23 +1085,8 @@ button {
   color: #667085;
   display: block;
   font-size: 14px;
-  margin: 0 0 8px;
+  margin: 0 0 5px;
   overflow-wrap: anywhere;
-}
-
-.profile-notes-preview {
-  background: #f7f9fc;
-  border: 1px solid #e3e8f0;
-  border-radius: 8px;
-  color: #475366;
-  font-size: 14px;
-  line-height: 1.4;
-  margin-top: 12px;
-  max-height: calc(1.4em * 3 + 20px);
-  overflow-y: auto;
-  padding: 10px 12px;
-  scrollbar-gutter: stable;
-  white-space: pre-wrap;
 }
 
 .contact-search-results {
@@ -1432,23 +1423,33 @@ button {
   border: 1px solid #f7c7d8;
   border-radius: 8px;
   display: grid;
-  gap: 10px;
-  padding: 14px;
+  gap: 8px;
+  padding: 10px 12px;
 }
 
 .intent-box > span {
   background: #ffdce8;
-  border-radius: 6px;
+  border-radius: 999px;
   color: #dc1f70;
+  font-size: 12px;
   font-weight: 620;
   justify-self: start;
-  padding: 6px 12px;
+  line-height: 1;
+  padding: 5px 10px;
 }
 
 .intent-box p {
   color: #667085;
-  font-size: 14px;
+  font-size: 13px;
+  line-height: 1.35;
   margin: 0;
+}
+
+.intent-box.is-empty p {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .intent-box label {
@@ -2151,9 +2152,26 @@ button {
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
+.notes-surface {
+  max-width: 520px;
+}
+
+.customer-notes-full {
+  background: #f7f9fc;
+  border: 1px solid #e3e8f0;
+  border-radius: 8px;
+  color: #475366;
+  font-size: 14px;
+  line-height: 1.5;
+  max-height: min(360px, calc(100vh - 220px));
+  overflow-y: auto;
+  padding: 12px 14px;
+  white-space: pre-wrap;
+}
+
 .quick-responses {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .secondary-action {
@@ -2173,11 +2191,11 @@ button {
   border-radius: 8px;
   color: #344054;
   display: flex;
-  font-size: 14px;
-  gap: 10px;
-  min-height: 40px;
+  font-size: 13px;
+  gap: 9px;
+  min-height: 36px;
   overflow: hidden;
-  padding: 0 14px;
+  padding: 0 12px;
   text-align: left;
 }
 
@@ -2639,7 +2657,7 @@ button {
 
   .intent-box {
     background: #fffafd;
-    padding: 12px;
+    padding: 10px 12px;
   }
 
   .context-scroll-area {
@@ -2647,11 +2665,11 @@ button {
   }
 
   .context-section {
-    padding-bottom: 18px;
+    padding-bottom: 16px;
   }
 
   .context-section + .context-section {
-    padding-top: 18px;
+    padding-top: 16px;
   }
 
   .quick-responses button,
@@ -3442,10 +3460,6 @@ button {
     height: 36px;
     justify-content: center;
     width: 36px;
-  }
-
-  .intent-box {
-    padding: 16px;
   }
 
   .drawer-backdrop {
