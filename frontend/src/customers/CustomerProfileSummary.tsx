@@ -37,7 +37,11 @@ export function CustomerProfileSummary({
       <strong>{name}</strong>
       <p>{phone}</p>
       {sessionCode && <em>Session ID: #{sessionCode}</em>}
-      {notes && <p className="profile-notes-preview">{notes}</p>}
+      {notes && (
+        <p className="profile-notes-preview" title={notes}>
+          {notes}
+        </p>
+      )}
       {isLoading && <p className="panel-note compact">Loading customer profile...</p>}
     </section>
   );
