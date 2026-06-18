@@ -90,6 +90,60 @@ create table if not exists public.call_events (
   received_at timestamptz not null default now()
 );
 
+create table if not exists public.customer_action_requests (
+  id uuid primary key default gen_random_uuid(),
+  conversation_id uuid not null references public.conversations(id) on delete cascade,
+  contact_id uuid references public.contacts(id) on delete set null,
+  request_type text not null check (request_type in ('proof', 'assets')),
+  status text not null default 'pending' check (
+    status in ('pending', 'approved', 'changes_requested', 'submitted', 'expired', 'canceled')
+  ),
+  title text,
+  operator_note text,
+  public_token_hash text not null unique,
+  expires_at timestamptz,
+  completed_at timestamptz,
+  canceled_at timestamptz,
+  created_by text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (
+    (request_type = 'proof' and status in ('pending', 'approved', 'changes_requested', 'expired', 'canceled'))
+    or
+    (request_type = 'assets' and status in ('pending', 'submitted', 'expired', 'canceled'))
+  )
+);
+
+create table if not exists public.customer_action_files (
+  id uuid primary key default gen_random_uuid(),
+  request_id uuid not null references public.customer_action_requests(id) on delete cascade,
+  role text not null check (role in ('proof', 'customer_asset')),
+  bucket text,
+  object_path text,
+  public_url text,
+  external_url text,
+  original_filename text,
+  content_type text,
+  size_bytes bigint,
+  created_at timestamptz not null default now(),
+  check (
+    (object_path is not null and bucket is not null)
+    or external_url is not null
+  )
+);
+
+create table if not exists public.customer_action_events (
+  id uuid primary key default gen_random_uuid(),
+  request_id uuid not null references public.customer_action_requests(id) on delete cascade,
+  conversation_id uuid not null references public.conversations(id) on delete cascade,
+  event_type text not null check (
+    event_type in ('created', 'sent', 'opened', 'approved', 'changes_requested', 'assets_submitted', 'canceled', 'expired')
+  ),
+  comment text,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
 create index if not exists conversations_customer_open_idx
   on public.conversations (customer_phone, assigned_employee, status, updated_at desc);
 
@@ -133,6 +187,21 @@ create index if not exists call_events_call_received_idx
 create index if not exists call_events_twilio_sid_received_idx
   on public.call_events (twilio_call_sid, received_at desc)
   where twilio_call_sid is not null;
+
+create index if not exists customer_action_requests_conversation_created_idx
+  on public.customer_action_requests (conversation_id, created_at desc);
+
+create index if not exists customer_action_requests_status_created_idx
+  on public.customer_action_requests (status, created_at desc);
+
+create index if not exists customer_action_files_request_idx
+  on public.customer_action_files (request_id, created_at);
+
+create index if not exists customer_action_events_request_created_idx
+  on public.customer_action_events (request_id, created_at);
+
+create index if not exists customer_action_events_conversation_created_idx
+  on public.customer_action_events (conversation_id, created_at desc);
 
 alter table public.messages
   add column if not exists num_media integer not null default 0,
@@ -229,11 +298,21 @@ before update on public.calls
 for each row
 execute function public.set_updated_at();
 
+drop trigger if exists customer_action_requests_set_updated_at on public.customer_action_requests;
+
+create trigger customer_action_requests_set_updated_at
+before update on public.customer_action_requests
+for each row
+execute function public.set_updated_at();
+
 alter table public.contacts enable row level security;
 alter table public.conversations enable row level security;
 alter table public.messages enable row level security;
 alter table public.calls enable row level security;
 alter table public.call_events enable row level security;
+alter table public.customer_action_requests enable row level security;
+alter table public.customer_action_files enable row level security;
+alter table public.customer_action_events enable row level security;
 
 grant all on public.contacts to service_role;
 grant all on public.conversations to service_role;
@@ -241,6 +320,9 @@ grant all on public.messages to service_role;
 grant all on public.message_attachments to service_role;
 grant all on public.calls to service_role;
 grant all on public.call_events to service_role;
+grant all on public.customer_action_requests to service_role;
+grant all on public.customer_action_files to service_role;
+grant all on public.customer_action_events to service_role;
 grant usage on schema public to service_role;
 grant all on all tables in schema public to service_role;
 grant usage, select on all sequences in schema public to service_role;
