@@ -140,6 +140,19 @@ Visual direction to preserve:
 - Dashboard visual softening started.
 - CSS token rule documented for future frontend styling.
 - `.env` / Railway variables remain source of truth.
+- Customer / Contact production slice:
+  - editable contact name
+  - phone number visible
+  - customer notes
+  - contact search by name/phone
+  - bounded contact search results
+- CSV Contact Import production slice:
+  - dashboard upload UI
+  - backend endpoint and tests
+  - accepts CSV with `phone_number`, `display_name`
+  - upserts contacts conservatively
+  - blank names do not overwrite
+  - imported names used before paid Twilio Lookup
 
 ## Next
 
@@ -161,23 +174,9 @@ Visual direction to preserve:
   - add name
   - add notes
   - add call outcome
-- Build Customer / Contact production slice:
-  - editable contact name
-  - phone number visible
-  - customer notes
-  - bounded recent message/call history
-- Build Contact / Client Search production slice:
-  - backend endpoint
-  - dashboard UI
-  - search by phone/name
-  - bounded/paginated results
-- Build CSV Import production slice:
-  - backend endpoint and tests are implemented
-  - frontend upload UI remains next
-  - accepts CSV with `phone_number`, `display_name`
-  - upserts contacts conservatively
-  - blank names do not overwrite
-  - imported names used before paid Twilio Lookup
+- Improve Customer / Contact history display:
+  - make recent message/call history more visible inside the profile area
+  - keep history bounded and avoid full CRM redesign
 - Build WhatsApp quick template drafts:
   - quote follow-up
   - proof ready

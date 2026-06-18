@@ -1796,13 +1796,130 @@ button {
 }
 
 .secondary-action {
+  align-items: center;
   background: var(--brand-blue);
   border: 0;
   border-radius: 8px;
   color: #ffffff;
+  display: inline-flex;
   font-weight: 560;
+  gap: 8px;
+  justify-content: center;
   min-height: 42px;
   padding: 0 14px;
+}
+
+.profile-form,
+.contact-search-form,
+.import-form {
+  display: grid;
+  gap: 10px;
+}
+
+.profile-form label,
+.import-form label {
+  color: #475366;
+  display: grid;
+  font-size: 13px;
+  font-weight: 560;
+  gap: 7px;
+}
+
+.profile-form input,
+.profile-form textarea,
+.import-form input {
+  background: #ffffff;
+  border: 1px solid #cdd5e1;
+  border-radius: 8px;
+  color: #172033;
+  font: inherit;
+  font-size: 13px;
+  min-height: 40px;
+  min-width: 0;
+  padding: 9px 12px;
+  width: 100%;
+}
+
+.profile-form textarea {
+  line-height: 1.45;
+  min-height: 96px;
+  resize: vertical;
+}
+
+.profile-form input:disabled,
+.profile-form textarea:disabled,
+.import-form input:disabled {
+  background: #f3f5f8;
+  color: #667085;
+}
+
+.profile-form em,
+.contact-results em {
+  color: #68748a;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 560;
+}
+
+.compact-search-box {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.compact-search-box input {
+  border: 1px solid #cdd5e1;
+  border-radius: 8px;
+  color: #172033;
+  font-size: 13px;
+  min-height: 40px;
+  min-width: 0;
+  padding: 0 12px;
+  width: 100%;
+}
+
+.contact-results {
+  display: grid;
+  gap: 8px;
+}
+
+.contact-results button {
+  background: #ffffff;
+  border: 1px solid #dfe4ec;
+  border-radius: 8px;
+  color: #344054;
+  display: grid;
+  gap: 4px;
+  min-height: 56px;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.contact-results strong,
+.contact-results span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contact-results span,
+.import-summary {
+  color: #68748a;
+  font-size: 12px;
+  font-weight: 560;
+}
+
+.import-summary {
+  display: grid;
+  gap: 5px;
+}
+
+.import-summary p,
+.app-error.compact,
+.app-success.compact,
+.panel-note.compact {
+  margin: 0;
+  padding: 0;
 }
 
 .quick-responses button {

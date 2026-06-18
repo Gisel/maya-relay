@@ -12,9 +12,9 @@ async function mockMayaRelayApi(
     channel: "sms",
     customer: {
       phone: "+15550000001",
-      displayName: null,
-      lookupName: null,
-      name: "Test Customer",
+      displayName: null as string | null,
+      lookupName: null as string | null,
+      name: "Test Customer" as string | null,
     },
     lastMessage: {
       body: "Hello",
@@ -25,6 +25,18 @@ async function mockMayaRelayApi(
       hasAttachments: false,
     },
     updatedAt: "2026-06-06T14:00:00Z",
+  };
+  let contact = {
+    id: "contact-1",
+    phone: "+15550000001",
+    displayName: null as string | null,
+    lookupName: null as string | null,
+    name: "Test Customer",
+    notes: null as string | null,
+    lastActivityAt: "2026-06-06T14:05:00Z",
+    openConversationId: "conversation-1",
+    lastConversationId: "conversation-1",
+    latestCallId: "call-existing",
   };
   const olderConversation = {
     ...conversation,
@@ -53,6 +65,9 @@ async function mockMayaRelayApi(
     callUpdates: 0,
     statusUpdates: 0,
     quickResponses: 0,
+    contacts: 0,
+    contactUpdates: 0,
+    contactImports: 0,
   };
   const calls = [
     {
@@ -358,6 +373,63 @@ async function mockMayaRelayApi(
     });
   });
 
+  await page.route("**/api/contacts/import", async (route) => {
+    requestCounts.contactImports += 1;
+    contact = {
+      ...contact,
+      displayName: "Imported Customer",
+      name: "Imported Customer",
+    };
+    conversation.customer = {
+      ...conversation.customer,
+      displayName: "Imported Customer",
+      name: "Imported Customer",
+    };
+    await route.fulfill({
+      contentType: "application/json",
+      json: {
+        created: 1,
+        updated: 1,
+        skipped: 0,
+        invalidRows: [{ row: 4, code: "missing_display_name", message: "Display name is required." }],
+      },
+    });
+  });
+
+  await page.route("**/api/contacts/contact-1", async (route) => {
+    requestCounts.contactUpdates += 1;
+    const payload = JSON.parse(route.request().postData() || "{}") as { displayName?: string | null; notes?: string | null };
+    contact = {
+      ...contact,
+      displayName: payload.displayName ?? contact.displayName,
+      notes: payload.notes ?? contact.notes,
+      name: payload.displayName || contact.lookupName || "Test Customer",
+    };
+    conversation.customer = {
+      ...conversation.customer,
+      displayName: contact.displayName,
+      name: contact.name,
+    };
+    await route.fulfill({
+      contentType: "application/json",
+      json: { contact },
+    });
+  });
+
+  await page.route(/\/api\/contacts(?:\?.*)?$/, async (route) => {
+    requestCounts.contacts += 1;
+    const url = new URL(route.request().url());
+    const query = (url.searchParams.get("q") || "").toLowerCase();
+    const matches = !query || [contact.name, contact.phone, contact.notes].join(" ").toLowerCase().includes(query);
+    await route.fulfill({
+      contentType: "application/json",
+      json: {
+        items: matches ? [contact] : [],
+        pagination: { limit: 25, offset: 0, nextOffset: null, hasMore: false },
+      },
+    });
+  });
+
   return {
     ...requestCounts,
     get conversations() {
@@ -383,6 +455,15 @@ async function mockMayaRelayApi(
     },
     get quickResponses() {
       return requestCounts.quickResponses;
+    },
+    get contacts() {
+      return requestCounts.contacts;
+    },
+    get contactUpdates() {
+      return requestCounts.contactUpdates;
+    },
+    get contactImports() {
+      return requestCounts.contactImports;
     },
     releaseHeldDetailRequest() {
       releaseHeldDetailRequest?.();
@@ -448,6 +529,40 @@ test("authenticated boot loads each initial resource once", async ({ page }) => 
   await expect.poll(() => requestCounts.quickResponses).toBe(1);
   expect(requestCounts.me).toBeGreaterThanOrEqual(1);
   expect(requestCounts.me).toBeLessThanOrEqual(2);
+});
+
+test("customer profile contact search and CSV import work from details panel", async ({ page }) => {
+  const requestCounts = await mockMayaRelayApi(page);
+
+  await page.goto("/app/");
+  await page.getByRole("button", { name: "Details" }).click();
+  const panel = page.locator(".context-panel.is-open");
+  await expect(panel.getByRole("heading", { name: "Customer Profile" })).toBeVisible();
+
+  await panel.getByLabel("Name").fill("Updated Customer");
+  await panel.getByLabel("Notes").fill("Prefers pickup reminders.");
+  await panel.getByRole("button", { name: "Save profile" }).click();
+
+  await expect.poll(() => requestCounts.contactUpdates).toBe(1);
+  await expect(panel.getByText("Saved customer profile.")).toBeVisible();
+
+  await panel.getByPlaceholder("Search name or phone").fill("pickup");
+  await panel.getByRole("button", { name: "Search" }).click();
+  await expect.poll(() => requestCounts.contacts).toBeGreaterThan(1);
+  await expect(panel.locator(".contact-results").getByText("Updated Customer")).toBeVisible();
+
+  await panel.getByLabel("Contact CSV").setInputFiles({
+    name: "contacts.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("phone_number,display_name\n+15550000001,Imported Customer\n"),
+  });
+  await panel.getByRole("button", { name: /import contacts/i }).click();
+
+  await expect.poll(() => requestCounts.contactImports).toBe(1);
+  await expect(panel.getByText("Created 1")).toBeVisible();
+  await expect(panel.getByText("Updated 1")).toBeVisible();
+  await expect(panel.getByText("1 row issue found.")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
 });
 
 test("calls tab shows grouped call activity and refreshes after starting a call", async ({ page }) => {

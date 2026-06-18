@@ -19,6 +19,22 @@ export type Customer = {
   name: string | null;
 };
 
+export type ContactProfile = {
+  id: string;
+  phone: string;
+  displayName: string | null;
+  lookupName: string | null;
+  name: string | null;
+  notes: string | null;
+};
+
+export type ContactSearchItem = ContactProfile & {
+  lastActivityAt: string | null;
+  openConversationId: string | null;
+  lastConversationId: string | null;
+  latestCallId: string | null;
+};
+
 export type ConversationListItem = {
   id: string;
   code: string | null;
@@ -149,6 +165,31 @@ export type CallsResponse = {
   };
 };
 
+export type ContactsResponse = {
+  items: ContactSearchItem[];
+  pagination?: {
+    limit: number;
+    offset: number;
+    nextOffset: number | null;
+    hasMore: boolean;
+  };
+};
+
+export type UpdateContactResponse = {
+  contact: ContactProfile;
+};
+
+export type ContactImportResponse = {
+  created: number;
+  updated: number;
+  skipped: number;
+  invalidRows: {
+    row: number;
+    code: string;
+    message: string;
+  }[];
+};
+
 export type ReplyResponse = {
   status: "sent" | "duplicate";
   message: Message;
@@ -239,6 +280,32 @@ export function getCalls(query = "", offset = 0, limit = 50, direction: CallDire
   if (direction !== "all") params.set("direction", direction);
   const suffix = params.toString() ? `?${params.toString()}` : "";
   return request<CallsResponse>(`/api/calls${suffix}`);
+}
+
+export function getContacts(query = "", offset = 0, limit = 25) {
+  const params = new URLSearchParams();
+  if (query.trim()) params.set("q", query.trim());
+  if (offset > 0) params.set("offset", String(offset));
+  if (limit !== 25) params.set("limit", String(limit));
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return request<ContactsResponse>(`/api/contacts${suffix}`);
+}
+
+export function updateContact(contactId: string, payload: { displayName?: string | null; notes?: string | null }) {
+  return request<UpdateContactResponse>(`/api/contacts/${contactId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function importContactsCsv(file: File, overwrite = false) {
+  const form = new FormData();
+  form.set("file", file);
+  form.set("overwrite", String(overwrite));
+  return request<ContactImportResponse>("/api/contacts/import", {
+    method: "POST",
+    body: form,
+  });
 }
 
 export function getConversationDetail(conversationId: string) {

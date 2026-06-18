@@ -13,6 +13,7 @@ import {
   Search,
   Send,
   Sparkles,
+  Upload,
   X,
 } from "lucide-react";
 import { DragEvent, FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -28,6 +29,9 @@ import {
   ConversationListItem,
   ConversationStatus,
   ConversationStatusFilter,
+  ContactImportResponse,
+  ContactProfile,
+  ContactSearchItem,
   DeliveryStatus,
   FollowUpStatus,
   Message,
@@ -36,16 +40,19 @@ import {
   callConversationCustomer,
   generateCallRecap,
   getCalls,
+  getContacts,
   getConversationDetail,
   getConversations,
   getMe,
   getQuickResponses,
+  importContactsCsv,
   login,
   logout,
   sendReply,
   startNewCall,
   transcribeCall,
   updateCallDetails,
+  updateContact,
   updateConversationStatus,
 } from "./api";
 import logoMaya from "./assets/logo-maya.jpg";
@@ -636,6 +643,18 @@ export function App() {
   const [selectedCallId, setSelectedCallId] = useState("");
   const [quickResponses, setQuickResponses] = useState<QuickResponse[]>([]);
   const [suggestedReply, setSuggestedReply] = useState("");
+  const [activeContact, setActiveContact] = useState<ContactProfile | null>(null);
+  const [contactNameDraft, setContactNameDraft] = useState("");
+  const [contactNotesDraft, setContactNotesDraft] = useState("");
+  const [isLoadingContact, setIsLoadingContact] = useState(false);
+  const [isSavingContact, setIsSavingContact] = useState(false);
+  const [contactStatus, setContactStatus] = useState("");
+  const [contactSearch, setContactSearch] = useState("");
+  const [contactResults, setContactResults] = useState<ContactSearchItem[]>([]);
+  const [isSearchingContacts, setIsSearchingContacts] = useState(false);
+  const [contactImportFile, setContactImportFile] = useState<File | null>(null);
+  const [isImportingContacts, setIsImportingContacts] = useState(false);
+  const [contactImportResult, setContactImportResult] = useState<ContactImportResponse | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<ConversationStatusFilter>("open");
   const [draft, setDraft] = useState("");
@@ -693,6 +712,12 @@ export function App() {
     () => calls.find((call) => call.id === selectedCallId) || null,
     [calls, selectedCallId],
   );
+  const activeContactPhone = useMemo(() => {
+    if (workspaceMode === "calls" && selectedCallRow) {
+      return cleanPhone(selectedCallRow.customer.phone || selectedCallRow.latestCall.customerPhone);
+    }
+    return cleanPhone((selectedConversation || selectedListItem)?.customer.phone);
+  }, [selectedCallRow, selectedConversation, selectedListItem, workspaceMode]);
 
   const visibleMessages = useMemo(
     () => messages.filter(isCustomerVisibleMessage),
@@ -1018,6 +1043,41 @@ export function App() {
   }, [isAuthenticated, loadDetail, selectedId]);
 
   useEffect(() => {
+    if (!isAuthenticated || !activeContactPhone) {
+      setActiveContact(null);
+      setContactNameDraft("");
+      setContactNotesDraft("");
+      setContactStatus("");
+      return;
+    }
+    let isCancelled = false;
+    setIsLoadingContact(true);
+    setContactStatus("");
+    getContacts(activeContactPhone, 0, 5)
+      .then((payload) => {
+        if (isCancelled) return;
+        const contact = payload.items.find((item) => cleanPhone(item.phone) === activeContactPhone) || payload.items[0] || null;
+        setActiveContact(contact);
+        setContactNameDraft(contact?.displayName || "");
+        setContactNotesDraft(contact?.notes || "");
+      })
+      .catch((error) => {
+        if (isCancelled) return;
+        if (error instanceof ApiError && error.status === 401) {
+          setIsAuthenticated(false);
+        } else {
+          setContactStatus(error instanceof Error ? error.message : "Could not load customer profile.");
+        }
+      })
+      .finally(() => {
+        if (!isCancelled) setIsLoadingContact(false);
+      });
+    return () => {
+      isCancelled = true;
+    };
+  }, [activeContactPhone, isAuthenticated]);
+
+  useEffect(() => {
     if (!isAuthenticated || workspaceMode !== "calls") return;
     if (!selectedCallRow) return;
     const conversationId = selectedCallRow.conversation?.id;
@@ -1184,6 +1244,138 @@ export function App() {
       }
     } else {
       setSelectedCallId("");
+    }
+  }
+
+  function applyContactProfile(contact: ContactProfile) {
+    const phone = cleanPhone(contact.phone);
+    const customer = {
+      phone: contact.phone,
+      displayName: contact.displayName,
+      lookupName: contact.lookupName,
+      name: contact.name,
+    };
+    setConversations((current) =>
+      current.map((conversation) =>
+        cleanPhone(conversation.customer.phone) === phone ? { ...conversation, customer } : conversation,
+      ),
+    );
+    setSearchResults((current) =>
+      current
+        ? current.map((conversation) =>
+          cleanPhone(conversation.customer.phone) === phone ? { ...conversation, customer } : conversation,
+        )
+        : current,
+    );
+    setSelectedConversation((current) =>
+      current && cleanPhone(current.customer.phone) === phone ? { ...current, customer } : current,
+    );
+    setCallRows((current) =>
+      current.map((row) =>
+        cleanPhone(row.customer.phone || row.latestCall.customerPhone) === phone ? { ...row, customer } : row,
+      ),
+    );
+  }
+
+  async function handleSaveContactProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!activeContact) return;
+    setIsSavingContact(true);
+    setContactStatus("");
+    setAppError("");
+    try {
+      const response = await updateContact(activeContact.id, {
+        displayName: contactNameDraft,
+        notes: contactNotesDraft,
+      });
+      setActiveContact(response.contact);
+      setContactNameDraft(response.contact.displayName || "");
+      setContactNotesDraft(response.contact.notes || "");
+      applyContactProfile(response.contact);
+      setContactStatus("Saved customer profile.");
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setIsAuthenticated(false);
+      } else {
+        setContactStatus(error instanceof Error ? error.message : "Could not save customer profile.");
+      }
+    } finally {
+      setIsSavingContact(false);
+    }
+  }
+
+  async function handleContactSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const query = contactSearch.trim();
+    if (!query) {
+      setContactResults([]);
+      return;
+    }
+    setIsSearchingContacts(true);
+    setContactStatus("");
+    try {
+      const payload = await getContacts(query, 0, 10);
+      setContactResults(payload.items);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setIsAuthenticated(false);
+      } else {
+        setContactStatus(error instanceof Error ? error.message : "Could not search contacts.");
+      }
+    } finally {
+      setIsSearchingContacts(false);
+    }
+  }
+
+  function handleSelectContactResult(contact: ContactSearchItem) {
+    setActiveContact(contact);
+    setContactNameDraft(contact.displayName || "");
+    setContactNotesDraft(contact.notes || "");
+    const targetConversationId = contact.openConversationId || contact.lastConversationId;
+    if (targetConversationId) {
+      setWorkspaceMode("text");
+      setSelectedId(targetConversationId);
+      setDraft("");
+      setFiles([]);
+      setDetailError("");
+      setSuggestedReply("");
+      if (window.matchMedia("(max-width: 760px)").matches) {
+        setIsContextOpen(false);
+      }
+    }
+  }
+
+  async function handleImportContacts(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!contactImportFile) return;
+    setIsImportingContacts(true);
+    setContactImportResult(null);
+    setContactStatus("");
+    setAppError("");
+    try {
+      const result = await importContactsCsv(contactImportFile);
+      setContactImportResult(result);
+      setContactImportFile(null);
+      setContactStatus("Imported contacts.");
+      await loadConversations(selectedId);
+      if (workspaceMode === "calls") {
+        await refreshCalls({ force: true });
+      }
+      if (activeContactPhone) {
+        const payload = await getContacts(activeContactPhone, 0, 5);
+        const contact = payload.items.find((item) => cleanPhone(item.phone) === activeContactPhone) || payload.items[0] || null;
+        setActiveContact(contact);
+        setContactNameDraft(contact?.displayName || "");
+        setContactNotesDraft(contact?.notes || "");
+      }
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setIsAuthenticated(false);
+      } else {
+        setContactStatus(error instanceof Error ? error.message : "Could not import contacts.");
+      }
+    } finally {
+      setIsImportingContacts(false);
     }
   }
 
@@ -1771,9 +1963,96 @@ export function App() {
 
           <section className="context-section">
             <h2>Customer Profile</h2>
-            <strong>{contextCustomerName}</strong>
-            <p>{contextDisplayPhone}</p>
-            {contextCode && <em>Session ID: #{contextCode}</em>}
+            <form className="profile-form" onSubmit={handleSaveContactProfile}>
+              <label>
+                Name
+                <input
+                  disabled={!activeContact || isSavingContact}
+                  onChange={(event) => setContactNameDraft(event.target.value)}
+                  placeholder={contextCustomerName}
+                  value={contactNameDraft}
+                />
+              </label>
+              <label>
+                Phone
+                <input disabled value={contextDisplayPhone} />
+              </label>
+              <label>
+                Notes
+                <textarea
+                  disabled={!activeContact || isSavingContact}
+                  onChange={(event) => setContactNotesDraft(event.target.value)}
+                  placeholder="Add customer notes"
+                  rows={4}
+                  value={contactNotesDraft}
+                />
+              </label>
+              {activeContact?.lookupName && <em>Lookup name: {activeContact.lookupName}</em>}
+              {contextCode && <em>Session ID: #{contextCode}</em>}
+              <button className="secondary-action" disabled={!activeContact || isSavingContact || isLoadingContact} type="submit">
+                {isSavingContact ? "Saving" : "Save profile"}
+              </button>
+            </form>
+            {contactStatus && <p className={contactStatus.toLowerCase().includes("could not") ? "app-error compact" : "app-success compact"}>{contactStatus}</p>}
+            {isLoadingContact && <p className="panel-note compact">Loading customer profile...</p>}
+          </section>
+
+          <section className="context-section">
+            <h2>Contact Search</h2>
+            <form className="contact-search-form" onSubmit={handleContactSearch}>
+              <label className="compact-search-box">
+                <Search size={16} />
+                <input
+                  onChange={(event) => setContactSearch(event.target.value)}
+                  placeholder="Search name or phone"
+                  type="search"
+                  value={contactSearch}
+                />
+              </label>
+              <button className="secondary-action" disabled={isSearchingContacts || !contactSearch.trim()} type="submit">
+                {isSearchingContacts ? "Searching" : "Search"}
+              </button>
+            </form>
+            {contactResults.length > 0 && (
+              <div className="contact-results">
+                {contactResults.map((contact) => (
+                  <button key={contact.id} onClick={() => handleSelectContactResult(contact)} type="button">
+                    <strong>{contact.name || cleanPhone(contact.phone)}</strong>
+                    <span>{cleanPhone(contact.phone)}</span>
+                    {contact.openConversationId && <em>Open conversation</em>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="context-section">
+            <h2>CSV Import</h2>
+            <form className="import-form" onSubmit={handleImportContacts}>
+              <label>
+                Contact CSV
+                <input
+                  accept=".csv,text/csv"
+                  disabled={isImportingContacts}
+                  onChange={(event) => setContactImportFile(event.target.files?.[0] || null)}
+                  type="file"
+                />
+              </label>
+              <button className="secondary-action" disabled={!contactImportFile || isImportingContacts} type="submit">
+                <Upload size={16} />
+                {isImportingContacts ? "Importing" : "Import contacts"}
+              </button>
+            </form>
+            {contactImportResult && (
+              <div className="import-summary">
+                <span>Created {contactImportResult.created}</span>
+                <span>Updated {contactImportResult.updated}</span>
+                <span>Skipped {contactImportResult.skipped}</span>
+                {contactImportResult.invalidRows.length > 0 && (
+                  <p>{contactImportResult.invalidRows.length} row issue{contactImportResult.invalidRows.length === 1 ? "" : "s"} found.</p>
+                )}
+              </div>
+            )}
           </section>
 
           <section className="context-section">
