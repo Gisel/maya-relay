@@ -7,6 +7,31 @@ from supabase import Client, create_client
 from app.config import Settings
 from app.models import Channel, Contact, Conversation
 
+CONTACT_COLUMNS = "id, phone_number, display_name, lookup_name, notes"
+CONTACT_COLUMNS_WITH_CREATED_AT = f"{CONTACT_COLUMNS}, created_at"
+CONTACT_COLUMNS_LEGACY = "id, phone_number, display_name, lookup_name"
+CONTACT_COLUMNS_LEGACY_WITH_CREATED_AT = f"{CONTACT_COLUMNS_LEGACY}, created_at"
+
+
+def _is_missing_contact_notes_column(error: Exception) -> bool:
+    message = str(error).lower()
+    return "42703" in message and "contacts" in message and "notes" in message
+
+
+def _execute_contact_query_with_optional_notes(
+    build_query,
+    *,
+    include_created_at: bool = False,
+):
+    columns = CONTACT_COLUMNS_WITH_CREATED_AT if include_created_at else CONTACT_COLUMNS
+    legacy_columns = CONTACT_COLUMNS_LEGACY_WITH_CREATED_AT if include_created_at else CONTACT_COLUMNS_LEGACY
+    try:
+        return build_query(columns).execute()
+    except Exception as error:
+        if not _is_missing_contact_notes_column(error):
+            raise
+        return build_query(legacy_columns).execute()
+
 
 def _conversation_from_row(row: dict[str, Any]) -> Conversation:
     conversation_code = row.get("conversation_code") or str(row["id"]).replace("-", "")[:8].upper()
@@ -302,24 +327,26 @@ class SupabaseRelayRepository:
         return _conversation_from_row(created.data[0])
 
     def get_contact(self, phone_number: str) -> Contact | None:
-        result = (
-            self.client.table("contacts")
-            .select("id, phone_number, display_name, lookup_name, notes")
-            .eq("phone_number", phone_number)
-            .limit(1)
-            .execute()
+        result = _execute_contact_query_with_optional_notes(
+            lambda columns: (
+                self.client.table("contacts")
+                .select(columns)
+                .eq("phone_number", phone_number)
+                .limit(1)
+            )
         )
         if not result.data:
             return None
         return _contact_from_row(result.data[0])
 
     def get_contact_by_id(self, contact_id: str) -> Contact | None:
-        result = (
-            self.client.table("contacts")
-            .select("id, phone_number, display_name, lookup_name, notes")
-            .eq("id", contact_id)
-            .limit(1)
-            .execute()
+        result = _execute_contact_query_with_optional_notes(
+            lambda columns: (
+                self.client.table("contacts")
+                .select(columns)
+                .eq("id", contact_id)
+                .limit(1)
+            )
         )
         if not result.data:
             return None
@@ -369,17 +396,16 @@ class SupabaseRelayRepository:
         display_name: str | None,
         notes: str | None,
     ) -> Contact | None:
-        result = (
-            self.client.table("contacts")
-            .update(
-                {
-                    "display_name": display_name,
-                    "notes": notes,
-                }
-            )
-            .eq("id", contact_id)
-            .execute()
-        )
+        payload = {
+            "display_name": display_name,
+            "notes": notes,
+        }
+        try:
+            result = self.client.table("contacts").update(payload).eq("id", contact_id).execute()
+        except Exception as error:
+            if not _is_missing_contact_notes_column(error):
+                raise
+            result = self.client.table("contacts").update({"display_name": display_name}).eq("id", contact_id).execute()
         if not result.data:
             return None
         return _contact_from_row(result.data[0])
@@ -432,14 +458,15 @@ class SupabaseRelayRepository:
         safe_offset = max(offset, 0)
         search_limit = safe_limit + safe_offset + 1
         contact_scan_limit = max(search_limit * 5, 500 if q.strip() else search_limit)
-        contacts = (
-            self.client.table("contacts")
-            .select("id, phone_number, display_name, lookup_name, notes, created_at")
-            .order("created_at", desc=True)
-            .limit(contact_scan_limit)
-            .execute()
-            .data
-        )
+        contacts = _execute_contact_query_with_optional_notes(
+            lambda columns: (
+                self.client.table("contacts")
+                .select(columns)
+                .order("created_at", desc=True)
+                .limit(contact_scan_limit)
+            ),
+            include_created_at=True,
+        ).data
         needle = q.strip().lower()
         if needle:
             contacts = [contact for contact in contacts if _contact_matches(contact, needle)]

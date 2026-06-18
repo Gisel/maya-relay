@@ -1,5 +1,19 @@
 from app.db import SupabaseRelayRepository
-from tests.in_memory_supabase import InMemorySupabaseClient
+from tests.in_memory_supabase import InMemoryQuery, InMemorySupabaseClient
+
+
+class MissingContactNotesQuery(InMemoryQuery):
+    def execute(self):
+        if self.table.name == "contacts" and self.selected_columns and "notes" in self.selected_columns:
+            raise Exception("{'code': '42703', 'message': 'column contacts.notes does not exist'}")
+        return super().execute()
+
+
+class MissingContactNotesClient(InMemorySupabaseClient):
+    def table(self, name: str) -> InMemoryQuery:
+        if name not in self.tables:
+            self.tables[name] = self.tables["contacts"].__class__(name)
+        return MissingContactNotesQuery(self, self.tables[name])
 
 
 def build_repository() -> tuple[SupabaseRelayRepository, InMemorySupabaseClient]:
@@ -38,6 +52,22 @@ def test_get_contact_by_id_returns_existing_row():
     assert contact.phone_number == "+15550000001"
     assert contact.display_name == "Maria Lopez"
     assert contact.notes == "VIP"
+
+
+def test_get_contact_tolerates_legacy_schema_without_notes_column():
+    client = MissingContactNotesClient()
+    repository = SupabaseRelayRepository(client)
+    client.seed(
+        "contacts",
+        [{"phone_number": "+15550000001", "display_name": "Maria Lopez"}],
+    )
+
+    contact = repository.get_contact("+15550000001")
+
+    assert contact is not None
+    assert contact.phone_number == "+15550000001"
+    assert contact.display_name == "Maria Lopez"
+    assert contact.notes is None
 
 
 def test_get_or_create_contact_creates_once_then_reuses_row():
