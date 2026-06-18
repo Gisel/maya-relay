@@ -44,6 +44,18 @@ async function mockMayaRelayApi(
     },
     updatedAt: "2026-06-05T14:00:00Z",
   };
+  let contact = {
+    id: "contact-1",
+    phone: "+15550000001",
+    displayName: null as string | null,
+    lookupName: null as string | null,
+    name: "Test Customer",
+    notes: "Prefers proof approvals by text.",
+    lastActivityAt: "2026-06-06T14:05:00Z",
+    openConversationId: "conversation-1",
+    lastConversationId: "conversation-1",
+    latestCallId: "call-existing",
+  };
   const requestCounts = {
     conversations: 0,
     detail: 0,
@@ -53,6 +65,9 @@ async function mockMayaRelayApi(
     callUpdates: 0,
     statusUpdates: 0,
     quickResponses: 0,
+    contacts: 0,
+    contactUpdates: 0,
+    contactImports: 0,
   };
   const calls = [
     {
@@ -358,6 +373,71 @@ async function mockMayaRelayApi(
     });
   });
 
+  await page.route("**/api/contacts/import", async (route) => {
+    requestCounts.contactImports += 1;
+    await route.fulfill({
+      contentType: "application/json",
+      json: {
+        created: 1,
+        updated: 1,
+        skipped: 0,
+        invalidRows: [],
+      },
+    });
+  });
+
+  await page.route("**/api/contacts/contact-1", async (route) => {
+    requestCounts.contactUpdates += 1;
+    const payload = JSON.parse(route.request().postData() || "{}") as {
+      displayName?: string | null;
+      notes?: string | null;
+    };
+    contact = {
+      ...contact,
+      displayName: payload.displayName ?? contact.displayName,
+      name: payload.displayName || contact.lookupName || contact.phone,
+      notes: payload.notes ?? contact.notes,
+    };
+    conversation.customer.displayName = contact.displayName;
+    conversation.customer.name = contact.name;
+    await route.fulfill({
+      contentType: "application/json",
+      json: {
+        contact: {
+          id: contact.id,
+          phone: contact.phone,
+          displayName: contact.displayName,
+          lookupName: contact.lookupName,
+          name: contact.name,
+          notes: contact.notes,
+        },
+      },
+    });
+  });
+
+  await page.route(/\/api\/contacts(?:\?.*)?$/, async (route) => {
+    requestCounts.contacts += 1;
+    const url = new URL(route.request().url());
+    const query = (url.searchParams.get("q") || "").toLowerCase();
+    const haystack = [contact.name, contact.displayName, contact.lookupName, contact.phone, contact.notes]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    const items = !query || haystack.includes(query) ? [contact] : [];
+    await route.fulfill({
+      contentType: "application/json",
+      json: {
+        items,
+        pagination: {
+          limit: Number(url.searchParams.get("limit") || "25"),
+          offset: Number(url.searchParams.get("offset") || "0"),
+          nextOffset: null,
+          hasMore: false,
+        },
+      },
+    });
+  });
+
   return {
     ...requestCounts,
     get conversations() {
@@ -383,6 +463,15 @@ async function mockMayaRelayApi(
     },
     get quickResponses() {
       return requestCounts.quickResponses;
+    },
+    get contacts() {
+      return requestCounts.contacts;
+    },
+    get contactUpdates() {
+      return requestCounts.contactUpdates;
+    },
+    get contactImports() {
+      return requestCounts.contactImports;
     },
     releaseHeldDetailRequest() {
       releaseHeldDetailRequest?.();
@@ -448,6 +537,77 @@ test("authenticated boot loads each initial resource once", async ({ page }) => 
   await expect.poll(() => requestCounts.quickResponses).toBe(1);
   expect(requestCounts.me).toBeGreaterThanOrEqual(1);
   expect(requestCounts.me).toBeLessThanOrEqual(2);
+});
+
+test("customer profile edits happen from the right-panel pencil without hiding messages", async ({ page }) => {
+  const requestCounts = await mockMayaRelayApi(page);
+
+  await page.goto("/app/");
+  await expect(page.getByRole("article").getByText("Hello")).toBeVisible();
+  await page.getByRole("button", { name: "Details" }).click();
+
+  const editButton = page.getByRole("button", { name: "Edit customer profile" });
+  await expect(editButton).toBeEnabled();
+  await editButton.click();
+
+  const editor = page.getByRole("dialog", { name: "Edit customer profile" });
+  await expect(editor).toBeVisible();
+  await editor.getByLabel("Name").fill("Priority Test Customer");
+  await editor.getByLabel("Notes").fill("Needs a printed proof before pickup.");
+  await editor.getByRole("button", { name: "Save profile" }).click();
+
+  await expect.poll(() => requestCounts.contactUpdates).toBe(1);
+  await expect(editor.getByText("Saved customer profile.")).toBeVisible();
+  await page.getByRole("button", { name: "Close customer profile editor" }).click();
+
+  await expect(page.getByRole("article").getByText("Hello")).toBeVisible();
+  await expect(page.locator(".customer-profile-summary").getByText("Priority Test Customer")).toBeVisible();
+  await expect(page.locator(".customer-profile-summary").getByText("Needs a printed proof before pickup.")).toBeVisible();
+});
+
+test("unified inbox search keeps conversation search and adds contact matches", async ({ page }) => {
+  const requestCounts = await mockMayaRelayApi(page);
+
+  await page.goto("/app/");
+  await expect(page.getByRole("article").getByText("Hello")).toBeVisible();
+
+  const searchInput = page.getByPlaceholder("Search conversations or contacts...");
+  await expect(page.locator(".inbox-panel input[type='search']")).toHaveCount(1);
+  await searchInput.fill("proof approvals");
+
+  await expect(page.locator(".contact-search-results", { hasText: "Contacts" })).toBeVisible();
+  await expect(page.locator(".contact-result-row", { hasText: "Test Customer" })).toBeVisible();
+  await expect.poll(() => requestCounts.contacts).toBeGreaterThan(1);
+
+  await page.locator(".contact-result-row", { hasText: "Test Customer" }).click();
+
+  await expect(page.getByRole("article").getByText("Hello")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Call", exact: true })).toBeVisible();
+});
+
+test("settings CSV import gives import feedback without moving profile controls into the inbox", async ({ page }) => {
+  const requestCounts = await mockMayaRelayApi(page);
+
+  await page.goto("/app/");
+  await expect(page.getByRole("article").getByText("Hello")).toBeVisible();
+
+  await page.getByRole("button", { name: "Settings" }).click();
+  const settings = page.getByRole("dialog", { name: "Settings" });
+  await expect(settings).toBeVisible();
+  await expect(settings.getByRole("heading", { name: "CSV Import" })).toBeVisible();
+
+  await settings.getByLabel("Contact CSV").setInputFiles({
+    name: "contacts.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("phone_number,display_name\n+15550000003,CSV Customer\n"),
+  });
+  await settings.getByRole("button", { name: "Import contacts" }).click();
+
+  await expect.poll(() => requestCounts.contactImports).toBe(1);
+  await expect(settings.getByText("Created 1")).toBeVisible();
+  await expect(settings.getByText("Updated 1")).toBeVisible();
+  await expect(settings.getByText("Skipped 0")).toBeVisible();
+  await expect(page.getByRole("article").getByText("Hello")).toBeVisible();
 });
 
 test("calls tab shows grouped call activity and refreshes after starting a call", async ({ page }) => {
@@ -695,7 +855,7 @@ test("conversation search filters loaded rows before server results", async ({ p
   await page.getByRole("button", { name: "Load more" }).click();
   await expect(page.getByRole("button", { name: /Older Customer/ })).toBeVisible();
 
-  await page.getByPlaceholder("Search conversations...").fill("Older");
+  await page.getByPlaceholder("Search conversations or contacts...").fill("Older");
 
   await expect(page.getByRole("button", { name: /Older Customer/ })).toBeVisible({ timeout: 100 });
   await expect(page.getByRole("button", { name: /Test Customer/ })).toHaveCount(0);
@@ -709,7 +869,7 @@ test("conversation search includes unloaded server matches", async ({ page }) =>
   await expect(page.getByRole("button", { name: /Test Customer/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Older Customer/ })).toHaveCount(0);
 
-  await page.getByPlaceholder("Search conversations...").fill("Older");
+  await page.getByPlaceholder("Search conversations or contacts...").fill("Older");
 
   await expect(page.getByRole("button", { name: /Older Customer/ })).toBeVisible();
   await expect.poll(() => requestCounts.conversations).toBe(2);

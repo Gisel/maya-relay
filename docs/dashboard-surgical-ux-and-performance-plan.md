@@ -16,6 +16,8 @@ Detailed production-slice contracts now live in [production-slice-plan.md](produ
 - Verify frontend changes with `npm run build` and e2e tests when UI behavior can be affected.
 - Verify backend changes with `.venv/bin/python -m pytest`.
 - Do not label broad MVP work as done unless production acceptance criteria are met.
+- Do not use `production-ready` unless code, tests, production schema/configuration, Railway deployment, live smoke test, and docs are all complete for the declared scope.
+- If production verification is incomplete, use precise labels such as `implemented locally`, `tests pass locally`, `deployed pending live verification`, `production schema pending`, or `validated in production`.
 
 ## Styling And CSS Token Rule
 

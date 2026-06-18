@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Search,
   Send,
+  Settings as SettingsIcon,
   Sparkles,
   X,
 } from "lucide-react";
@@ -28,6 +29,9 @@ import {
   ConversationListItem,
   ConversationStatus,
   ConversationStatusFilter,
+  ContactImportResponse,
+  ContactProfile,
+  ContactSearchItem,
   DeliveryStatus,
   FollowUpStatus,
   Message,
@@ -36,15 +40,18 @@ import {
   callConversationCustomer,
   generateCallRecap,
   getCalls,
+  getContacts,
   getConversationDetail,
   getConversations,
   getMe,
   getQuickResponses,
+  importContactsCsv,
   login,
   logout,
   sendReply,
   startNewCall,
   transcribeCall,
+  updateContact,
   updateCallDetails,
   updateConversationStatus,
 } from "./api";
@@ -53,6 +60,11 @@ import { CallDetailsForm, CallDetailsPayload } from "./calls/CallDetailsForm";
 import { CallsPanel } from "./calls/CallsPanel";
 import { CallWorkspace } from "./calls/CallWorkspace";
 import { WorkspaceMode, WorkspaceTabs } from "./calls/WorkspaceTabs";
+import { CustomerProfileSummary } from "./customers/CustomerProfileSummary";
+import { EditCustomerProfileModal } from "./customers/EditCustomerProfileModal";
+import { UnifiedSearchResults } from "./search/UnifiedSearchResults";
+import { ContactCsvImport } from "./settings/ContactCsvImport";
+import { SettingsModal } from "./settings/SettingsModal";
 
 const INBOX_REFRESH_INTERVAL_MS = 15000;
 const CLOSE_AUDIT_LOG_PREFIX = "[Maya Relay Close Audit]";
@@ -636,6 +648,15 @@ export function App() {
   const [selectedCallId, setSelectedCallId] = useState("");
   const [quickResponses, setQuickResponses] = useState<QuickResponse[]>([]);
   const [suggestedReply, setSuggestedReply] = useState("");
+  const [activeContact, setActiveContact] = useState<ContactProfile | null>(null);
+  const [contactSearchResults, setContactSearchResults] = useState<ContactSearchItem[]>([]);
+  const [isSearchingContacts, setIsSearchingContacts] = useState(false);
+  const [isLoadingContact, setIsLoadingContact] = useState(false);
+  const [isProfileEditorOpen, setIsProfileEditorOpen] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const [profileStatus, setProfileStatus] = useState("");
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<ConversationStatusFilter>("open");
   const [draft, setDraft] = useState("");
@@ -693,6 +714,12 @@ export function App() {
     () => calls.find((call) => call.id === selectedCallId) || null,
     [calls, selectedCallId],
   );
+  const activeContactPhone = useMemo(() => {
+    if (workspaceMode === "calls" && selectedCallRow) {
+      return cleanPhone(selectedCallRow.customer.phone || selectedCallRow.latestCall.customerPhone);
+    }
+    return cleanPhone((selectedConversation || selectedListItem)?.customer.phone);
+  }, [selectedCallRow, selectedConversation, selectedListItem, workspaceMode]);
 
   const visibleMessages = useMemo(
     () => messages.filter(isCustomerVisibleMessage),
@@ -941,6 +968,8 @@ export function App() {
     if (!query) {
       searchRequestId.current += 1;
       setSearchResults(null);
+      setContactSearchResults([]);
+      setIsSearchingContacts(false);
       setIsSearchingConversations(false);
       return;
     }
@@ -948,6 +977,7 @@ export function App() {
       const requestId = searchRequestId.current + 1;
       searchRequestId.current = requestId;
       setIsSearchingConversations(true);
+      setIsSearchingContacts(true);
       getConversations(query, 0, 50, statusFilter)
         .then((payload) => {
           if (searchRequestId.current === requestId) {
@@ -965,6 +995,25 @@ export function App() {
         .finally(() => {
           if (searchRequestId.current === requestId) {
             setIsSearchingConversations(false);
+          }
+        });
+      getContacts(query, 0, 8)
+        .then((payload) => {
+          if (searchRequestId.current === requestId) {
+            setContactSearchResults(payload.items);
+          }
+        })
+        .catch((error) => {
+          if (searchRequestId.current !== requestId) return;
+          if (error instanceof ApiError && error.status === 401) {
+            setIsAuthenticated(false);
+          } else {
+            setAppError(error instanceof Error ? error.message : "Could not search contacts.");
+          }
+        })
+        .finally(() => {
+          if (searchRequestId.current === requestId) {
+            setIsSearchingContacts(false);
           }
         });
     }, 250);
@@ -1016,6 +1065,38 @@ export function App() {
     if (!isAuthenticated) return;
     loadDetail(selectedId);
   }, [isAuthenticated, loadDetail, selectedId]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !activeContactPhone) {
+      setActiveContact(null);
+      setProfileError("");
+      setProfileStatus("");
+      return;
+    }
+    let isCancelled = false;
+    setIsLoadingContact(true);
+    setProfileError("");
+    getContacts(activeContactPhone, 0, 5)
+      .then((payload) => {
+        if (isCancelled) return;
+        const contact = payload.items.find((item) => cleanPhone(item.phone) === activeContactPhone) || payload.items[0] || null;
+        setActiveContact(contact);
+      })
+      .catch((error) => {
+        if (isCancelled) return;
+        if (error instanceof ApiError && error.status === 401) {
+          setIsAuthenticated(false);
+        } else {
+          setProfileError(error instanceof Error ? error.message : "Could not load customer profile.");
+        }
+      })
+      .finally(() => {
+        if (!isCancelled) setIsLoadingContact(false);
+      });
+    return () => {
+      isCancelled = true;
+    };
+  }, [activeContactPhone, isAuthenticated]);
 
   useEffect(() => {
     if (!isAuthenticated || workspaceMode !== "calls") return;
@@ -1200,6 +1281,98 @@ export function App() {
     }
     if (window.matchMedia("(max-width: 760px)").matches) {
       setIsContextOpen(false);
+    }
+  }
+
+  function applyContactProfile(contact: ContactProfile) {
+    const phone = cleanPhone(contact.phone);
+    const customer = {
+      phone: contact.phone,
+      displayName: contact.displayName,
+      lookupName: contact.lookupName,
+      name: contact.name,
+    };
+    setConversations((current) =>
+      current.map((conversation) =>
+        cleanPhone(conversation.customer.phone) === phone ? { ...conversation, customer } : conversation,
+      ),
+    );
+    setSearchResults((current) =>
+      current
+        ? current.map((conversation) =>
+          cleanPhone(conversation.customer.phone) === phone ? { ...conversation, customer } : conversation,
+        )
+        : current,
+    );
+    setSelectedConversation((current) =>
+      current && cleanPhone(current.customer.phone) === phone ? { ...current, customer } : current,
+    );
+    setCallRows((current) =>
+      current.map((row) =>
+        cleanPhone(row.customer.phone || row.latestCall.customerPhone) === phone ? { ...row, customer } : row,
+      ),
+    );
+  }
+
+  async function handleSaveContactProfile(payload: { displayName: string; notes: string }) {
+    if (!activeContact) return;
+    setIsSavingProfile(true);
+    setProfileError("");
+    setProfileStatus("");
+    setAppError("");
+    try {
+      const response = await updateContact(activeContact.id, {
+        displayName: payload.displayName,
+        notes: payload.notes,
+      });
+      setActiveContact(response.contact);
+      applyContactProfile(response.contact);
+      setProfileStatus("Saved customer profile.");
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setIsAuthenticated(false);
+      } else {
+        setProfileError(error instanceof Error ? error.message : "Could not save customer profile.");
+      }
+      throw error;
+    } finally {
+      setIsSavingProfile(false);
+    }
+  }
+
+  function handleSelectContactResult(contact: ContactSearchItem) {
+    const targetConversationId = contact.openConversationId || contact.lastConversationId;
+    if (!targetConversationId) {
+      setActiveContact(contact);
+      setIsProfileEditorOpen(true);
+      return;
+    }
+    setWorkspaceMode("text");
+    setSelectedId(targetConversationId);
+    setDraft("");
+    setFiles([]);
+    setDetailError("");
+    setSuggestedReply("");
+    setCallStatus("");
+    if (window.matchMedia("(max-width: 760px)").matches) {
+      setIsContextOpen(false);
+    }
+  }
+
+  async function handleImportContacts(file: File, overwrite: boolean): Promise<ContactImportResponse> {
+    setAppError("");
+    try {
+      const result = await importContactsCsv(file, overwrite);
+      await loadConversations(selectedId);
+      if (workspaceMode === "calls") {
+        await refreshCalls({ force: true });
+      }
+      return result;
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setIsAuthenticated(false);
+      }
+      throw error;
     }
   }
 
@@ -1527,6 +1700,10 @@ export function App() {
             <Plus size={18} />
             New call
           </button>
+          <button className="settings-button" onClick={() => setIsSettingsOpen(true)} type="button">
+            <SettingsIcon size={18} />
+            Settings
+          </button>
           <button className="logout-button" onClick={handleLogout} type="button">
             <LogOut size={18} />
             Logout
@@ -1544,7 +1721,7 @@ export function App() {
                 <Search size={20} />
                 <input
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search conversations..."
+                  placeholder="Search conversations or contacts..."
                   type="search"
                   value={search}
                 />
@@ -1558,6 +1735,7 @@ export function App() {
                     onClick={() => {
                       setStatusFilter(filter);
                       setSearchResults(null);
+                      setContactSearchResults([]);
                       setNextConversationOffset(null);
                       setHasMoreConversations(false);
                       setClosedConversationUndo(null);
@@ -1622,6 +1800,12 @@ export function App() {
                 {search.trim() && isSearchingConversations && (
                   <p className="panel-note">Searching older conversations...</p>
                 )}
+                <UnifiedSearchResults
+                  contacts={contactSearchResults}
+                  isSearching={isSearchingContacts}
+                  onSelectContact={handleSelectContactResult}
+                  query={search}
+                />
                 {!search.trim() && hasMoreConversations && (
                   <button
                     className="load-more-button"
@@ -1769,12 +1953,19 @@ export function App() {
             </button>
           </div>
 
-          <section className="context-section">
-            <h2>Customer Profile</h2>
-            <strong>{contextCustomerName}</strong>
-            <p>{contextDisplayPhone}</p>
-            {contextCode && <em>Session ID: #{contextCode}</em>}
-          </section>
+          <CustomerProfileSummary
+            canEdit={Boolean(activeContact)}
+            isLoading={isLoadingContact}
+            name={activeContact?.name || contextCustomerName}
+            notes={activeContact?.notes}
+            onEdit={() => {
+              setProfileError("");
+              setProfileStatus("");
+              setIsProfileEditorOpen(true);
+            }}
+            phone={contextDisplayPhone}
+            sessionCode={contextCode}
+          />
 
           <section className="context-section">
             <h2>
@@ -1819,6 +2010,20 @@ export function App() {
         onStartCall={handleStartNewCall}
         open={isNewCallOpen}
       />
+      <EditCustomerProfileModal
+        contact={activeContact}
+        error={profileError}
+        fallbackName={contextCustomerName}
+        isSaving={isSavingProfile}
+        onClose={() => setIsProfileEditorOpen(false)}
+        onSave={handleSaveContactProfile}
+        open={isProfileEditorOpen}
+        phone={contextDisplayPhone}
+        status={profileStatus}
+      />
+      <SettingsModal onClose={() => setIsSettingsOpen(false)} open={isSettingsOpen}>
+        <ContactCsvImport onImport={handleImportContacts} />
+      </SettingsModal>
       <CloseConversationModal
         customerName={activeConversation ? displayCustomerName(activeConversation) : "This conversation"}
         isSubmitting={isUpdatingStatus}

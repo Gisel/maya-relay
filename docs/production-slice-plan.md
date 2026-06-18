@@ -21,6 +21,40 @@ Before implementation begins on any feature, define:
 
 No feature is called done until the acceptance criteria pass. If something is deferred, the reason must be explicit and today's work must not need to be thrown away later.
 
+## Production-Ready Language Standard
+
+Use the phrase `production-ready` only when every required item for the declared scope is complete and verified. Local tests alone are not enough.
+
+For a slice to be called production-ready, all applicable checks must be true:
+
+- Code is implemented.
+- Local backend tests pass.
+- Frontend build passes when frontend code is touched.
+- Playwright/e2e tests pass when UI or operator workflow is touched.
+- Required Supabase schema changes are applied in production, not only present in `supabase_schema.sql`.
+- Required Railway deployment is successful.
+- Live production smoke test passes against the deployed app.
+- Required Twilio, Supabase, OpenAI, AssemblyAI, domain/DNS, or other third-party configuration is verified in the live environment.
+- The 360 doc and production slice plan reflect the true current status.
+- No known blocker remains for the declared scope.
+
+If any item is missing, do not call the work production-ready. Use precise status language instead:
+
+- `Implemented locally`
+- `Tests pass locally`
+- `Committed and pushed`
+- `Deployed, pending live verification`
+- `Backend code ready, production schema pending`
+- `Production schema applied, live smoke pending`
+- `Blocked on Supabase migration`
+- `Validated in production`
+
+Example:
+
+`Backend code ready, tests pass locally, production Supabase schema pending` is acceptable.
+
+`Backend is production-ready` is not acceptable until production schema, deployment, and live smoke checks have all passed.
+
 ## Non-Negotiables
 
 - Keep existing SMS, MMS, WhatsApp, calls, recording, transcription, recap, and native reply-code flows working.
