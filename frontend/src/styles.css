@@ -1180,13 +1180,12 @@ button {
   align-items: center;
   display: flex !important;
   gap: 10px;
+  justify-content: flex-start;
+  line-height: 1.35;
 }
 
-.checkbox-row input {
-  accent-color: var(--brand-blue);
-  height: 18px;
-  min-height: 18px;
-  width: 18px;
+.checkbox-row span {
+  min-width: 0;
 }
 
 .import-summary {
@@ -2114,6 +2113,74 @@ button {
   padding: 11px 13px;
   resize: vertical;
   width: 100%;
+}
+
+.drawer-form .file-picker-label {
+  gap: 8px;
+  position: relative;
+}
+
+.drawer-form .file-picker-control {
+  align-items: center;
+  border: 1px solid #cdd5e1;
+  border-radius: 8px;
+  display: flex;
+  gap: 10px;
+  min-height: 44px;
+  min-width: 0;
+  padding: 6px 8px;
+  width: 100%;
+}
+
+.file-picker-button {
+  align-items: center;
+  background: #eef1f5;
+  border: 1px solid #c6cfdb;
+  border-radius: 7px;
+  color: #172033;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 560;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 12px;
+}
+
+.file-picker-name {
+  color: #68748a;
+  font-size: 13px;
+  font-weight: 560;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-picker-name.has-file {
+  color: #172033;
+}
+
+.drawer-form .file-picker-input {
+  height: 1px;
+  left: 0;
+  min-height: 1px;
+  opacity: 0;
+  padding: 0;
+  pointer-events: none;
+  position: absolute;
+  top: 100%;
+  width: 1px;
+}
+
+.drawer-form .checkbox-row input[type="checkbox"] {
+  accent-color: var(--brand-blue);
+  border-radius: 4px;
+  flex: 0 0 auto;
+  height: 18px;
+  min-height: 18px;
+  padding: 0;
+  width: 18px;
 }
 
 .drawer-form fieldset {

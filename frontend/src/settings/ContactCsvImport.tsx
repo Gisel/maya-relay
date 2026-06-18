@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import { Upload } from "lucide-react";
 import { ContactImportResponse } from "../api";
 
@@ -7,6 +7,7 @@ type ContactCsvImportProps = {
 };
 
 export function ContactCsvImport({ onImport }: ContactCsvImportProps) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [overwrite, setOverwrite] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -23,6 +24,9 @@ export function ContactCsvImport({ onImport }: ContactCsvImportProps) {
       const response = await onImport(file, overwrite);
       setResult(response);
       setFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : "Could not import contacts.");
     } finally {
@@ -35,12 +39,18 @@ export function ContactCsvImport({ onImport }: ContactCsvImportProps) {
       <h3>CSV Import</h3>
       <p>Upload a contact CSV with columns named phone_number and display_name.</p>
       <form className="drawer-form" onSubmit={handleSubmit}>
-        <label>
-          Contact CSV
+        <label className="file-picker-label">
+          <span>Contact CSV</span>
+          <span className="file-picker-control">
+            <span className="file-picker-button">Choose CSV</span>
+            <span className={`file-picker-name ${file ? "has-file" : ""}`}>{file?.name || "No file chosen"}</span>
+          </span>
           <input
             accept=".csv,text/csv"
+            className="file-picker-input"
             disabled={isImporting}
             onChange={(event) => setFile(event.target.files?.[0] || null)}
+            ref={fileInputRef}
             type="file"
           />
         </label>
