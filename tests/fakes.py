@@ -291,6 +291,11 @@ class FakeRepository:
                 "error_message": error_message,
             }
         )
+        for message in self.messages:
+            if message.get("twilio_message_sid") == twilio_message_sid:
+                message["delivery_status"] = status
+                message["delivery_error_code"] = error_code
+                message["delivery_error_message"] = error_message
 
     def list_conversations(
         self,
@@ -580,6 +585,52 @@ class FakeRepository:
         }
         self.call_events.append(event)
         return event
+
+    def get_operational_status(self, *, limit: int = 10) -> dict[str, list[dict[str, Any]]]:
+        safe_limit = min(max(limit, 1), 25)
+        message_failures = [
+            self._with_operational_context(message)
+            for message in reversed(self.messages)
+            if message.get("delivery_status") in {"failed", "undelivered"}
+        ][:safe_limit]
+        call_attention = [
+            {"kind": kind, "call": self._with_operational_context(call)}
+            for call in reversed(self.calls)
+            for kind in [self._call_attention_kind(call)]
+            if kind is not None
+        ][:safe_limit]
+        return {
+            "message_failures": message_failures,
+            "call_attention": call_attention,
+        }
+
+    def _with_operational_context(self, row: dict[str, Any]) -> dict[str, Any]:
+        conversation = self.get_conversation(str(row.get("conversation_id") or ""))
+        phone = row.get("customer_phone") or (conversation.customer_phone if conversation else None) or row.get("to_phone") or row.get("from_phone")
+        contact = self.get_contact(str(phone or ""))
+        return {
+            **row,
+            "conversation_code": conversation.conversation_code if conversation else None,
+            "customer_channel": conversation.customer_channel if conversation else None,
+            "customer_name": contact.best_name if contact else None,
+        }
+
+    @staticmethod
+    def _call_attention_kind(call: dict[str, Any]) -> str | None:
+        recording_status = str(call.get("recording_status") or "").lower()
+        call_status = str(call.get("status") or "").lower()
+        has_recording = bool(call.get("recording_sid") or call.get("recording_url"))
+        has_transcription = bool(str(call.get("transcription") or "").strip())
+        has_recap = bool(str(call.get("recap") or "").strip())
+        if recording_status in {"failed", "absent", "canceled"}:
+            return "recording_failed"
+        if call_status == "completed" and not has_recording:
+            return "recording_missing"
+        if recording_status == "completed" and has_recording and not has_transcription:
+            return "transcription_missing"
+        if has_transcription and not has_recap:
+            return "recap_missing"
+        return None
 
 
 class FakeSender:

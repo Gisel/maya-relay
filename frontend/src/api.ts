@@ -190,6 +190,52 @@ export type ContactImportResponse = {
   }[];
 };
 
+export type OperationalMessageFailure = {
+  id: string;
+  conversationId: string | null;
+  conversationCode: string | null;
+  customerName: string | null;
+  customerPhone: string | null;
+  channel: string;
+  direction: string | null;
+  bodyPreview: string;
+  twilioMessageSid: string | null;
+  deliveryStatus: string | null;
+  deliveryErrorCode: string | null;
+  deliveryErrorMessage: string | null;
+  createdAt: string | null;
+  hint: string;
+};
+
+export type OperationalCallAttention = {
+  id: string;
+  kind: "recording_failed" | "recording_missing" | "transcription_missing" | "recap_missing" | string;
+  conversationId: string | null;
+  conversationCode: string | null;
+  customerName: string | null;
+  customerPhone: string | null;
+  direction: string | null;
+  callType: string | null;
+  twilioCallSid: string | null;
+  status: string | null;
+  recordingStatus: string | null;
+  recordingSid: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string | null;
+  hint: string;
+};
+
+export type OperationalStatusResponse = {
+  summary: {
+    messageFailures: number;
+    callAttention: number;
+    total: number;
+  };
+  messageFailures: OperationalMessageFailure[];
+  callAttention: OperationalCallAttention[];
+};
+
 export type ReplyResponse = {
   status: "sent" | "duplicate";
   message: Message;
@@ -314,6 +360,13 @@ export function getConversationDetail(conversationId: string) {
 
 export function getQuickResponses() {
   return request<{ quickResponses: QuickResponse[] }>("/api/quick-responses");
+}
+
+export function getOperationalStatus(limit = 10) {
+  const params = new URLSearchParams();
+  if (limit !== 10) params.set("limit", String(limit));
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return request<OperationalStatusResponse>(`/api/operations/status${suffix}`);
 }
 
 export function sendReply(conversationId: string, body: string, files: File[], clientRequestId: string) {

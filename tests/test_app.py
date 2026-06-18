@@ -319,6 +319,72 @@ def test_api_json_login_and_logout():
     assert "maya_admin" in logout.headers["set-cookie"]
 
 
+def test_api_operations_status_reports_recent_message_and_call_issues():
+    client, repository, _ = make_client(admin_password="secret")
+    repository.update_contact_lookup_name("+15550000001", "Test Customer")
+    conversation = repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    repository.create_message(
+        conversation_id=conversation.id,
+        direction="employee_to_customer",
+        from_phone="+13852208404",
+        to_phone="+15550000001",
+        body="Your proof is ready.",
+        twilio_message_sid="SMfailed",
+    )
+    repository.update_message_status(
+        twilio_message_sid="SMfailed",
+        status="undelivered",
+        error_code="30007",
+        error_message="Carrier violation",
+    )
+    call = repository.create_call(
+        conversation_id=conversation.id,
+        direction="inbound",
+        call_type="inbound",
+        customer_phone="+15550000001",
+        employee_phone="+15551234567",
+        twilio_call_sid="CAmissingRecording",
+        status="initiated",
+    )
+    repository.update_call_status_by_sid(twilio_call_sid=str(call["twilio_call_sid"]), status="completed")
+
+    unauthenticated = client.get("/api/operations/status")
+    assert unauthenticated.status_code == 401
+
+    login = client.post("/api/auth/login", json={"password": "secret"})
+    response = client.get("/api/operations/status", headers={"cookie": login.headers["set-cookie"]})
+
+    assert response.status_code == 200
+    assert response.json()["summary"] == {
+        "messageFailures": 1,
+        "callAttention": 1,
+        "total": 2,
+    }
+    assert response.json()["messageFailures"][0] == {
+        "id": "message-1",
+        "conversationId": "conversation-1",
+        "conversationCode": "C0001",
+        "customerName": "Test Customer",
+        "customerPhone": "+15550000001",
+        "channel": "sms",
+        "direction": "employee_to_customer",
+        "bodyPreview": "Your proof is ready.",
+        "twilioMessageSid": "SMfailed",
+        "deliveryStatus": "undelivered",
+        "deliveryErrorCode": "30007",
+        "deliveryErrorMessage": "Carrier violation",
+        "createdAt": None,
+        "hint": "Carrier filtering. Check message wording, sender registration, and recent repeated sends.",
+    }
+    assert response.json()["callAttention"][0]["kind"] == "recording_missing"
+    assert response.json()["callAttention"][0]["conversationCode"] == "C0001"
+    assert response.json()["callAttention"][0]["customerName"] == "Test Customer"
+    assert response.json()["callAttention"][0]["hint"].startswith("The call completed but no recording is attached yet.")
+
+
 def test_api_conversation_contract_and_idempotent_reply():
     client, repository, sender = make_client(admin_password="secret")
     repository.update_contact_lookup_name("+15550000001", "GOMEZ, GISEL")

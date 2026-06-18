@@ -68,6 +68,7 @@ async function mockMayaRelayApi(
     contacts: 0,
     contactUpdates: 0,
     contactImports: 0,
+    operationalStatus: 0,
   };
   const calls = [
     {
@@ -373,6 +374,58 @@ async function mockMayaRelayApi(
     });
   });
 
+  await page.route("**/api/operations/status*", async (route) => {
+    requestCounts.operationalStatus += 1;
+    await route.fulfill({
+      contentType: "application/json",
+      json: {
+        summary: {
+          messageFailures: 1,
+          callAttention: 1,
+          total: 2,
+        },
+        messageFailures: [
+          {
+            id: "message-failed",
+            conversationId: "conversation-1",
+            conversationCode: "C0001",
+            customerName: "Test Customer",
+            customerPhone: "+15550000001",
+            channel: "sms",
+            direction: "employee_to_customer",
+            bodyPreview: "Your proof is ready.",
+            twilioMessageSid: "SMfailed",
+            deliveryStatus: "undelivered",
+            deliveryErrorCode: "30007",
+            deliveryErrorMessage: "Carrier violation",
+            createdAt: "2026-06-06T14:00:00Z",
+            hint: "Carrier filtering. Check message wording, sender registration, and recent repeated sends.",
+          },
+        ],
+        callAttention: [
+          {
+            id: "call-existing",
+            kind: "recording_missing",
+            conversationId: "conversation-1",
+            conversationCode: "C0001",
+            customerName: "Test Customer",
+            customerPhone: "+15550000001",
+            direction: "outbound",
+            callType: "conversation_call",
+            twilioCallSid: "CAexisting",
+            status: "completed",
+            recordingStatus: null,
+            recordingSid: null,
+            startedAt: "2026-06-06T14:05:00Z",
+            completedAt: "2026-06-06T14:05:49Z",
+            createdAt: "2026-06-06T14:05:00Z",
+            hint: "The call completed but no recording is attached yet. Confirm recording callbacks and Studio recording settings.",
+          },
+        ],
+      },
+    });
+  });
+
   await page.route("**/api/contacts/import", async (route) => {
     requestCounts.contactImports += 1;
     await route.fulfill({
@@ -472,6 +525,9 @@ async function mockMayaRelayApi(
     },
     get contactImports() {
       return requestCounts.contactImports;
+    },
+    get operationalStatus() {
+      return requestCounts.operationalStatus;
     },
     releaseHeldDetailRequest() {
       releaseHeldDetailRequest?.();
@@ -595,6 +651,11 @@ test("settings CSV import gives import feedback without moving profile controls 
   await page.getByRole("button", { name: "Settings" }).click();
   const settings = page.getByRole("dialog", { name: "Settings" });
   await expect(settings).toBeVisible();
+  await expect(settings.getByRole("heading", { name: "Operational status" })).toBeVisible();
+  await expect(settings.getByText("Failed Twilio sends")).toBeVisible();
+  await expect(settings.getByText("Carrier filtering")).toBeVisible();
+  await expect(settings.getByText("Recording missing")).toBeVisible();
+  await expect.poll(() => requestCounts.operationalStatus).toBeGreaterThan(0);
   await expect(settings.getByRole("heading", { name: "CSV Import" })).toBeVisible();
 
   await settings.getByLabel("Contact CSV").setInputFiles({

@@ -277,6 +277,9 @@ class RelayRepository(Protocol):
     ) -> dict[str, Any]:
         ...
 
+    def get_operational_status(self, *, limit: int = 10) -> dict[str, list[dict[str, Any]]]:
+        ...
+
 
 class SupabaseRelayRepository:
     def __init__(self, client: Client):
@@ -1070,6 +1073,96 @@ class SupabaseRelayRepository:
         )
         return result.data[0]
 
+    def get_operational_status(self, *, limit: int = 10) -> dict[str, list[dict[str, Any]]]:
+        safe_limit = min(max(limit, 1), 25)
+        failed_messages = (
+            self.client.table("messages")
+            .select(
+                "id, conversation_id, direction, from_phone, to_phone, body, twilio_message_sid, "
+                "delivery_status, delivery_error_code, delivery_error_message, created_at"
+            )
+            .in_("delivery_status", ["failed", "undelivered"])
+            .order("created_at", desc=True)
+            .limit(safe_limit)
+            .execute()
+            .data
+        )
+
+        calls = (
+            self.client.table("calls")
+            .select(
+                "id, conversation_id, direction, call_type, customer_phone, employee_phone, twilio_call_sid, "
+                "status, outcome, notes, follow_up_status, recap, transcription, "
+                "recording_sid, recording_url, recording_status, recording_duration_seconds, recording_channels, "
+                "started_at, answered_at, completed_at, created_at, updated_at"
+            )
+            .order("created_at", desc=True)
+            .limit(max(safe_limit * 20, 50))
+            .execute()
+            .data
+        )
+        call_attention = [
+            item
+            for item in (_call_attention_item(call) for call in calls)
+            if item is not None
+        ][:safe_limit]
+
+        conversation_ids = sorted(
+            {
+                str(row.get("conversation_id"))
+                for row in [*failed_messages, *(item["call"] for item in call_attention)]
+                if row.get("conversation_id")
+            }
+        )
+        conversations_by_id: dict[str, dict[str, Any]] = {}
+        if conversation_ids:
+            conversations = (
+                self.client.table("conversations")
+                .select("id, customer_phone, customer_channel, conversation_code, status, updated_at")
+                .in_("id", conversation_ids)
+                .execute()
+                .data
+            )
+            conversations_by_id = {conversation["id"]: conversation for conversation in conversations}
+
+        customer_phones = sorted(
+            {
+                str(value)
+                for row in [*failed_messages, *(item["call"] for item in call_attention)]
+                for value in (
+                    row.get("customer_phone"),
+                    row.get("from_phone"),
+                    row.get("to_phone"),
+                    (conversations_by_id.get(str(row.get("conversation_id") or "")) or {}).get("customer_phone"),
+                )
+                if value
+            }
+        )
+        contacts_by_phone: dict[str, dict[str, Any]] = {}
+        if customer_phones:
+            contacts = (
+                self.client.table("contacts")
+                .select("phone_number, display_name, lookup_name")
+                .in_("phone_number", customer_phones)
+                .execute()
+                .data
+            )
+            contacts_by_phone = {contact["phone_number"]: contact for contact in contacts}
+
+        return {
+            "message_failures": [
+                _with_operational_context(message, conversations_by_id, contacts_by_phone)
+                for message in failed_messages
+            ],
+            "call_attention": [
+                {
+                    **item,
+                    "call": _with_operational_context(item["call"], conversations_by_id, contacts_by_phone),
+                }
+                for item in call_attention
+            ],
+        }
+
 
 def _message_search_text(messages: list[dict[str, Any]]) -> str:
     parts: list[str] = []
@@ -1170,4 +1263,38 @@ def _contact_search_row(
         "open_conversation_id": (open_conversation or {}).get("id"),
         "last_conversation_id": (latest_conversation or {}).get("id"),
         "latest_call_id": (latest_call or {}).get("id"),
+    }
+
+
+def _call_attention_item(call: dict[str, Any]) -> dict[str, Any] | None:
+    recording_status = str(call.get("recording_status") or "").lower()
+    call_status = str(call.get("status") or "").lower()
+    has_recording = bool(call.get("recording_sid") or call.get("recording_url"))
+    has_transcription = bool(str(call.get("transcription") or "").strip())
+    has_recap = bool(str(call.get("recap") or "").strip())
+
+    if recording_status in {"failed", "absent", "canceled"}:
+        return {"kind": "recording_failed", "call": call}
+    if call_status == "completed" and not has_recording:
+        return {"kind": "recording_missing", "call": call}
+    if recording_status == "completed" and has_recording and not has_transcription:
+        return {"kind": "transcription_missing", "call": call}
+    if has_transcription and not has_recap:
+        return {"kind": "recap_missing", "call": call}
+    return None
+
+
+def _with_operational_context(
+    row: dict[str, Any],
+    conversations_by_id: dict[str, dict[str, Any]],
+    contacts_by_phone: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    conversation = conversations_by_id.get(str(row.get("conversation_id") or "")) or {}
+    phone = row.get("customer_phone") or conversation.get("customer_phone") or row.get("to_phone") or row.get("from_phone")
+    contact = contacts_by_phone.get(str(phone or ""), {})
+    return {
+        **row,
+        "conversation_code": conversation.get("conversation_code"),
+        "customer_channel": conversation.get("customer_channel"),
+        "customer_name": contact.get("display_name") or contact.get("lookup_name"),
     }

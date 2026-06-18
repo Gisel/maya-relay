@@ -154,6 +154,29 @@ def api_quick_responses(
     }
 
 
+@router.get("/operations/status")
+def api_operations_status(
+    request: Request,
+    limit: int = 10,
+    settings: Settings = Depends(get_settings),
+    repository: RelayRepository = Depends(get_repository),
+) -> dict[str, Any]:
+    require_admin(request, settings)
+    safe_limit = min(max(limit, 1), 25)
+    status = repository.get_operational_status(limit=safe_limit)
+    message_failures = [_serialize_message_failure(message) for message in status["message_failures"]]
+    call_attention = [_serialize_call_attention(item) for item in status["call_attention"]]
+    return {
+        "summary": {
+            "messageFailures": len(message_failures),
+            "callAttention": len(call_attention),
+            "total": len(message_failures) + len(call_attention),
+        },
+        "messageFailures": message_failures,
+        "callAttention": call_attention,
+    }
+
+
 @router.get("/conversations")
 def api_conversations(
     request: Request,
@@ -942,6 +965,84 @@ def _serialize_call(call: dict[str, Any]) -> dict[str, Any]:
         "createdAt": call.get("created_at"),
         "updatedAt": call.get("updated_at"),
     }
+
+
+def _serialize_message_failure(message: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": message.get("id"),
+        "conversationId": message.get("conversation_id"),
+        "conversationCode": message.get("conversation_code"),
+        "customerName": message.get("customer_name"),
+        "customerPhone": message.get("to_phone") or message.get("from_phone"),
+        "channel": _channel_from_message(message),
+        "direction": message.get("direction"),
+        "bodyPreview": _preview_text(str(message.get("body") or "")),
+        "twilioMessageSid": message.get("twilio_message_sid"),
+        "deliveryStatus": message.get("delivery_status"),
+        "deliveryErrorCode": message.get("delivery_error_code"),
+        "deliveryErrorMessage": message.get("delivery_error_message"),
+        "createdAt": message.get("created_at"),
+        "hint": _message_failure_hint(message),
+    }
+
+
+def _serialize_call_attention(item: dict[str, Any]) -> dict[str, Any]:
+    call = item["call"]
+    kind = item["kind"]
+    return {
+        "id": call.get("id"),
+        "kind": kind,
+        "conversationId": call.get("conversation_id"),
+        "conversationCode": call.get("conversation_code"),
+        "customerName": call.get("customer_name"),
+        "customerPhone": call.get("customer_phone"),
+        "direction": call.get("direction"),
+        "callType": call.get("call_type"),
+        "twilioCallSid": call.get("twilio_call_sid"),
+        "status": call.get("status"),
+        "recordingStatus": call.get("recording_status"),
+        "recordingSid": call.get("recording_sid"),
+        "startedAt": call.get("started_at"),
+        "completedAt": call.get("completed_at"),
+        "createdAt": call.get("created_at"),
+        "hint": _call_attention_hint(kind),
+    }
+
+
+def _message_failure_hint(message: dict[str, Any]) -> str:
+    error_code = str(message.get("delivery_error_code") or "").strip()
+    if error_code == "30007":
+        return "Carrier filtering. Check message wording, sender registration, and recent repeated sends."
+    if error_code == "30034":
+        return "Sender registration issue. Check A2P 10DLC/toll-free registration before retrying."
+    if error_code in {"21610", "21614"}:
+        return "Recipient cannot receive this message. Confirm opt-in and the phone number."
+    if error_code:
+        return f"Twilio returned error {error_code}. Open the message SID in Twilio logs for the exact cause."
+    return "Twilio reported the send as failed or undelivered. Check the message SID and status callback details."
+
+
+def _call_attention_hint(kind: str) -> str:
+    if kind == "recording_failed":
+        return "Twilio reported a recording problem. Check the recording callback payload and Twilio call logs."
+    if kind == "recording_missing":
+        return "The call completed but no recording is attached yet. Confirm recording callbacks and Studio recording settings."
+    if kind == "transcription_missing":
+        return "Recording is available but no transcription is saved. Check AssemblyAI configuration or run transcription."
+    if kind == "recap_missing":
+        return "Transcription is available but no recap is saved. Check OpenAI configuration or generate the recap."
+    return "Review this call in Twilio logs and Maya Relay call details."
+
+
+def _preview_text(value: str, max_length: int = 140) -> str:
+    cleaned = " ".join(value.split())
+    if len(cleaned) <= max_length:
+        return cleaned
+    return f"{cleaned[:max_length - 1].rstrip()}…"
+
+
+def _channel_from_message(message: dict[str, Any]) -> str:
+    return str(message.get("customer_channel") or ("whatsapp" if "whatsapp:" in str(message.get("to_phone") or "") else "sms"))
 
 
 def _clean_optional_text(value: str | None) -> str | None:

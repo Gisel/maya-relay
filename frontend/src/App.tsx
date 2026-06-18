@@ -64,6 +64,7 @@ import { CustomerProfileSummary } from "./customers/CustomerProfileSummary";
 import { EditCustomerProfileModal } from "./customers/EditCustomerProfileModal";
 import { UnifiedSearchResults } from "./search/UnifiedSearchResults";
 import { ContactCsvImport } from "./settings/ContactCsvImport";
+import { OperationalStatusView } from "./settings/OperationalStatusView";
 import { SettingsModal } from "./settings/SettingsModal";
 
 const INBOX_REFRESH_INTERVAL_MS = 15000;
@@ -2022,6 +2023,7 @@ export function App() {
         status={profileStatus}
       />
       <SettingsModal onClose={() => setIsSettingsOpen(false)} open={isSettingsOpen}>
+        <OperationalStatusView />
         <ContactCsvImport onImport={handleImportContacts} />
       </SettingsModal>
       <CloseConversationModal

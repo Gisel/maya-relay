@@ -1168,6 +1168,18 @@ button {
   gap: 12px;
 }
 
+.settings-section + .settings-section {
+  border-top: 1px solid #edf0f4;
+  padding-top: 18px;
+}
+
+.settings-section-heading {
+  align-items: start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
 .settings-section h3 {
   color: #172033;
   font-size: 17px;
@@ -1179,6 +1191,139 @@ button {
   font-size: 14px;
   line-height: 1.4;
   margin: 0;
+}
+
+.settings-section-heading p {
+  color: #667085;
+  font-size: 14px;
+  line-height: 1.4;
+  margin: 6px 0 0;
+}
+
+.mini-action-button {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #cbd8e6;
+  border-radius: 8px;
+  color: #36566f;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 560;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 11px;
+}
+
+.mini-action-button:disabled {
+  color: #98a2b6;
+  cursor: not-allowed;
+}
+
+.status-empty {
+  align-items: center;
+  background: #f0fbf4;
+  border: 1px solid #cfeeda;
+  border-radius: 8px;
+  color: #146a3a;
+  display: flex;
+  font-size: 14px;
+  font-weight: 560;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 12px;
+}
+
+.status-summary-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.status-summary-grid span {
+  background: #f7f9fc;
+  border: 1px solid #e3e8f0;
+  border-radius: 8px;
+  color: #667085;
+  display: grid;
+  font-size: 12px;
+  font-weight: 560;
+  gap: 2px;
+  padding: 10px 12px;
+}
+
+.status-summary-grid strong {
+  color: #172033;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.status-issue-group {
+  display: grid;
+  gap: 8px;
+}
+
+.status-issue-group h4 {
+  color: #9ba4b6;
+  font-size: 12px;
+  letter-spacing: .08em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.status-issue-card {
+  background: #fffaf8;
+  border: 1px solid #f2d4cb;
+  border-radius: 8px;
+  color: #475366;
+  display: grid;
+  gap: 7px;
+  padding: 10px 12px;
+}
+
+.status-issue-card header {
+  align-items: center;
+  color: #172033;
+  display: flex;
+  gap: 7px;
+  min-width: 0;
+}
+
+.status-issue-card header svg {
+  color: #b54708;
+  flex: 0 0 auto;
+}
+
+.status-issue-card strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-issue-card em {
+  color: #98a2b6;
+  font-size: 12px;
+  font-style: normal;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.status-issue-card p,
+.status-issue-card small,
+.status-issue-card span {
+  font-size: 13px;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.status-issue-card small {
+  color: #68748a;
+  font-weight: 560;
+}
+
+.status-issue-card span {
+  color: #5b6678;
 }
 
 .checkbox-row {
