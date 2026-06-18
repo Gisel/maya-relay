@@ -1748,6 +1748,12 @@ export function App() {
               </div>
 
               <div className="conversation-list">
+                <UnifiedSearchResults
+                  contacts={contactSearchResults}
+                  isSearching={isSearchingContacts}
+                  onSelectContact={handleSelectContactResult}
+                  query={search}
+                />
                 {isLoadingList && <p className="panel-note">Loading conversations...</p>}
                 {!isLoadingList && visibleConversations.length === 0 && <p className="panel-note">No conversations found.</p>}
                 {visibleConversations.map((conversation) => (
@@ -1800,12 +1806,6 @@ export function App() {
                 {search.trim() && isSearchingConversations && (
                   <p className="panel-note">Searching older conversations...</p>
                 )}
-                <UnifiedSearchResults
-                  contacts={contactSearchResults}
-                  isSearching={isSearchingContacts}
-                  onSelectContact={handleSelectContactResult}
-                  query={search}
-                />
                 {!search.trim() && hasMoreConversations && (
                   <button
                     className="load-more-button"

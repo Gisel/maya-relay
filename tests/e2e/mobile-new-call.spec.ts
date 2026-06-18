@@ -577,6 +577,7 @@ test("unified inbox search keeps conversation search and adds contact matches", 
 
   await expect(page.locator(".contact-search-results", { hasText: "Contacts" })).toBeVisible();
   await expect(page.locator(".contact-result-row", { hasText: "Test Customer" })).toBeVisible();
+  await expect(page.locator(".conversation-list > *").first()).toHaveClass(/contact-search-results/);
   await expect.poll(() => requestCounts.contacts).toBeGreaterThan(1);
 
   await page.locator(".contact-result-row", { hasText: "Test Customer" }).click();
