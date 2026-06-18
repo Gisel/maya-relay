@@ -4,6 +4,17 @@ import { FileCheck2, Send, Upload, X } from "lucide-react";
 
 import { Channel } from "../api";
 
+const PROOF_MAX_FILE_SIZE_BYTES = 32 * 1024 * 1024;
+const PROOF_ALLOWED_CONTENT_TYPES = new Set([
+  "application/pdf",
+  "image/gif",
+  "image/jpeg",
+  "image/png",
+  "image/tiff",
+  "image/webp",
+]);
+const PROOF_ALLOWED_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png", ".gif", ".webp", ".tif", ".tiff"];
+
 type ProofRequestPayload = {
   proofFile: File;
   title: string;
@@ -83,9 +94,23 @@ export function ProofRequestModal({
     if (isSending) return;
     const file = event.dataTransfer.files.item(0);
     if (file) {
-      setProofFile(file);
-      setLocalError("");
+      selectProofFile(file);
     }
+  }
+
+  function selectProofFile(file: File | null) {
+    if (!file) {
+      setProofFile(null);
+      return;
+    }
+    const validationError = proofFileValidationError(file);
+    if (validationError) {
+      setProofFile(null);
+      setLocalError(validationError);
+      return;
+    }
+    setProofFile(file);
+    setLocalError("");
   }
 
   return createPortal(
@@ -127,8 +152,7 @@ export function ProofRequestModal({
               className="file-picker-input"
               disabled={isSending}
               onChange={(event) => {
-                setProofFile(event.target.files?.[0] ?? null);
-                setLocalError("");
+                selectProofFile(event.target.files?.[0] ?? null);
               }}
               type="file"
             />
@@ -183,4 +207,17 @@ export function ProofRequestModal({
     </div>,
     document.body,
   );
+}
+
+function proofFileValidationError(file: File) {
+  if (file.size > PROOF_MAX_FILE_SIZE_BYTES) {
+    return "Proof file must be 32 MB or smaller.";
+  }
+  const contentType = file.type.toLowerCase();
+  const filename = file.name.toLowerCase();
+  const hasAllowedExtension = PROOF_ALLOWED_EXTENSIONS.some((extension) => filename.endsWith(extension));
+  if ((contentType && !PROOF_ALLOWED_CONTENT_TYPES.has(contentType)) || (!contentType && !hasAllowedExtension)) {
+    return "Proof file must be a PDF or image file: PDF, JPG, PNG, GIF, WebP, or TIFF.";
+  }
+  return "";
 }

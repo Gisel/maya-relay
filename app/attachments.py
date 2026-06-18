@@ -45,6 +45,9 @@ class AttachmentStore(Protocol):
     ) -> tuple[StoredAttachment, ...]:
         ...
 
+    def delete_uploaded_attachments(self, attachments: tuple[StoredAttachment, ...]) -> None:
+        ...
+
 
 class NoopAttachmentStore:
     def store_message_attachments(
@@ -81,6 +84,9 @@ class NoopAttachmentStore:
             )
             for file in files
         )
+
+    def delete_uploaded_attachments(self, attachments: tuple[StoredAttachment, ...]) -> None:
+        return None
 
 
 class SupabaseAttachmentStore:
@@ -162,6 +168,11 @@ class SupabaseAttachmentStore:
                 )
             )
         return tuple(stored)
+
+    def delete_uploaded_attachments(self, attachments: tuple[StoredAttachment, ...]) -> None:
+        object_paths = [attachment.object_path for attachment in attachments if attachment.bucket == self.bucket and attachment.object_path]
+        if object_paths:
+            self.client.storage.from_(self.bucket).remove(object_paths)
 
 
 def _extension_for_content_type(content_type: str) -> str:

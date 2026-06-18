@@ -802,6 +802,7 @@ class FakeVoiceCaller:
 class FakeAttachmentStore:
     def __init__(self):
         self.uploads: list[dict[str, object]] = []
+        self.deleted_uploads: list[StoredAttachment] = []
 
     def store_uploaded_attachments(
         self,
@@ -820,6 +821,9 @@ class FakeAttachmentStore:
             )
             for file in files
         )
+
+    def delete_uploaded_attachments(self, attachments: tuple[StoredAttachment, ...]) -> None:
+        self.deleted_uploads.extend(attachments)
 
 
 class FakeLookup:

@@ -8,6 +8,9 @@ from app.services.relay import RelayService
 from tests.fakes import FakeAttachmentStore, FakeRepository, FakeSender, FakeVoiceCaller
 
 
+PROOF_PDF_BYTES = b"%PDF-1.4\nfake proof"
+
+
 def make_client(
     *,
     verify_twilio_signature: bool = False,
@@ -1844,7 +1847,7 @@ def test_api_creates_sends_public_proof_request_and_exposes_conversation_action_
     )
     unauthenticated = client.post(
         "/api/conversations/conversation-1/proof-requests",
-        files={"proof_file": ("proof.pdf", b"fake proof", "application/pdf")},
+        files={"proof_file": ("proof.pdf", PROOF_PDF_BYTES, "application/pdf")},
     )
     assert unauthenticated.status_code == 401
 
@@ -1856,7 +1859,7 @@ def test_api_creates_sends_public_proof_request_and_exposes_conversation_action_
             "operator_note": "Please review before print.",
             "customer_message": "Please review this proof before we print.",
         },
-        files={"proof_file": ("proof.pdf", b"fake proof", "application/pdf")},
+        files={"proof_file": ("proof.pdf", PROOF_PDF_BYTES, "application/pdf")},
         headers={"cookie": login.headers["set-cookie"]},
     )
 
@@ -1885,7 +1888,7 @@ def test_api_creates_sends_public_proof_request_and_exposes_conversation_action_
     assert repository.customer_action_files[0]["external_url"] is None
     assert repository.customer_action_files[0]["original_filename"] == "proof.pdf"
     assert repository.customer_action_files[0]["content_type"] == "application/pdf"
-    assert repository.customer_action_files[0]["size_bytes"] == 10
+    assert repository.customer_action_files[0]["size_bytes"] == len(PROOF_PDF_BYTES)
     assert payload["message"]["twilioMessageSid"] == "SMfake1"
     assert sender.sent_messages[-1] == {
         "sid": "SMfake1",
@@ -1909,6 +1912,47 @@ def test_api_creates_sends_public_proof_request_and_exposes_conversation_action_
     assert detail.json()["customerActions"] == [payload["proofRequest"]]
 
 
+def test_api_proof_request_rejects_unsupported_file_type_before_storage():
+    client, repository, _ = make_client(admin_password="secret")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    login = client.post("/api/auth/login", json={"password": "secret"})
+
+    response = client.post(
+        "/api/conversations/conversation-1/proof-requests",
+        files={"proof_file": ("proof.txt", b"not a proof", "text/plain")},
+        headers={"cookie": login.headers["set-cookie"]},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Proof file must be a PDF or image file: PDF, JPG, PNG, GIF, WebP, or TIFF."
+    assert repository.customer_action_requests == []
+    assert repository.customer_action_files == []
+
+
+def test_api_proof_request_rejects_oversized_file_before_storage():
+    client, repository, _ = make_client(admin_password="secret")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    login = client.post("/api/auth/login", json={"password": "secret"})
+    oversized_pdf = b"%PDF-1.4\n" + (b"x" * (32 * 1024 * 1024))
+
+    response = client.post(
+        "/api/conversations/conversation-1/proof-requests",
+        files={"proof_file": ("proof.pdf", oversized_pdf, "application/pdf")},
+        headers={"cookie": login.headers["set-cookie"]},
+    )
+
+    assert response.status_code == 413
+    assert response.json()["detail"] == "Proof file must be 32 MB or smaller."
+    assert repository.customer_action_requests == []
+    assert repository.customer_action_files == []
+
+
 def test_api_public_proof_request_read_and_approve_flow():
     client, repository, _ = make_client(admin_password="secret")
     repository.get_or_create_customer_conversation(
@@ -1918,7 +1962,7 @@ def test_api_public_proof_request_read_and_approve_flow():
     login = client.post("/api/auth/login", json={"password": "secret"})
     created = client.post(
         "/api/conversations/conversation-1/proof-requests",
-        files={"proof_file": ("proof.pdf", b"fake proof", "application/pdf")},
+        files={"proof_file": ("proof.pdf", PROOF_PDF_BYTES, "application/pdf")},
         headers={"cookie": login.headers["set-cookie"]},
     ).json()
     token = created["publicUrl"].rsplit("/", 1)[-1]
@@ -1936,7 +1980,7 @@ def test_api_public_proof_request_read_and_approve_flow():
             "externalUrl": None,
             "originalFilename": "proof.pdf",
             "contentType": "application/pdf",
-            "sizeBytes": 10,
+            "sizeBytes": len(PROOF_PDF_BYTES),
             "createdAt": repository.customer_action_files[0]["created_at"],
         }
     ]
@@ -1967,7 +2011,7 @@ def test_api_public_proof_request_changes_flow_and_invalid_token():
     login = client.post("/api/auth/login", json={"password": "secret"})
     created = client.post(
         "/api/conversations/conversation-1/proof-requests",
-        files={"proof_file": ("proof.pdf", b"fake proof", "application/pdf")},
+        files={"proof_file": ("proof.pdf", PROOF_PDF_BYTES, "application/pdf")},
         headers={"cookie": login.headers["set-cookie"]},
     ).json()
     token = created["publicUrl"].rsplit("/", 1)[-1]
@@ -1995,7 +2039,7 @@ def test_api_proof_request_uses_whatsapp_channel_when_conversation_is_whatsapp()
 
     response = client.post(
         "/api/conversations/conversation-1/proof-requests",
-        files={"proof_file": ("proof.pdf", b"fake proof", "application/pdf")},
+        files={"proof_file": ("proof.pdf", PROOF_PDF_BYTES, "application/pdf")},
         headers={"cookie": login.headers["set-cookie"]},
     )
 
@@ -2016,12 +2060,12 @@ def test_api_proof_request_keeps_request_when_twilio_send_fails():
 
     response = client.post(
         "/api/conversations/conversation-1/proof-requests",
-        files={"proof_file": ("proof.pdf", b"fake proof", "application/pdf")},
+        files={"proof_file": ("proof.pdf", PROOF_PDF_BYTES, "application/pdf")},
         headers={"cookie": login.headers["set-cookie"]},
     )
 
     assert response.status_code == 502
-    assert response.json()["detail"] == "Proof request was created, but the message could not be sent."
+    assert response.json()["detail"] == "Proof request was created, but the customer message could not be sent."
     assert len(repository.customer_action_requests) == 1
     assert [event["event_type"] for event in repository.customer_action_events] == ["created"]
     assert repository.messages == []

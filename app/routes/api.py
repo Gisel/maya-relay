@@ -1,5 +1,6 @@
 import hmac
 import logging
+import mimetypes
 import time
 from typing import Any, Literal
 
@@ -9,7 +10,7 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
 from app.ai_triage import _extract_response_text
-from app.attachments import AttachmentStore
+from app.attachments import AttachmentStore, UploadedAttachment
 from app.auth import SESSION_COOKIE, admin_enabled, require_admin, session_value
 from app.config import Settings, get_settings, normalize_phone_number
 from app.customer_actions import CustomerActionFileInput
@@ -35,6 +36,16 @@ from app.twilio_client import MessageSender, VoiceCaller
 
 router = APIRouter(prefix="/api", tags=["api"])
 logger = logging.getLogger(__name__)
+
+PROOF_MAX_FILE_SIZE_BYTES = 32 * 1024 * 1024
+PROOF_ALLOWED_CONTENT_TYPES = {
+    "application/pdf",
+    "image/gif",
+    "image/jpeg",
+    "image/png",
+    "image/tiff",
+    "image/webp",
+}
 
 
 class ConversationUpdate(BaseModel):
@@ -422,10 +433,11 @@ def api_create_proof_request(
     uploads = read_uploads([proof_file])
     if not uploads:
         raise HTTPException(status_code=400, detail="Proof file is required.")
+    proof_upload = _validated_proof_upload(uploads[0])
     try:
         stored_files = attachment_store.store_uploaded_attachments(
             object_prefix=f"proof-requests/{conversation.id}",
-            files=uploads,
+            files=(proof_upload,),
         )
     except Exception as exc:
         logger.exception("Could not store proof file for conversation %s.", conversation.id)
@@ -439,9 +451,9 @@ def api_create_proof_request(
         bucket=stored_proof.bucket,
         object_path=stored_proof.object_path,
         public_url=stored_proof.public_url,
-        original_filename=uploads[0].filename,
+        original_filename=proof_upload.filename,
         content_type=stored_proof.content_type,
-        size_bytes=len(uploads[0].content),
+        size_bytes=len(proof_upload.content),
     )
     try:
         result = service.create_proof_request(
@@ -451,7 +463,12 @@ def api_create_proof_request(
             proof_file=proof_file_input,
         )
     except CustomerActionValidationError as exc:
+        attachment_store.delete_uploaded_attachments(stored_files)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        attachment_store.delete_uploaded_attachments(stored_files)
+        logger.exception("Could not create proof request for conversation %s.", conversation.id)
+        raise HTTPException(status_code=502, detail="Proof file was uploaded, but the request could not be created.") from exc
 
     message_body = _proof_request_message_body(
         public_url=result["public_url"],
@@ -465,7 +482,10 @@ def api_create_proof_request(
         )
     except Exception as exc:
         logger.exception("Could not send proof request %s.", result["request"].get("id"))
-        raise HTTPException(status_code=502, detail="Proof request was created, but the message could not be sent.") from exc
+        raise HTTPException(
+            status_code=502,
+            detail="Proof request was created, but the customer message could not be sent.",
+        ) from exc
 
     created_message = repository.create_message(
         conversation_id=conversation.id,
@@ -1310,6 +1330,44 @@ def _clean_optional_text(value: str | None) -> str | None:
         return None
     cleaned = value.strip()
     return cleaned or None
+
+
+def _validated_proof_upload(upload: UploadedAttachment) -> UploadedAttachment:
+    if len(upload.content) > PROOF_MAX_FILE_SIZE_BYTES:
+        raise HTTPException(status_code=413, detail="Proof file must be 32 MB or smaller.")
+    content_type = _proof_content_type(upload)
+    if content_type not in PROOF_ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail="Proof file must be a PDF or image file: PDF, JPG, PNG, GIF, WebP, or TIFF.",
+        )
+    if not _proof_content_matches_type(upload.content, content_type):
+        raise HTTPException(status_code=400, detail="Proof file content does not match the selected file type.")
+    return UploadedAttachment(filename=upload.filename, content=upload.content, content_type=content_type)
+
+
+def _proof_content_type(upload: UploadedAttachment) -> str:
+    content_type = upload.content_type.split(";")[0].strip().lower()
+    if content_type and content_type != "application/octet-stream":
+        return content_type
+    guessed_type = mimetypes.guess_type(upload.filename)[0]
+    return (guessed_type or content_type).split(";")[0].strip().lower()
+
+
+def _proof_content_matches_type(content: bytes, content_type: str) -> bool:
+    if content_type == "application/pdf":
+        return content.startswith(b"%PDF")
+    if content_type == "image/jpeg":
+        return content.startswith(b"\xff\xd8\xff")
+    if content_type == "image/png":
+        return content.startswith(b"\x89PNG\r\n\x1a\n")
+    if content_type == "image/gif":
+        return content.startswith((b"GIF87a", b"GIF89a"))
+    if content_type == "image/webp":
+        return len(content) >= 12 and content.startswith(b"RIFF") and content[8:12] == b"WEBP"
+    if content_type == "image/tiff":
+        return content.startswith((b"II*\x00", b"MM\x00*"))
+    return False
 
 
 def _serialize_attachments(media_urls: tuple[str, ...] | list[str], content_types: tuple[str, ...] | list[str]) -> list[dict[str, str]]:
