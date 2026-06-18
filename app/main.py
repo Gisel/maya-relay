@@ -31,6 +31,10 @@ def create_app() -> FastAPI:
         def frontend_app(path: str = "") -> FileResponse:
             return FileResponse(FRONTEND_DIST / "index.html")
 
+        @app.get("/proof/{path:path}", include_in_schema=False)
+        def frontend_public_proof(path: str) -> FileResponse:
+            return FileResponse(FRONTEND_DIST / "index.html")
+
     return app
 
 

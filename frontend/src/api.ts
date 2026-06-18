@@ -156,6 +156,30 @@ export type CustomerActionRequest = {
   updatedAt: string | null;
 };
 
+export type CustomerActionFile = {
+  id: string;
+  role: string;
+  publicUrl: string | null;
+  externalUrl: string | null;
+  originalFilename: string | null;
+  contentType: string | null;
+  sizeBytes: number | null;
+  createdAt: string | null;
+};
+
+export type CustomerActionEvent = {
+  id: string;
+  type: string;
+  comment: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string | null;
+};
+
+export type PublicProofRequest = CustomerActionRequest & {
+  files: CustomerActionFile[];
+  events: CustomerActionEvent[];
+};
+
 export type ConversationsResponse = {
   metrics: Metrics;
   conversations: ConversationListItem[];
@@ -265,6 +289,10 @@ export type ProofRequestResponse = {
   proofRequest: CustomerActionRequest;
   publicUrl: string;
   message: Message;
+};
+
+export type PublicProofRequestResponse = {
+  proofRequest: PublicProofRequest;
 };
 
 export type UpdateConversationResponse = {
@@ -425,6 +453,24 @@ export function createProofRequest(
   return request<ProofRequestResponse>(`/api/conversations/${conversationId}/proof-requests`, {
     method: "POST",
     body: form,
+  });
+}
+
+export function getPublicProofRequest(token: string) {
+  return request<PublicProofRequestResponse>(`/api/proof/${encodeURIComponent(token)}`);
+}
+
+export function approvePublicProofRequest(token: string, comment?: string) {
+  return request<{ proofRequest: CustomerActionRequest }>(`/api/proof/${encodeURIComponent(token)}/approve`, {
+    method: "POST",
+    body: JSON.stringify({ comment: comment || null }),
+  });
+}
+
+export function requestPublicProofChanges(token: string, comment: string) {
+  return request<{ proofRequest: CustomerActionRequest }>(`/api/proof/${encodeURIComponent(token)}/changes`, {
+    method: "POST",
+    body: JSON.stringify({ comment }),
   });
 }
 
