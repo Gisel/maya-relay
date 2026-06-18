@@ -1969,16 +1969,20 @@ export function App() {
           />
 
           <section className="context-section">
-            <h2>
-              <Sparkles size={18} />
-              AI Suggested Reply
-            </h2>
+            <div className="ai-suggestion-heading">
+              <h2>
+                <Sparkles size={18} />
+                AI Suggested Reply
+              </h2>
+              <span className={`suggestion-status-pill ${suggestedReply ? "ready" : "empty"}`}>
+                {suggestedReply ? "Ready" : "No suggestion"}
+              </span>
+            </div>
             <div className={`intent-box ${suggestedReply ? "has-suggestion" : "is-empty"}`}>
-              <span>{suggestedReply ? "Ready" : "No suggestion"}</span>
               <p>{suggestedReply || "No AI suggestion is available for this conversation yet."}</p>
               {suggestedReply && (
                 <button
-                  className="secondary-action"
+                  className="secondary-action compact"
                   onClick={() => {
                     setDraft(suggestedReply);
                     setSuggestedReply("");

@@ -1049,6 +1049,40 @@ button {
   margin: 0;
 }
 
+.ai-suggestion-heading {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  margin: 0 0 10px;
+  min-width: 0;
+}
+
+.ai-suggestion-heading h2 {
+  margin: 0;
+  min-width: 0;
+}
+
+.suggestion-status-pill {
+  border-radius: 999px;
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 620;
+  line-height: 1;
+  padding: 5px 10px;
+  text-transform: none;
+}
+
+.suggestion-status-pill.ready {
+  background: #ffdce8;
+  color: #dc1f70;
+}
+
+.suggestion-status-pill.empty {
+  background: #f1f4f8;
+  color: #667085;
+}
+
 .icon-button {
   align-items: center;
   background: #eef1f5;
@@ -1427,22 +1461,15 @@ button {
   padding: 10px 12px;
 }
 
-.intent-box > span {
-  background: #ffdce8;
-  border-radius: 999px;
-  color: #dc1f70;
-  font-size: 12px;
-  font-weight: 620;
-  justify-self: start;
-  line-height: 1;
-  padding: 5px 10px;
-}
-
 .intent-box p {
   color: #667085;
   font-size: 13px;
   line-height: 1.35;
   margin: 0;
+  max-height: calc(1.35em * 4);
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-gutter: stable;
 }
 
 .intent-box.is-empty p {
@@ -2182,6 +2209,12 @@ button {
   font-weight: 560;
   min-height: 42px;
   padding: 0 14px;
+}
+
+.secondary-action.compact {
+  justify-self: end;
+  min-height: 32px;
+  padding: 0 12px;
 }
 
 .quick-responses button {
