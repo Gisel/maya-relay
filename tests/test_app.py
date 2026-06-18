@@ -319,6 +319,26 @@ def test_api_json_login_and_logout():
     assert "maya_admin" in logout.headers["set-cookie"]
 
 
+def test_api_quick_responses_include_whatsapp_drafts():
+    client, _, _ = make_client(admin_password="secret")
+
+    unauthenticated = client.get("/api/quick-responses")
+    assert unauthenticated.status_code == 401
+
+    login = client.post("/api/auth/login", json={"password": "secret"})
+    response = client.get("/api/quick-responses", headers={"cookie": login.headers["set-cookie"]})
+
+    assert response.status_code == 200
+    quick_responses = response.json()["quickResponses"]
+    response_by_id = {item["id"]: item for item in quick_responses}
+
+    assert response_by_id["missing_job_specs"]["channels"] == ["sms", "whatsapp"]
+    assert response_by_id["whatsapp_quote_follow_up"]["group"] == "whatsapp_draft"
+    assert response_by_id["whatsapp_quote_follow_up"]["channels"] == ["whatsapp"]
+    assert response_by_id["whatsapp_quote_follow_up"]["requiresActiveWindow"] is True
+    assert response_by_id["whatsapp_payment_reminder"]["body"]
+
+
 def test_api_operations_status_reports_recent_message_and_call_issues():
     client, repository, _ = make_client(admin_password="secret")
     repository.update_contact_lookup_name("+15550000001", "Test Customer")

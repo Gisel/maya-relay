@@ -30,6 +30,7 @@ async function mockMayaRelayApi(
     ...conversation,
     id: "conversation-2",
     code: "C0002",
+    channel: "whatsapp",
     customer: {
       phone: "+15550000002",
       displayName: "Older Customer",
@@ -259,6 +260,39 @@ async function mockMayaRelayApi(
     });
   });
 
+  await page.route("**/api/conversations/conversation-2", async (route) => {
+    requestCounts.detail += 1;
+    await route.fulfill({
+      contentType: "application/json",
+      json: {
+        conversation: {
+          ...olderConversation,
+          assignedEmployee: "+15551234567",
+          createdAt: "2026-06-05T14:00:00Z",
+        },
+        messages: [
+          {
+            id: "message-whatsapp-1",
+            conversationId: "conversation-2",
+            direction: "customer_to_employee",
+            body: "Can you follow up on my quote?",
+            fromPhone: "+15550000002",
+            toPhone: "+13852208404",
+            twilioMessageSid: "SMwhatsapp",
+            deliveryStatus: "delivered",
+            deliveryErrorCode: null,
+            deliveryErrorMessage: null,
+            clientRequestId: null,
+            createdAt: "2026-06-05T14:00:00Z",
+            attachments: [],
+          },
+        ],
+        calls: [],
+        suggestedReply: "",
+      },
+    });
+  });
+
   await page.route("**/api/conversations/conversation-1/call", async (route) => {
     requestCounts.callStarts += 1;
     calls.unshift({
@@ -370,7 +404,25 @@ async function mockMayaRelayApi(
     requestCounts.quickResponses += 1;
     await route.fulfill({
       contentType: "application/json",
-      json: { quickResponses: [] },
+      json: {
+        quickResponses: [
+          {
+            id: "missing_job_specs",
+            label: "Request missing job specs",
+            body: "Please send size and deadline.",
+            group: "quick_response",
+            channels: ["sms", "whatsapp"],
+          },
+          {
+            id: "whatsapp_quote_follow_up",
+            label: "Quote follow-up",
+            body: "Hi - following up on your quote request.",
+            group: "whatsapp_draft",
+            channels: ["whatsapp"],
+            requiresActiveWindow: true,
+          },
+        ],
+      },
     });
   });
 
@@ -619,6 +671,28 @@ test("customer profile edits happen from the right-panel pencil without hiding m
   await expect(page.getByRole("article").getByText("Hello")).toBeVisible();
   await expect(page.locator(".customer-profile-summary").getByText("Priority Test Customer")).toBeVisible();
   await expect(page.locator(".customer-profile-summary").getByText("Needs a printed proof before pickup.")).toBeVisible();
+});
+
+test("WhatsApp draft responses only appear for WhatsApp conversations", async ({ page }) => {
+  await mockMayaRelayApi(page);
+
+  await page.goto("/app/");
+  await expect(page.getByRole("article").getByText("Hello")).toBeVisible();
+  await page.getByRole("button", { name: "Details" }).click();
+
+  await expect(page.getByRole("heading", { name: "Quick Responses" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "WhatsApp Drafts" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Close details panel" }).click();
+
+  await page.getByRole("button", { name: "Load more" }).click();
+  await page.getByRole("button", { name: /Older Customer/ }).click();
+  await expect(page.getByRole("article").getByText("Can you follow up on my quote?")).toBeVisible();
+  await page.getByRole("button", { name: "Details" }).click();
+
+  await expect(page.getByRole("heading", { name: "WhatsApp Drafts" })).toBeVisible();
+  await page.getByRole("button", { name: "Quote follow-up" }).click();
+
+  await expect(page.getByLabel("Reply message")).toHaveValue("Hi - following up on your quote request.");
 });
 
 test("unified inbox search keeps conversation search and adds contact matches", async ({ page }) => {

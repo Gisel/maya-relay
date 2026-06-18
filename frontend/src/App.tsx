@@ -1,7 +1,6 @@
 import {
   AlertTriangle,
   Archive,
-  CheckCircle2,
   FileText,
   LogOut,
   PanelRightClose,
@@ -62,6 +61,7 @@ import { CallWorkspace } from "./calls/CallWorkspace";
 import { WorkspaceMode, WorkspaceTabs } from "./calls/WorkspaceTabs";
 import { CustomerProfileSummary } from "./customers/CustomerProfileSummary";
 import { EditCustomerProfileModal } from "./customers/EditCustomerProfileModal";
+import { QuickResponsesPanel } from "./messaging/QuickResponsesPanel";
 import { UnifiedSearchResults } from "./search/UnifiedSearchResults";
 import { ContactCsvImport } from "./settings/ContactCsvImport";
 import { OperationalStatusView } from "./settings/OperationalStatusView";
@@ -1991,19 +1991,7 @@ export function App() {
             </div>
           </section>
 
-          <section className="context-section">
-            <h2>Quick Responses</h2>
-            <div className="quick-responses">
-              {quickResponses.map((response, index) => (
-                <button key={response.id} onClick={() => setDraft(response.body)} type="button">
-                  {index === 0 && "?"}
-                  {index === 1 && <CheckCircle2 size={16} />}
-                  {index === 2 && <Sparkles size={16} />}
-                  <span>{response.label}</span>
-                </button>
-              ))}
-            </div>
-          </section>
+          <QuickResponsesPanel channel={channel} onUseResponse={setDraft} responses={quickResponses} />
         </aside>
       </main>
       <NewCallDrawer

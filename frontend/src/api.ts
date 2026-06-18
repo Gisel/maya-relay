@@ -135,6 +135,9 @@ export type QuickResponse = {
   id: string;
   label: string;
   body: string;
+  group?: "quick_response" | "whatsapp_draft" | string;
+  channels?: Channel[];
+  requiresActiveWindow?: boolean;
 };
 
 export type ConversationsResponse = {

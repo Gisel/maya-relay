@@ -128,7 +128,7 @@ def api_metrics(
 def api_quick_responses(
     request: Request,
     settings: Settings = Depends(get_settings),
-) -> dict[str, list[dict[str, str]]]:
+) -> dict[str, list[dict[str, Any]]]:
     require_admin(request, settings)
     return {
         "quickResponses": [
@@ -139,16 +139,60 @@ def api_quick_responses(
                     "Thanks. Can you send the size, quantity, material/finish, "
                     "artwork status, and when you need it?"
                 ),
+                "group": "quick_response",
+                "channels": ["sms", "whatsapp"],
             },
             {
                 "id": "proof_approval",
                 "label": "Send standard proof approval request",
                 "body": "Please review the proof and reply approved or send any changes needed.",
+                "group": "quick_response",
+                "channels": ["sms", "whatsapp"],
             },
             {
                 "id": "shop_hours",
                 "label": "Provide shop hours and pickup info",
                 "body": f"We are open {settings.business_hours_text}",
+                "group": "quick_response",
+                "channels": ["sms", "whatsapp"],
+            },
+            {
+                "id": "whatsapp_quote_follow_up",
+                "label": "Quote follow-up",
+                "body": (
+                    "Hi - following up on your quote request. Please send size, quantity, "
+                    "material/finish, artwork status, and deadline so we can confirm pricing."
+                ),
+                "group": "whatsapp_draft",
+                "channels": ["whatsapp"],
+                "requiresActiveWindow": True,
+            },
+            {
+                "id": "whatsapp_proof_ready",
+                "label": "Proof ready",
+                "body": "Your proof is ready for review. Please reply approved or send any changes needed.",
+                "group": "whatsapp_draft",
+                "channels": ["whatsapp"],
+                "requiresActiveWindow": True,
+            },
+            {
+                "id": "whatsapp_pickup_reminder",
+                "label": "Pickup reminder",
+                "body": f"Your order is ready for pickup. We are open {settings.business_hours_text}",
+                "group": "whatsapp_draft",
+                "channels": ["whatsapp"],
+                "requiresActiveWindow": True,
+            },
+            {
+                "id": "whatsapp_payment_reminder",
+                "label": "Payment reminder",
+                "body": (
+                    "Your order is ready. Please complete payment before pickup. "
+                    "Let us know if you need the payment link resent."
+                ),
+                "group": "whatsapp_draft",
+                "channels": ["whatsapp"],
+                "requiresActiveWindow": True,
             },
         ]
     }
