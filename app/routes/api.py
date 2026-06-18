@@ -431,6 +431,12 @@ def api_create_proof_request(
     conversation = repository.get_conversation(conversation_id)
     if conversation is None:
         raise HTTPException(status_code=404)
+    public_base_url = _public_base_url(request, settings)
+    if _is_local_base_url(public_base_url):
+        raise HTTPException(
+            status_code=503,
+            detail="APP_BASE_URL must be set to the public Maya Relay URL before sending proof links.",
+        )
     uploads = read_uploads([proof_file])
     if not uploads:
         raise HTTPException(status_code=400, detail="Proof file is required.")
@@ -462,7 +468,7 @@ def api_create_proof_request(
             title=title,
             operator_note=operator_note,
             proof_file=proof_file_input,
-            public_base_url=_public_base_url(request, settings),
+            public_base_url=public_base_url,
         )
     except CustomerActionValidationError as exc:
         attachment_store.delete_uploaded_attachments(stored_files)

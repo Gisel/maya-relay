@@ -1977,6 +1977,30 @@ def test_api_proof_request_uses_forwarded_host_when_configured_base_url_is_local
     assert "http://localhost:8000" not in repository.messages[-1]["body"]
 
 
+def test_api_proof_request_rejects_local_public_link_before_uploading():
+    client, repository, _ = make_client(admin_password="secret", app_base_url="http://127.0.0.1:8000")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    login = client.post("/api/auth/login", json={"password": "secret"})
+
+    response = client.post(
+        "/api/conversations/conversation-1/proof-requests",
+        files={"proof_file": ("proof.pdf", PROOF_PDF_BYTES, "application/pdf")},
+        headers={
+            "cookie": login.headers["set-cookie"],
+            "host": "127.0.0.1:8000",
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "APP_BASE_URL must be set to the public Maya Relay URL before sending proof links."
+    assert repository.customer_action_requests == []
+    assert repository.customer_action_files == []
+    assert repository.messages == []
+
+
 def test_api_public_proof_request_read_and_approve_flow():
     client, repository, _ = make_client(admin_password="secret")
     repository.get_or_create_customer_conversation(
