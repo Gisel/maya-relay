@@ -32,6 +32,7 @@ def make_client(
         SUPABASE_URL="",
         SUPABASE_SERVICE_ROLE_KEY="",
         APP_BASE_URL="https://maya-relay.example",
+        CUSTOMER_ACTION_TOKEN_SECRET="test-action-secret",
     )
     repository = FakeRepository()
     sender = FakeSender()
@@ -1833,3 +1834,128 @@ def test_unsigned_status_callback_is_rejected_when_signature_validation_is_enabl
     assert response.status_code == 403
     assert response.text == "Forbidden"
     assert repository.status_updates == []
+
+
+def test_api_creates_public_proof_request_and_exposes_conversation_action_history():
+    client, repository, _ = make_client(admin_password="secret")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    unauthenticated = client.post(
+        "/api/conversations/conversation-1/proof-requests",
+        json={"proofUrl": "https://files.example/proof.pdf"},
+    )
+    assert unauthenticated.status_code == 401
+
+    login = client.post("/api/auth/login", json={"password": "secret"})
+    response = client.post(
+        "/api/conversations/conversation-1/proof-requests",
+        json={
+            "title": "Business card proof",
+            "operatorNote": "Please review before print.",
+            "proofUrl": "https://files.example/proof.pdf",
+        },
+        headers={"cookie": login.headers["set-cookie"]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["publicUrl"].startswith("https://maya-relay.example/proof/")
+    assert payload["proofRequest"] == {
+        "id": "customer-action-request-1",
+        "conversationId": "conversation-1",
+        "contactId": "contact-1",
+        "type": "proof",
+        "status": "pending",
+        "title": "Business card proof",
+        "operatorNote": "Please review before print.",
+        "expiresAt": None,
+        "completedAt": None,
+        "canceledAt": None,
+        "createdBy": None,
+        "createdAt": repository.customer_action_requests[0]["created_at"],
+        "updatedAt": None,
+    }
+    assert "public_token_hash" not in payload["proofRequest"]
+    assert repository.customer_action_files[0]["external_url"] == "https://files.example/proof.pdf"
+
+    detail = client.get("/api/conversations/conversation-1", headers={"cookie": login.headers["set-cookie"]})
+
+    assert detail.status_code == 200
+    assert detail.json()["customerActions"] == [payload["proofRequest"]]
+
+
+def test_api_public_proof_request_read_and_approve_flow():
+    client, repository, _ = make_client(admin_password="secret")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    login = client.post("/api/auth/login", json={"password": "secret"})
+    created = client.post(
+        "/api/conversations/conversation-1/proof-requests",
+        json={"proofUrl": "https://files.example/proof.pdf"},
+        headers={"cookie": login.headers["set-cookie"]},
+    ).json()
+    token = created["publicUrl"].rsplit("/", 1)[-1]
+
+    public_read = client.get(f"/api/proof/{token}")
+
+    assert public_read.status_code == 200
+    public_payload = public_read.json()["proofRequest"]
+    assert public_payload["status"] == "pending"
+    assert public_payload["files"] == [
+        {
+            "id": "customer-action-file-1",
+            "role": "proof",
+            "publicUrl": None,
+            "externalUrl": "https://files.example/proof.pdf",
+            "originalFilename": None,
+            "contentType": None,
+            "sizeBytes": None,
+            "createdAt": repository.customer_action_files[0]["created_at"],
+        }
+    ]
+    assert public_payload["events"][0]["type"] == "created"
+    assert "public_token_hash" not in public_payload
+
+    approved = client.post(f"/api/proof/{token}/approve", json={"comment": "Approved."})
+
+    assert approved.status_code == 200
+    assert approved.json()["proofRequest"]["status"] == "approved"
+    assert repository.customer_action_events[-1]["event_type"] == "approved"
+    assert repository.customer_action_events[-1]["comment"] == "Approved."
+
+    changes_after_approval = client.post(
+        f"/api/proof/{token}/changes",
+        json={"comment": "Actually change it."},
+    )
+
+    assert changes_after_approval.status_code == 409
+
+
+def test_api_public_proof_request_changes_flow_and_invalid_token():
+    client, repository, _ = make_client(admin_password="secret")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    login = client.post("/api/auth/login", json={"password": "secret"})
+    created = client.post(
+        "/api/conversations/conversation-1/proof-requests",
+        json={"proofUrl": "https://files.example/proof.pdf"},
+        headers={"cookie": login.headers["set-cookie"]},
+    ).json()
+    token = created["publicUrl"].rsplit("/", 1)[-1]
+
+    missing = client.get("/api/proof/not-a-real-token")
+    invalid_comment = client.post(f"/api/proof/{token}/changes", json={"comment": " "})
+    changes = client.post(f"/api/proof/{token}/changes", json={"comment": "Please make the logo larger."})
+
+    assert missing.status_code == 404
+    assert invalid_comment.status_code == 400
+    assert changes.status_code == 200
+    assert changes.json()["proofRequest"]["status"] == "changes_requested"
+    assert repository.customer_action_events[-1]["event_type"] == "changes_requested"
+    assert repository.customer_action_events[-1]["comment"] == "Please make the logo larger."

@@ -13,10 +13,22 @@ from app.attachments import AttachmentStore
 from app.auth import SESSION_COOKIE, admin_enabled, require_admin, session_value
 from app.config import Settings, get_settings, normalize_phone_number
 from app.db import RelayRepository
-from app.dependencies import get_attachment_store, get_repository, get_sender, get_voice_caller
+from app.dependencies import (
+    get_attachment_store,
+    get_customer_action_service,
+    get_repository,
+    get_sender,
+    get_voice_caller,
+)
 from app.models import Conversation
 from app.reply_helpers import image_attachment_urls, read_uploads, reply_body_with_attachments
 from app.services.contact_import import ContactImportValidationError, import_contacts_csv
+from app.services.customer_actions import (
+    CustomerActionNotFound,
+    CustomerActionService,
+    CustomerActionStateError,
+    CustomerActionValidationError,
+)
 from app.twilio_client import MessageSender, VoiceCaller
 
 
@@ -44,6 +56,20 @@ class CallDetailsUpdate(BaseModel):
     notes: str | None = None
     recap: str | None = None
     transcription: str | None = None
+
+
+class ProofRequestCreate(BaseModel):
+    title: str | None = None
+    operatorNote: str | None = None
+    proofUrl: str
+
+
+class ProofRequestChanges(BaseModel):
+    comment: str
+
+
+class ProofRequestApproval(BaseModel):
+    comment: str | None = None
 
 
 class LoginRequest(BaseModel):
@@ -356,10 +382,12 @@ def api_conversation_detail(
     conversation_row = _conversation_metadata(repository, conversation)
     messages = repository.list_messages_for_conversation(conversation_id)
     calls = repository.list_calls_for_conversation(conversation_id)
+    customer_actions = repository.list_customer_actions_for_conversation(conversation_id)
     return {
         "conversation": _serialize_conversation_detail(conversation, conversation_row),
         "messages": [_serialize_message(message) for message in messages],
         "calls": [_serialize_call(call) for call in calls],
+        "customerActions": [_serialize_customer_action_request(action) for action in customer_actions],
         "suggestedReply": _suggested_reply(messages, conversation.conversation_code),
     }
 
@@ -376,6 +404,74 @@ def api_conversation_messages(
         raise HTTPException(status_code=404)
     messages = repository.list_messages_for_conversation(conversation_id)
     return {"messages": [_serialize_message(message) for message in messages]}
+
+
+@router.post("/conversations/{conversation_id}/proof-requests")
+def api_create_proof_request(
+    conversation_id: str,
+    payload: ProofRequestCreate,
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    service: CustomerActionService = Depends(get_customer_action_service),
+) -> dict[str, Any]:
+    require_admin(request, settings)
+    try:
+        result = service.create_proof_request(
+            conversation_id=conversation_id,
+            title=payload.title,
+            operator_note=payload.operatorNote,
+            proof_url=payload.proofUrl,
+        )
+    except CustomerActionValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "proofRequest": _serialize_customer_action_request(result["request"]),
+        "publicUrl": result["public_url"],
+    }
+
+
+@router.get("/proof/{public_token}")
+def api_public_proof_request(
+    public_token: str,
+    service: CustomerActionService = Depends(get_customer_action_service),
+) -> dict[str, Any]:
+    try:
+        result = service.get_public_proof_request(public_token=public_token)
+    except CustomerActionNotFound as exc:
+        raise HTTPException(status_code=404) from exc
+    return {"proofRequest": _serialize_public_customer_action(result)}
+
+
+@router.post("/proof/{public_token}/approve")
+def api_approve_public_proof_request(
+    public_token: str,
+    payload: ProofRequestApproval,
+    service: CustomerActionService = Depends(get_customer_action_service),
+) -> dict[str, Any]:
+    try:
+        request_row = service.approve_proof_request(public_token=public_token, comment=payload.comment)
+    except CustomerActionNotFound as exc:
+        raise HTTPException(status_code=404) from exc
+    except CustomerActionStateError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"proofRequest": _serialize_customer_action_request(request_row)}
+
+
+@router.post("/proof/{public_token}/changes")
+def api_request_public_proof_changes(
+    public_token: str,
+    payload: ProofRequestChanges,
+    service: CustomerActionService = Depends(get_customer_action_service),
+) -> dict[str, Any]:
+    try:
+        request_row = service.request_proof_changes(public_token=public_token, comment=payload.comment)
+    except CustomerActionNotFound as exc:
+        raise HTTPException(status_code=404) from exc
+    except CustomerActionValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except CustomerActionStateError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"proofRequest": _serialize_customer_action_request(request_row)}
 
 
 @router.patch("/conversations/{conversation_id}")
@@ -909,6 +1005,55 @@ def _serialize_contact_import_error(error: Any) -> dict[str, Any]:
         "row": error.row,
         "code": error.code,
         "message": error.message,
+    }
+
+
+def _serialize_customer_action_request(request: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": request.get("id"),
+        "conversationId": request.get("conversation_id"),
+        "contactId": request.get("contact_id"),
+        "type": request.get("request_type"),
+        "status": request.get("status"),
+        "title": request.get("title"),
+        "operatorNote": request.get("operator_note"),
+        "expiresAt": request.get("expires_at"),
+        "completedAt": request.get("completed_at"),
+        "canceledAt": request.get("canceled_at"),
+        "createdBy": request.get("created_by"),
+        "createdAt": request.get("created_at"),
+        "updatedAt": request.get("updated_at"),
+    }
+
+
+def _serialize_public_customer_action(result: dict[str, Any]) -> dict[str, Any]:
+    return {
+        **_serialize_customer_action_request(result["request"]),
+        "files": [_serialize_customer_action_file(file_row) for file_row in result["files"]],
+        "events": [_serialize_customer_action_event(event) for event in result["events"]],
+    }
+
+
+def _serialize_customer_action_file(file_row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": file_row.get("id"),
+        "role": file_row.get("role"),
+        "publicUrl": file_row.get("public_url"),
+        "externalUrl": file_row.get("external_url"),
+        "originalFilename": file_row.get("original_filename"),
+        "contentType": file_row.get("content_type"),
+        "sizeBytes": file_row.get("size_bytes"),
+        "createdAt": file_row.get("created_at"),
+    }
+
+
+def _serialize_customer_action_event(event: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": event.get("id"),
+        "type": event.get("event_type"),
+        "comment": event.get("comment"),
+        "metadata": event.get("metadata") or {},
+        "createdAt": event.get("created_at"),
     }
 
 

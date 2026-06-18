@@ -1,10 +1,13 @@
 from functools import lru_cache
 
+from fastapi import Depends
+
 from app.attachments import AttachmentStore, SupabaseAttachmentStore
 from app.ai_triage import MessageTriage, NoopMessageTriage, OpenAIMessageTriage
 from app.config import Settings, get_settings
 from app.db import RelayRepository, SupabaseRelayRepository
 from app.lookup import ContactNameLookup, NoopContactNameLookup, TwilioContactNameLookup
+from app.services.customer_actions import CustomerActionService
 from app.services.relay import RelayService
 from app.twilio_client import MessageSender, TwilioMessageSender, TwilioVoiceCaller, VoiceCaller
 
@@ -55,3 +58,10 @@ def get_relay_service() -> RelayService:
         contact_name_lookup=get_contact_name_lookup(),
         message_triage=get_message_triage(),
     )
+
+
+def get_customer_action_service(
+    settings: Settings = Depends(get_settings),
+    repository: RelayRepository = Depends(get_repository),
+) -> CustomerActionService:
+    return CustomerActionService(settings=settings, repository=repository)

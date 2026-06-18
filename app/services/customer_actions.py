@@ -81,6 +81,16 @@ class CustomerActionService:
             "public_url": build_public_action_url(self.settings.app_base_url, action_type="proof", token=token),
         }
 
+    def get_public_proof_request(self, *, public_token: str) -> dict[str, Any]:
+        request = self._get_pending_or_final_proof(public_token)
+        files = self.repository.list_customer_action_files(request["id"])
+        events = self.repository.list_customer_action_events(request["id"])
+        return {
+            "request": request,
+            "files": files,
+            "events": events,
+        }
+
     def approve_proof_request(self, *, public_token: str, comment: str | None = None) -> dict[str, Any]:
         request = self._get_pending_or_final_proof(public_token)
         if request["status"] == "approved":
