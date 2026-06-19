@@ -484,10 +484,11 @@ Reuse the customer-action foundation to let the operator request missing custome
 
 Current status:
 
-- Implemented locally.
+- Implemented and deployed.
 - Backend tests pass.
 - Frontend build passes.
-- Live production smoke is pending.
+- Live SMS and WhatsApp smoke passed.
+- Formal frontend/e2e automation remains pending because the frontend package has no Playwright script yet.
 
 In scope:
 

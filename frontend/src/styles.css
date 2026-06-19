@@ -1095,15 +1095,15 @@ button {
 }
 
 .conversation-proof-action {
-  background: #f0fbf4;
-  border-color: #bde8ca;
-  color: #146a3a;
+  background: #effaf3;
+  border-color: #a8dfbc;
+  color: #176a3b;
 }
 
 .conversation-asset-action {
-  background: var(--brand-blue-soft);
-  border-color: #bfd5f8;
-  color: var(--brand-blue-dark);
+  background: #fff7ed;
+  border-color: #f4c98a;
+  color: #875000;
 }
 
 .conversation-status-action.is-close-action {

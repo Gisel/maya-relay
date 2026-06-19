@@ -60,11 +60,15 @@ Verified locally:
 - `.venv/bin/python -m pytest`: 140 passed.
 - `npm --workspace frontend run build`: passed.
 
+Verified in production:
+
+- Live SMS asset request delivered.
+- Customer upload page accepted multiple files.
+- Uploaded assets appeared in the Maya Relay conversation.
+- Live WhatsApp asset request worked inside an active 24-hour WhatsApp conversation.
+
 Pending before calling the Assets slice production-ready:
 
-- Railway deployment.
-- Live SMS smoke: send asset request, upload multiple files from customer page, verify files appear in Maya conversation.
-- Live WhatsApp smoke inside a fresh 24-hour WhatsApp service window.
 - Formal frontend/e2e automation; no frontend Playwright script exists yet.
 
 ## Scope Guardrails
