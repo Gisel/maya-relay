@@ -174,7 +174,7 @@ Features:
 
 ### Customer Action Workflows
 
-Proof approval is the first customer-action workflow.
+Proof approval and Assets upload are the first customer-action workflows.
 
 Current Proof status:
 
@@ -188,13 +188,31 @@ Current Proof status:
 - Token security stores hashes only; raw public tokens are only sent in the customer URL.
 - SMS proof request flow has been live-smoke tested.
 
+Current Assets status:
+
+- Operator `Assets` button exists in the conversation header.
+- Operator can send a tokenized customer upload link.
+- Public `/assets/{token}` page supports drag/drop and multi-file choose-file upload.
+- Asset upload limits: 8 files, 32 MB per file, 100 MB total.
+- Supported asset types: PDF, image, design, document, and ZIP files.
+- Uploaded files are stored as customer-action files.
+- Maya Relay shows `Assets uploaded by customer` in the conversation timeline with the uploaded files attached.
+- SMS and WhatsApp asset request flows have been live-smoke tested.
+
+UI action color language:
+
+- `Open`: status green.
+- `Proof`: approval green.
+- `Assets`: amber/gold file-request action.
+- `Call`: blue.
+- `Close`: red.
+
 Pending:
 
 - Live WhatsApp proof smoke test inside a fresh 24-hour WhatsApp service window.
 - Approved WhatsApp template send path for proof links outside the 24-hour service window.
-- Assets request/upload workflow.
 - Pending request list/cancel/retry UI for operators.
-- Formal frontend/e2e automation for proof flows.
+- Formal frontend/e2e automation for proof and assets flows.
 
 ### React Operator Inbox
 

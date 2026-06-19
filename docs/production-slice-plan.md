@@ -488,6 +488,7 @@ Current status:
 - Backend tests pass.
 - Frontend build passes.
 - Live SMS and WhatsApp smoke passed.
+- Live acceptance criteria passed for the declared Assets scope.
 - Formal frontend/e2e automation remains pending because the frontend package has no Playwright script yet.
 
 In scope:
@@ -515,13 +516,13 @@ Acceptance criteria:
 
 Validation plan:
 
-- Deploy from GitHub/Railway.
-- Send an Assets request from an SMS conversation.
-- Open the public asset link on phone.
-- Upload at least two files with a note.
-- Confirm Maya Relay shows `Assets uploaded by customer` in the conversation timeline.
-- Confirm attachment links open from the conversation.
-- Repeat inside a fresh 24-hour WhatsApp conversation.
+- Completed: deploy from GitHub/Railway.
+- Completed: send an Assets request from an SMS conversation.
+- Completed: open the public asset link on phone.
+- Completed: upload multiple files with a note.
+- Completed: confirm Maya Relay shows `Assets uploaded by customer` in the conversation timeline.
+- Completed: repeat inside a fresh 24-hour WhatsApp conversation.
+- Pending hardening: add formal frontend/e2e automation when a frontend e2e runner exists.
 
 ## WhatsApp Templates Production Slice
 
