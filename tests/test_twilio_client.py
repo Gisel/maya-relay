@@ -23,6 +23,7 @@ def test_twilio_sender_passes_media_urls_to_messages_create(monkeypatch):
             TWILIO_ACCOUNT_SID="ACtest",
             TWILIO_AUTH_TOKEN="token",
             TWILIO_MESSAGING_SERVICE_SID="MGtest",
+            MAYA_BUSINESS_NUMBER="+13852208404",
         )
     )
 
@@ -76,6 +77,7 @@ def test_twilio_sender_sends_content_template_without_body_or_media(monkeypatch)
     assert sid == "SMtemplate"
     assert captured == {
         "messaging_service_sid": "MGtest",
+        "from_": "whatsapp:+13852208404",
         "to": "whatsapp:+15550000001",
         "content_sid": "HXtemplate",
         "content_variables": '{"1": "Business cards", "2": "token"}',

@@ -85,6 +85,7 @@ class TwilioMessageSender:
     ) -> str:
         message_kwargs = {
             "messaging_service_sid": self.settings.twilio_messaging_service_sid,
+            "from_": _sender_for_channel(self.settings.maya_business_number_e164, channel),
             "to": _recipient_for_channel(to_phone, channel),
             "content_sid": content_sid,
         }
@@ -125,6 +126,12 @@ class TwilioVoiceCaller:
 
 
 def _recipient_for_channel(phone_number: str, channel: Channel) -> str:
+    if channel == "whatsapp":
+        return phone_number if phone_number.lower().startswith("whatsapp:") else f"whatsapp:{phone_number}"
+    return phone_number
+
+
+def _sender_for_channel(phone_number: str, channel: Channel) -> str:
     if channel == "whatsapp":
         return phone_number if phone_number.lower().startswith("whatsapp:") else f"whatsapp:{phone_number}"
     return phone_number
