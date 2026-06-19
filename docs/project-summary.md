@@ -170,7 +170,10 @@ Features:
 - WhatsApp customer messages use the same conversation model as SMS.
 - Replies route through the original customer channel.
 - The app must respect WhatsApp's 24-hour free-form service window.
-- Approved templates will be needed later for outbound messages outside the service window.
+- Approved Twilio Content templates are used for Proof and Assets action links:
+  - `maya_proof_ready`: `HX7f7896c1911956f2817e11158289dc5d`
+  - `maya_assets_needed`: `HX590dbe4e79f340f2cd5cbc9ae5e42eeb`
+- Railway must define `WHATSAPP_TEMPLATE_PROOF_READY_CONTENT_SID` and `WHATSAPP_TEMPLATE_ASSETS_NEEDED_CONTENT_SID` before WhatsApp action-link sends work.
 
 ### Customer Action Workflows
 
@@ -210,7 +213,7 @@ UI action color language:
 Pending:
 
 - Live WhatsApp proof smoke test inside a fresh 24-hour WhatsApp service window.
-- Approved WhatsApp template send path for proof links outside the 24-hour service window.
+- Approved WhatsApp template send path for proof/assets links is implemented locally; deployment and live smoke are pending.
 - Pending request visibility/cancel UI is implemented locally and awaits verification/deployment.
 - Retry UI for failed customer-action sends remains pending.
 - Formal frontend/e2e automation for proof and assets flows.

@@ -1,3 +1,4 @@
+import json
 from typing import Protocol
 
 from twilio.rest import Client
@@ -17,6 +18,16 @@ class MessageSender(Protocol):
         body: str,
         channel: Channel = "sms",
         media_urls: tuple[str, ...] = (),
+    ) -> str:
+        ...
+
+    def send_template_message(
+        self,
+        *,
+        to_phone: str,
+        channel: Channel,
+        content_sid: str,
+        content_variables: dict[str, str] | None = None,
     ) -> str:
         ...
 
@@ -60,6 +71,25 @@ class TwilioMessageSender:
         }
         if media_urls:
             message_kwargs["media_url"] = list(media_urls)
+
+        message = self.client.messages.create(**message_kwargs)
+        return message.sid
+
+    def send_template_message(
+        self,
+        *,
+        to_phone: str,
+        channel: Channel,
+        content_sid: str,
+        content_variables: dict[str, str] | None = None,
+    ) -> str:
+        message_kwargs = {
+            "messaging_service_sid": self.settings.twilio_messaging_service_sid,
+            "to": _recipient_for_channel(to_phone, channel),
+            "content_sid": content_sid,
+        }
+        if content_variables:
+            message_kwargs["content_variables"] = json.dumps(content_variables)
 
         message = self.client.messages.create(**message_kwargs)
         return message.sid

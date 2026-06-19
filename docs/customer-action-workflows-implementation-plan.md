@@ -360,16 +360,25 @@ Your proof is ready. Review it here: https://mayagraphics.co/proof/{token}
 
 ### WhatsApp Outside 24-Hour Window
 
-First Proof slice should not pretend this is solved.
+Current implementation status as of 2026-06-19:
 
-Implementation options:
+- Proof and Assets WhatsApp requests use approved Twilio Content templates when the conversation channel is WhatsApp.
+- Required Railway/env variables:
+  - `WHATSAPP_TEMPLATE_PROOF_READY_CONTENT_SID`
+  - `WHATSAPP_TEMPLATE_ASSETS_NEEDED_CONTENT_SID`
+- Current Twilio templates:
+  - `maya_proof_ready`: `HX7f7896c1911956f2817e11158289dc5d`
+  - `maya_assets_needed`: `HX590dbe4e79f340f2cd5cbc9ae5e42eeb`
+- The call-to-action templates use variable `{{1}}` for the job/request title and variable `{{2}}` for the public action token.
+- The template URLs are configured in Twilio as:
+  - `https://mayagraphics.co/proof/{{2}}`
+  - `https://mayagraphics.co/assets/{{2}}`
 
-- If the app cannot prove an active WhatsApp window, show a safe warning and either block WhatsApp send or let operator send SMS fallback if available.
-- Later slice: add approved Twilio template send with `contentSid` and `contentVariables`.
+If a WhatsApp action template SID is not configured, the API blocks the send with a clear configuration error instead of attempting a free-form WhatsApp send.
 
 ### Future Template Slice
 
-Add after Proof workflow is stable:
+Add later for non-action reminders and editable template management:
 
 - `message_templates` table or config mapping:
   - `template_key`

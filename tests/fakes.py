@@ -788,6 +788,27 @@ class FakeSender:
         self.sent_messages.append(message)
         return sid
 
+    def send_template_message(
+        self,
+        *,
+        to_phone: str,
+        channel: Channel,
+        content_sid: str,
+        content_variables: dict[str, str] | None = None,
+    ) -> str:
+        if self.should_raise:
+            raise RuntimeError("send failed")
+        sid = f"SMfake{len(self.sent_messages) + 1}"
+        message: dict[str, object] = {
+            "sid": sid,
+            "to_phone": to_phone,
+            "channel": channel,
+            "content_sid": content_sid,
+            "content_variables": content_variables or {},
+        }
+        self.sent_messages.append(message)
+        return sid
+
 
 class FakeVoiceCaller:
     def __init__(self):

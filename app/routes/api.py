@@ -520,11 +520,17 @@ def api_create_proof_request(
         customer_message=customer_message,
     )
     try:
-        outbound_sid = sender.send_message(
-            to_phone=conversation.customer_phone,
+        send_result = _send_customer_action_request_message(
+            sender=sender,
+            settings=settings,
+            conversation=conversation,
             body=message_body,
-            channel=conversation.customer_channel,
+            public_url=result["public_url"],
+            template_kind="proof_ready",
+            title=(result["request"].get("title") or "Proof approval"),
         )
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.exception("Could not send proof request %s.", result["request"].get("id"))
         raise HTTPException(
@@ -538,7 +544,7 @@ def api_create_proof_request(
         from_phone=settings.maya_business_number,
         to_phone=conversation.customer_phone,
         body=message_body,
-        twilio_message_sid=outbound_sid,
+        twilio_message_sid=send_result["sid"],
     )
     repository.create_customer_action_event(
         request_id=result["request"]["id"],
@@ -547,8 +553,9 @@ def api_create_proof_request(
         comment=None,
         metadata={
             "message_id": created_message["id"],
-            "twilio_message_sid": outbound_sid,
-            "channel": conversation.customer_channel,
+            "twilio_message_sid": send_result["sid"],
+            "channel": _effective_customer_channel(conversation.customer_channel, conversation.customer_phone),
+            **send_result["metadata"],
         },
     )
     return {
@@ -595,11 +602,17 @@ def api_create_asset_request(
         customer_message=customer_message,
     )
     try:
-        outbound_sid = sender.send_message(
-            to_phone=conversation.customer_phone,
+        send_result = _send_customer_action_request_message(
+            sender=sender,
+            settings=settings,
+            conversation=conversation,
             body=message_body,
-            channel=conversation.customer_channel,
+            public_url=result["public_url"],
+            template_kind="assets_needed",
+            title=(result["request"].get("title") or "Asset upload"),
         )
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.exception("Could not send asset request %s.", result["request"].get("id"))
         raise HTTPException(
@@ -613,7 +626,7 @@ def api_create_asset_request(
         from_phone=settings.maya_business_number,
         to_phone=conversation.customer_phone,
         body=message_body,
-        twilio_message_sid=outbound_sid,
+        twilio_message_sid=send_result["sid"],
     )
     repository.create_customer_action_event(
         request_id=result["request"]["id"],
@@ -622,8 +635,9 @@ def api_create_asset_request(
         comment=None,
         metadata={
             "message_id": created_message["id"],
-            "twilio_message_sid": outbound_sid,
-            "channel": conversation.customer_channel,
+            "twilio_message_sid": send_result["sid"],
+            "channel": _effective_customer_channel(conversation.customer_channel, conversation.customer_phone),
+            **send_result["metadata"],
         },
     )
     return {
@@ -1249,7 +1263,7 @@ def _serialize_conversation_list_item(conversation: dict[str, Any]) -> dict[str,
         "id": conversation["id"],
         "code": conversation.get("conversation_code"),
         "status": conversation.get("status"),
-        "channel": conversation.get("customer_channel") or "sms",
+        "channel": _effective_customer_channel(conversation.get("customer_channel"), conversation.get("customer_phone")),
         "customer": _serialize_customer(conversation),
         "lastMessage": _serialize_last_message(last_message),
         "updatedAt": conversation.get("updated_at"),
@@ -1265,7 +1279,7 @@ def _serialize_conversation_detail(
         "id": conversation.id,
         "code": conversation.conversation_code,
         "status": conversation.status,
-        "channel": conversation.customer_channel,
+        "channel": _effective_customer_channel(conversation.customer_channel, conversation.customer_phone),
         "customer": _serialize_customer(
             {
                 "customer_phone": conversation.customer_phone,
@@ -1389,6 +1403,83 @@ def _asset_request_message_body(*, public_url: str, customer_message: str | None
     if not note:
         return base
     return f"{note}\n\n{base}"
+
+
+def _send_customer_action_request_message(
+    *,
+    sender: MessageSender,
+    settings: Settings,
+    conversation: Conversation,
+    body: str,
+    public_url: str,
+    template_kind: Literal["proof_ready", "assets_needed"],
+    title: str,
+) -> dict[str, Any]:
+    channel = _effective_customer_channel(conversation.customer_channel, conversation.customer_phone)
+    if channel != "whatsapp":
+        sid = sender.send_message(
+            to_phone=conversation.customer_phone,
+            body=body,
+            channel=channel,
+        )
+        return {"sid": sid, "metadata": {"send_mode": "free_form"}}
+
+    content_sid = _customer_action_template_content_sid(settings, template_kind)
+    token = _public_action_token(public_url)
+    sid = sender.send_template_message(
+        to_phone=conversation.customer_phone,
+        channel=channel,
+        content_sid=content_sid,
+        content_variables={
+            "1": _clean_template_value(title),
+            "2": token,
+        },
+    )
+    return {
+        "sid": sid,
+        "metadata": {
+            "send_mode": "template",
+            "template_key": template_kind,
+            "content_sid": content_sid,
+            "content_variables": {"1": _clean_template_value(title), "2": token},
+        },
+    }
+
+
+def _customer_action_template_content_sid(settings: Settings, template_kind: str) -> str:
+    if template_kind == "proof_ready":
+        content_sid = settings.whatsapp_template_proof_ready_content_sid.strip()
+        template_label = "WHATSAPP_TEMPLATE_PROOF_READY_CONTENT_SID"
+    elif template_kind == "assets_needed":
+        content_sid = settings.whatsapp_template_assets_needed_content_sid.strip()
+        template_label = "WHATSAPP_TEMPLATE_ASSETS_NEEDED_CONTENT_SID"
+    else:
+        content_sid = ""
+        template_label = "WhatsApp template Content SID"
+    if content_sid:
+        return content_sid
+    raise HTTPException(
+        status_code=503,
+        detail=f"{template_label} must be configured before sending this WhatsApp request.",
+    )
+
+
+def _public_action_token(public_url: str) -> str:
+    parsed = urlparse(public_url)
+    path = parsed.path.rstrip("/")
+    token = path.rsplit("/", 1)[-1] if path else ""
+    return token or public_url.rstrip("/").rsplit("/", 1)[-1]
+
+
+def _clean_template_value(value: str) -> str:
+    cleaned = _clean_optional_text(value)
+    return cleaned or "your order"
+
+
+def _effective_customer_channel(channel: str | None, customer_phone: str | None) -> Literal["sms", "whatsapp"]:
+    if str(customer_phone or "").lower().startswith("whatsapp:"):
+        return "whatsapp"
+    return "whatsapp" if channel == "whatsapp" else "sms"
 
 
 def _record_customer_action_message(

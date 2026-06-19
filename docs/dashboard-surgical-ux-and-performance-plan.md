@@ -245,6 +245,10 @@ Visual direction to preserve:
   - template approval/management
   - business-initiated conversations outside the 24-hour window
   - template usage tracking
+- Asset storage retention:
+  - delete or archive old proof/customer asset files after projects are no longer live
+  - remove related database rows safely without breaking active conversation history
+  - keep live project assets available until the operator explicitly closes or archives them
 - Customer Profile advanced:
   - tags
   - active/inactive client status

@@ -20,6 +20,8 @@ def make_client(
     app_base_url: str = "https://maya-relay.example",
     assemblyai_api_key: str = "",
     openai_api_key: str = "",
+    whatsapp_template_proof_ready_content_sid: str = "",
+    whatsapp_template_assets_needed_content_sid: str = "",
 ) -> tuple[TestClient, FakeRepository, FakeSender]:
     settings = Settings(
         FRANCISCO_PHONE="+15551234567",
@@ -37,6 +39,8 @@ def make_client(
         SUPABASE_SERVICE_ROLE_KEY="",
         APP_BASE_URL=app_base_url,
         CUSTOMER_ACTION_TOKEN_SECRET="test-action-secret",
+        WHATSAPP_TEMPLATE_PROOF_READY_CONTENT_SID=whatsapp_template_proof_ready_content_sid,
+        WHATSAPP_TEMPLATE_ASSETS_NEEDED_CONTENT_SID=whatsapp_template_assets_needed_content_sid,
     )
     repository = FakeRepository()
     sender = FakeSender()
@@ -1905,6 +1909,7 @@ def test_api_creates_sends_public_proof_request_and_exposes_conversation_action_
         "message_id": "message-1",
         "twilio_message_sid": "SMfake1",
         "channel": "sms",
+        "send_mode": "free_form",
     }
 
     detail = client.get("/api/conversations/conversation-1", headers={"cookie": login.headers["set-cookie"]})
@@ -2081,8 +2086,11 @@ def test_api_public_proof_request_changes_flow_and_invalid_token():
     assert repository.messages[-1]["body"] == "Proof changes requested by customer:\nPlease make the logo larger."
 
 
-def test_api_proof_request_uses_whatsapp_channel_when_conversation_is_whatsapp():
-    client, repository, sender = make_client(admin_password="secret")
+def test_api_proof_request_uses_whatsapp_template_when_conversation_is_whatsapp():
+    client, repository, sender = make_client(
+        admin_password="secret",
+        whatsapp_template_proof_ready_content_sid="HXproof",
+    )
     repository.get_or_create_customer_conversation(
         customer_phone="+15550000001",
         assigned_employee="+15551234567",
@@ -2097,9 +2105,72 @@ def test_api_proof_request_uses_whatsapp_channel_when_conversation_is_whatsapp()
     )
 
     assert response.status_code == 200
+    token = response.json()["publicUrl"].rsplit("/", 1)[-1]
+    assert sender.sent_messages[-1] == {
+        "sid": "SMfake1",
+        "to_phone": "+15550000001",
+        "channel": "whatsapp",
+        "content_sid": "HXproof",
+        "content_variables": {"1": "Proof approval", "2": token},
+    }
+    assert repository.customer_action_events[-1]["metadata"] == {
+        "message_id": "message-1",
+        "twilio_message_sid": "SMfake1",
+        "channel": "whatsapp",
+        "send_mode": "template",
+        "template_key": "proof_ready",
+        "content_sid": "HXproof",
+        "content_variables": {"1": "Proof approval", "2": token},
+    }
+
+
+def test_api_whatsapp_proof_request_requires_template_config():
+    client, repository, _ = make_client(admin_password="secret")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+        customer_channel="whatsapp",
+    )
+    login = client.post("/api/auth/login", json={"password": "secret"})
+
+    response = client.post(
+        "/api/conversations/conversation-1/proof-requests",
+        files={"proof_file": ("proof.pdf", PROOF_PDF_BYTES, "application/pdf")},
+        headers={"cookie": login.headers["set-cookie"]},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == (
+        "WHATSAPP_TEMPLATE_PROOF_READY_CONTENT_SID must be configured before sending this WhatsApp request."
+    )
+
+
+def test_api_proof_request_infers_whatsapp_from_legacy_prefixed_customer_phone():
+    client, repository, sender = make_client(
+        admin_password="secret",
+        whatsapp_template_proof_ready_content_sid="HXproof",
+    )
+    repository.get_or_create_customer_conversation(
+        customer_phone="whatsapp:+5218443261219",
+        assigned_employee="+15551234567",
+        customer_channel="sms",
+    )
+    login = client.post("/api/auth/login", json={"password": "secret"})
+
+    detail = client.get("/api/conversations/conversation-1", headers={"cookie": login.headers["set-cookie"]})
+    response = client.post(
+        "/api/conversations/conversation-1/proof-requests",
+        files={"proof_file": ("proof.pdf", PROOF_PDF_BYTES, "application/pdf")},
+        headers={"cookie": login.headers["set-cookie"]},
+    )
+
+    assert detail.status_code == 200
+    assert detail.json()["conversation"]["channel"] == "whatsapp"
+    assert response.status_code == 200
     assert sender.sent_messages[-1]["channel"] == "whatsapp"
-    assert sender.sent_messages[-1]["body"] == f"Your proof is ready. Review here: {response.json()['publicUrl']}"
+    assert sender.sent_messages[-1]["content_sid"] == "HXproof"
     assert repository.customer_action_events[-1]["metadata"]["channel"] == "whatsapp"
+    assert repository.customer_action_events[-1]["metadata"]["send_mode"] == "template"
 
 
 def test_api_proof_request_keeps_request_when_twilio_send_fails():
@@ -2243,6 +2314,37 @@ def test_api_creates_asset_request_and_customer_upload_arrives_in_conversation()
     detail_messages = detail.json()["messages"]
     assert detail_messages[-1]["body"] == "Assets uploaded by customer: 2 files.\nNote: Here are the logo files."
     assert len(detail_messages[-1]["attachments"]) == 2
+
+
+def test_api_asset_request_uses_whatsapp_template_when_conversation_is_whatsapp():
+    client, repository, sender = make_client(
+        admin_password="secret",
+        whatsapp_template_assets_needed_content_sid="HXassets",
+    )
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+        customer_channel="whatsapp",
+    )
+    login = client.post("/api/auth/login", json={"password": "secret"})
+
+    response = client.post(
+        "/api/conversations/conversation-1/asset-requests",
+        data={"title": "Banner order"},
+        headers={"cookie": login.headers["set-cookie"]},
+    )
+
+    assert response.status_code == 200
+    token = response.json()["publicUrl"].rsplit("/", 1)[-1]
+    assert sender.sent_messages[-1] == {
+        "sid": "SMfake1",
+        "to_phone": "+15550000001",
+        "channel": "whatsapp",
+        "content_sid": "HXassets",
+        "content_variables": {"1": "Banner order", "2": token},
+    }
+    assert repository.customer_action_events[-1]["metadata"]["send_mode"] == "template"
+    assert repository.customer_action_events[-1]["metadata"]["template_key"] == "assets_needed"
 
 
 def test_api_asset_request_rejects_local_public_link_before_sending():
