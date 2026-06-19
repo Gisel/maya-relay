@@ -414,12 +414,30 @@ async function mockMayaRelayApi(
             channels: ["sms", "whatsapp"],
           },
           {
-            id: "whatsapp_quote_follow_up",
+            id: "shop_hours",
+            label: "Shop hours",
+            body: "Maya hours\nM-F: 9:00am - 5:30pm | SAT: By Appointment",
+            group: "quick_response",
+            channels: ["sms", "whatsapp"],
+          },
+          {
+            id: "maya_quote_follow_up",
             label: "Quote follow-up",
-            body: "Hi - following up on your quote request.",
-            group: "whatsapp_draft",
-            channels: ["whatsapp"],
-            requiresActiveWindow: true,
+            body: "Hi there, following up on your quote request. Reply here with any questions or updates.",
+            bodyTemplate: "Hi {customer_name}, following up on your quote request. Reply here with any questions or updates.",
+            group: "template_response",
+            channels: ["sms", "whatsapp"],
+            templateKey: "quote_follow_up",
+            variables: [
+              {
+                key: "customer_name",
+                label: "Customer name",
+                placeholder: "Customer name",
+                required: true,
+                defaultValue: "there",
+                defaultSource: "customer_name",
+              },
+            ],
           },
         ],
       },
@@ -675,15 +693,19 @@ test("customer profile edits happen from the right-panel pencil without hiding m
   await page.getByRole("button", { name: "Close customer notes" }).click();
 });
 
-test("channel-specific responses appear in the single quick responses list", async ({ page }) => {
+test("template-aware quick responses appear in the single quick responses list", async ({ page }) => {
   await mockMayaRelayApi(page);
 
   await page.goto("/app/");
   await expect(page.getByRole("article").getByText("Hello")).toBeVisible();
   await page.getByRole("button", { name: "Details" }).click();
 
-  await expect(page.getByRole("heading", { name: "Quick Responses" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Quote follow-up" })).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: "Quick Responses" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("button", { name: /Request missing job specs/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Shop hours/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Quote follow-up/ })).toBeVisible();
+  await page.getByRole("button", { name: /Request missing job specs/ }).click();
+  await expect(page.getByLabel("Reply message")).toHaveValue("Please send size and deadline.");
   await page.getByRole("button", { name: "Close details panel" }).click();
 
   await page.getByRole("button", { name: "Load more" }).click();
@@ -691,11 +713,13 @@ test("channel-specific responses appear in the single quick responses list", asy
   await expect(page.getByRole("article").getByText("Can you follow up on my quote?")).toBeVisible();
   await page.getByRole("button", { name: "Details" }).click();
 
-  await expect(page.getByRole("heading", { name: "Quick Responses" })).toHaveCount(1);
+  await expect(page.getByRole("tab", { name: "Quick Responses" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("heading", { name: "WhatsApp Drafts" })).toHaveCount(0);
-  await page.getByRole("button", { name: "Quote follow-up" }).click();
+  await page.getByRole("button", { name: /Quote follow-up/ }).click();
 
-  await expect(page.getByLabel("Reply message")).toHaveValue("Hi - following up on your quote request.");
+  await expect(page.getByRole("dialog", { name: "Quote follow-up" })).toBeVisible();
+  await expect(page.getByLabel("Customer name")).toHaveValue("Older Customer");
+  await expect(page.getByText("Hi Older Customer, following up on your quote request. Reply here with any questions or updates.")).toBeVisible();
 });
 
 test("unified inbox search keeps conversation search and adds contact matches", async ({ page }) => {
@@ -812,7 +836,12 @@ test("system relay and AI suggestion messages stay out of the chat timeline", as
   await expect(page.getByRole("article").getByText("Please send size and deadline.")).toHaveCount(0);
   await expect(page.getByRole("article").getByText(/Reply with #C0001/)).toHaveCount(0);
   await expect(page.getByRole("article").getByText(/https:\/\/files\.example\/proof\.png/)).toHaveCount(0);
+  await page.getByRole("button", { name: "Details" }).click();
   await expect(page.getByText("Please send size and deadline.")).toHaveCount(1);
+
+  await page.getByRole("button", { name: "Use suggested reply" }).click();
+  await expect(page.getByLabel("Reply message")).toHaveValue("Please send size and deadline.");
+  await expect(page.getByText("No AI suggestion is available for this conversation yet.")).toBeVisible();
 });
 
 test("selected conversation refreshes new messages automatically", async ({ page }) => {
