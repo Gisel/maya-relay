@@ -86,8 +86,65 @@ class CustomerActionService:
             ),
         }
 
+    def create_assets_request(
+        self,
+        *,
+        conversation_id: str,
+        title: str | None = None,
+        operator_note: str | None = None,
+        public_base_url: str | None = None,
+        created_by: str | None = None,
+    ) -> dict[str, Any]:
+        conversation = self.repository.get_conversation(conversation_id)
+        if conversation is None:
+            raise CustomerActionValidationError("Conversation not found.")
+
+        contact = self.repository.get_or_create_contact(conversation.customer_phone)
+        token = generate_public_token()
+        token_hash = hash_public_token(token, customer_action_token_secret(self.settings))
+        now = _now_iso()
+
+        request = self.repository.create_customer_action_request(
+            conversation_id=conversation.id,
+            contact_id=contact.id,
+            request_type="assets",
+            status="pending",
+            title=(title or "Asset upload").strip(),
+            operator_note=_clean_optional_text(operator_note),
+            public_token_hash=token_hash,
+            expires_at=None,
+            created_by=_clean_optional_text(created_by),
+        )
+        self.repository.create_customer_action_event(
+            request_id=request["id"],
+            conversation_id=conversation.id,
+            event_type="created",
+            comment=None,
+            metadata={"created_at": now},
+        )
+
+        return {
+            "request": request,
+            "public_token": token,
+            "public_url": build_public_action_url(
+                public_base_url or self.settings.app_base_url,
+                action_type="assets",
+                token=token,
+            ),
+        }
+
     def get_public_proof_request(self, *, public_token: str) -> dict[str, Any]:
         request = self._get_pending_or_final_proof(public_token)
+        files = self.repository.list_customer_action_files(request["id"])
+        events = self.repository.list_customer_action_events(request["id"])
+        return {
+            "request": request,
+            "files": files,
+            "events": events,
+        }
+
+    def get_public_assets_request(self, *, public_token: str) -> dict[str, Any]:
+        request = self._get_pending_or_final_assets(public_token)
         files = self.repository.list_customer_action_files(request["id"])
         events = self.repository.list_customer_action_events(request["id"])
         return {
@@ -146,6 +203,45 @@ class CustomerActionService:
         )
         return updated
 
+    def submit_assets(
+        self,
+        *,
+        public_token: str,
+        files: tuple[CustomerActionFileInput, ...],
+        comment: str | None = None,
+    ) -> dict[str, Any]:
+        if not files:
+            raise CustomerActionValidationError("At least one asset file is required.")
+
+        request = self._get_pending_or_final_assets(public_token)
+        if request["status"] == "submitted":
+            return request
+        self._ensure_pending(request, action_name="Asset request")
+
+        for file_input in files:
+            if file_input.role != "customer_asset":
+                raise CustomerActionValidationError("Asset file role must be 'customer_asset'.")
+            if not (file_input.public_url or file_input.external_url or file_input.object_path):
+                raise CustomerActionValidationError("Asset file must include a URL or storage object path.")
+            self.repository.create_customer_action_file(request_id=request["id"], **file_input.__dict__)
+
+        updated = self.repository.update_customer_action_request_status(
+            request_id=request["id"],
+            status="submitted",
+            completed_at=_now_iso(),
+            canceled_at=None,
+        )
+        if updated is None:
+            raise CustomerActionNotFound("Asset request not found.")
+        self.repository.create_customer_action_event(
+            request_id=request["id"],
+            conversation_id=request["conversation_id"],
+            event_type="assets_submitted",
+            comment=_clean_optional_text(comment),
+            metadata={"file_count": len(files)},
+        )
+        return updated
+
     def _get_pending_or_final_proof(self, public_token: str) -> dict[str, Any]:
         token_hash = hash_public_token(public_token, customer_action_token_secret(self.settings))
         request = self.repository.get_customer_action_by_token_hash(token_hash)
@@ -153,10 +249,17 @@ class CustomerActionService:
             raise CustomerActionNotFound("Proof request not found.")
         return request
 
+    def _get_pending_or_final_assets(self, public_token: str) -> dict[str, Any]:
+        token_hash = hash_public_token(public_token, customer_action_token_secret(self.settings))
+        request = self.repository.get_customer_action_by_token_hash(token_hash)
+        if request is None or request.get("request_type") != "assets":
+            raise CustomerActionNotFound("Asset request not found.")
+        return request
+
     @staticmethod
-    def _ensure_pending(request: dict[str, Any]) -> None:
+    def _ensure_pending(request: dict[str, Any], *, action_name: str = "Proof request") -> None:
         if request["status"] != "pending":
-            raise CustomerActionStateError(f"Proof request is already {request['status']}.")
+            raise CustomerActionStateError(f"{action_name} is already {request['status']}.")
 
     @staticmethod
     def _proof_file_input(

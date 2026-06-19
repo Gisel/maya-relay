@@ -180,6 +180,11 @@ export type PublicProofRequest = CustomerActionRequest & {
   events: CustomerActionEvent[];
 };
 
+export type PublicAssetRequest = CustomerActionRequest & {
+  files: CustomerActionFile[];
+  events: CustomerActionEvent[];
+};
+
 export type ConversationsResponse = {
   metrics: Metrics;
   conversations: ConversationListItem[];
@@ -291,8 +296,18 @@ export type ProofRequestResponse = {
   message: Message;
 };
 
+export type AssetRequestResponse = {
+  assetRequest: CustomerActionRequest;
+  publicUrl: string;
+  message: Message;
+};
+
 export type PublicProofRequestResponse = {
   proofRequest: PublicProofRequest;
+};
+
+export type PublicAssetRequestResponse = {
+  assetRequest: PublicAssetRequest;
 };
 
 export type UpdateConversationResponse = {
@@ -456,8 +471,42 @@ export function createProofRequest(
   });
 }
 
+export function createAssetRequest(
+  conversationId: string,
+  payload: {
+    title?: string | null;
+    operatorNote?: string | null;
+    customerMessage?: string | null;
+  },
+) {
+  const form = new FormData();
+  form.set("title", payload.title ?? "");
+  form.set("operator_note", payload.operatorNote ?? "");
+  form.set("customer_message", payload.customerMessage ?? "");
+
+  return request<AssetRequestResponse>(`/api/conversations/${conversationId}/asset-requests`, {
+    method: "POST",
+    body: form,
+  });
+}
+
 export function getPublicProofRequest(token: string) {
   return request<PublicProofRequestResponse>(`/api/proof/${encodeURIComponent(token)}`);
+}
+
+export function getPublicAssetRequest(token: string) {
+  return request<PublicAssetRequestResponse>(`/api/assets/${encodeURIComponent(token)}`);
+}
+
+export function submitPublicAssets(token: string, files: File[], note: string) {
+  const form = new FormData();
+  form.set("note", note);
+  files.forEach((file) => form.append("asset_files", file));
+
+  return request<PublicAssetRequestResponse>(`/api/assets/${encodeURIComponent(token)}/submit`, {
+    method: "POST",
+    body: form,
+  });
 }
 
 export function approvePublicProofRequest(token: string, comment?: string) {

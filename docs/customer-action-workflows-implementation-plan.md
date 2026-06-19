@@ -36,6 +36,37 @@ Not done yet:
 - Admin list/cancel/retry UI for pending customer-action requests.
 - Assets workflow.
 
+## Assets Slice Status As Of 2026-06-18
+
+Assets request/upload has been implemented locally and completed automated verification.
+
+Implemented:
+
+- Operator `Assets` action in the conversation header.
+- Operator assets request modal with title, customer message, and internal note.
+- Admin API to create `request_type = assets` requests and send the upload link through the current conversation channel.
+- Public `/assets/{token}` page with drag/drop and multi-file choose-file upload.
+- Public assets submit API with validation:
+  - up to 8 files
+  - 32 MB per file
+  - 100 MB total per submission
+  - PDF, image, design, document, and ZIP file types
+- Uploaded files are stored as `customer_action_files.role = customer_asset`.
+- Customer submission records an `assets_submitted` event.
+- Maya Relay creates a conversation system message with the uploaded files attached, so the files arrive in the conversation timeline.
+
+Verified locally:
+
+- `.venv/bin/python -m pytest`: 140 passed.
+- `npm --workspace frontend run build`: passed.
+
+Pending before calling the Assets slice production-ready:
+
+- Railway deployment.
+- Live SMS smoke: send asset request, upload multiple files from customer page, verify files appear in Maya conversation.
+- Live WhatsApp smoke inside a fresh 24-hour WhatsApp service window.
+- Formal frontend/e2e automation; no frontend Playwright script exists yet.
+
 ## Scope Guardrails
 
 - Additive only. Do not break existing SMS, WhatsApp, calls, AI suggested replies, quick responses, customer profile, CSV import, observability, or native reply-code flows.

@@ -11,8 +11,16 @@ from app.config import Settings
 
 
 CustomerActionType = Literal["proof", "assets"]
-CustomerActionStatus = Literal["pending", "approved", "changes_requested", "expired", "canceled"]
-CustomerActionEventType = Literal["created", "approved", "changes_requested", "canceled", "expired"]
+CustomerActionStatus = Literal["pending", "approved", "changes_requested", "submitted", "expired", "canceled"]
+CustomerActionEventType = Literal[
+    "created",
+    "sent",
+    "approved",
+    "changes_requested",
+    "assets_submitted",
+    "canceled",
+    "expired",
+]
 
 
 @dataclass(frozen=True)

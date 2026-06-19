@@ -2122,3 +2122,150 @@ def test_api_proof_request_keeps_request_when_twilio_send_fails():
     assert len(repository.customer_action_requests) == 1
     assert [event["event_type"] for event in repository.customer_action_events] == ["created"]
     assert repository.messages == []
+
+
+def test_api_creates_asset_request_and_customer_upload_arrives_in_conversation():
+    client, repository, sender = make_client(admin_password="secret")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    unauthenticated = client.post("/api/conversations/conversation-1/asset-requests")
+    assert unauthenticated.status_code == 401
+
+    login = client.post("/api/auth/login", json={"password": "secret"})
+    created = client.post(
+        "/api/conversations/conversation-1/asset-requests",
+        data={
+            "title": "Upload logo files",
+            "operator_note": "Need source files.",
+            "customer_message": "Please upload the logo and any reference files.",
+        },
+        headers={"cookie": login.headers["set-cookie"]},
+    )
+
+    assert created.status_code == 200
+    payload = created.json()
+    assert payload["publicUrl"].startswith("https://maya-relay.example/assets/")
+    assert payload["assetRequest"] == {
+        "id": "customer-action-request-1",
+        "conversationId": "conversation-1",
+        "contactId": "contact-1",
+        "type": "assets",
+        "status": "pending",
+        "title": "Upload logo files",
+        "operatorNote": "Need source files.",
+        "expiresAt": None,
+        "completedAt": None,
+        "canceledAt": None,
+        "createdBy": None,
+        "createdAt": repository.customer_action_requests[0]["created_at"],
+        "updatedAt": None,
+    }
+    assert sender.sent_messages[-1] == {
+        "sid": "SMfake1",
+        "to_phone": "+15550000001",
+        "body": (
+            "Please upload the logo and any reference files.\n\n"
+            f"Please upload your files here: {payload['publicUrl']}"
+        ),
+    }
+    assert repository.messages[-1]["direction"] == "employee_to_customer"
+    assert repository.customer_action_events[-1]["event_type"] == "sent"
+
+    token = payload["publicUrl"].rsplit("/", 1)[-1]
+    public_read = client.get(f"/api/assets/{token}")
+    assert public_read.status_code == 200
+    assert public_read.json()["assetRequest"]["files"] == []
+
+    submitted = client.post(
+        f"/api/assets/{token}/submit",
+        data={"note": "Here are the logo files."},
+        files=[
+            ("asset_files", ("logo.png", b"\x89PNG\r\n\x1a\nfake logo", "image/png")),
+            ("asset_files", ("brand.ai", b"fake illustrator", "application/octet-stream")),
+        ],
+    )
+
+    assert submitted.status_code == 200
+    submitted_payload = submitted.json()["assetRequest"]
+    assert submitted_payload["status"] == "submitted"
+    assert [file["role"] for file in submitted_payload["files"]] == ["customer_asset", "customer_asset"]
+    assert [file["originalFilename"] for file in submitted_payload["files"]] == ["logo.png", "brand.ai"]
+    assert repository.customer_action_events[-1]["event_type"] == "assets_submitted"
+    assert repository.customer_action_events[-1]["comment"] == "Here are the logo files."
+    assert repository.customer_action_events[-1]["metadata"] == {"file_count": 2}
+    assert repository.messages[-1]["direction"] == "system"
+    assert repository.messages[-1]["body"] == "Assets uploaded by customer: 2 files.\nNote: Here are the logo files."
+    assert repository.messages[-1]["num_media"] == 2
+    assert repository.messages[-1]["media_urls"] == (
+        "https://files.example/customer-assets/customer-action-request-1/logo.png",
+        "https://files.example/customer-assets/customer-action-request-1/brand.ai",
+    )
+    assert len(repository.attachments) == 2
+    assert repository.attachments[-1]["message_id"] == repository.messages[-1]["id"]
+
+    detail = client.get("/api/conversations/conversation-1", headers={"cookie": login.headers["set-cookie"]})
+    detail_messages = detail.json()["messages"]
+    assert detail_messages[-1]["body"] == "Assets uploaded by customer: 2 files.\nNote: Here are the logo files."
+    assert len(detail_messages[-1]["attachments"]) == 2
+
+
+def test_api_asset_request_rejects_local_public_link_before_sending():
+    client, repository, _ = make_client(admin_password="secret", app_base_url="http://127.0.0.1:8000")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    login = client.post("/api/auth/login", json={"password": "secret"})
+
+    response = client.post(
+        "/api/conversations/conversation-1/asset-requests",
+        headers={
+            "cookie": login.headers["set-cookie"],
+            "host": "127.0.0.1:8000",
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "APP_BASE_URL must be set to the public Maya Relay URL before sending asset links."
+    assert repository.customer_action_requests == []
+    assert repository.messages == []
+
+
+def test_api_public_asset_submit_validates_file_count_type_and_size():
+    client, repository, _ = make_client(admin_password="secret")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    login = client.post("/api/auth/login", json={"password": "secret"})
+    token = client.post(
+        "/api/conversations/conversation-1/asset-requests",
+        headers={"cookie": login.headers["set-cookie"]},
+    ).json()["publicUrl"].rsplit("/", 1)[-1]
+
+    missing_files = client.post(f"/api/assets/{token}/submit", data={"note": "No files"})
+    too_many_files = client.post(
+        f"/api/assets/{token}/submit",
+        files=[("asset_files", (f"file-{index}.png", b"\x89PNG\r\n\x1a\n", "image/png")) for index in range(9)],
+    )
+    unsupported = client.post(
+        f"/api/assets/{token}/submit",
+        files=[("asset_files", ("malware.exe", b"MZ", "application/x-msdownload"))],
+    )
+    oversized = client.post(
+        f"/api/assets/{token}/submit",
+        files=[("asset_files", ("large.pdf", b"x" * (32 * 1024 * 1024 + 1), "application/pdf"))],
+    )
+
+    assert missing_files.status_code == 400
+    assert missing_files.json()["detail"] == "At least one asset file is required."
+    assert too_many_files.status_code == 400
+    assert too_many_files.json()["detail"] == "Upload 8 files or fewer."
+    assert unsupported.status_code == 400
+    assert unsupported.json()["detail"] == "Asset files must be PDF, image, design, document, or ZIP files."
+    assert oversized.status_code == 413
+    assert oversized.json()["detail"] == "Each asset file must be 32 MB or smaller."
+    assert repository.customer_action_requests[0]["status"] == "pending"
+    assert repository.customer_action_files == []

@@ -482,6 +482,13 @@ Feature goal:
 
 Reuse the customer-action foundation to let the operator request missing customer assets and let the customer upload them through a tokenized public link.
 
+Current status:
+
+- Implemented locally.
+- Backend tests pass.
+- Frontend build passes.
+- Live production smoke is pending.
+
 In scope:
 
 - Add `Assets` action near `Proof`.
@@ -504,6 +511,16 @@ Acceptance criteria:
 - Submitted assets are stored and linked to the request.
 - Maya Relay shows the submission event.
 - Proof workflow remains unchanged.
+
+Validation plan:
+
+- Deploy from GitHub/Railway.
+- Send an Assets request from an SMS conversation.
+- Open the public asset link on phone.
+- Upload at least two files with a note.
+- Confirm Maya Relay shows `Assets uploaded by customer` in the conversation timeline.
+- Confirm attachment links open from the conversation.
+- Repeat inside a fresh 24-hour WhatsApp conversation.
 
 ## WhatsApp Templates Production Slice
 

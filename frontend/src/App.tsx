@@ -31,6 +31,7 @@ import {
   ContactImportResponse,
   ContactProfile,
   ContactSearchItem,
+  createAssetRequest,
   createProofRequest,
   DeliveryStatus,
   FollowUpStatus,
@@ -62,6 +63,8 @@ import { CallWorkspace } from "./calls/CallWorkspace";
 import { WorkspaceMode, WorkspaceTabs } from "./calls/WorkspaceTabs";
 import { CustomerProfileSummary } from "./customers/CustomerProfileSummary";
 import { EditCustomerProfileModal } from "./customers/EditCustomerProfileModal";
+import { AssetActionButton } from "./customerActions/AssetActionButton";
+import { AssetsRequestModal } from "./customerActions/AssetsRequestModal";
 import { ProofActionButton } from "./customerActions/ProofActionButton";
 import { ProofRequestModal } from "./customerActions/ProofRequestModal";
 import { QuickResponsesPanel } from "./messaging/QuickResponsesPanel";
@@ -171,12 +174,16 @@ function needsReply(conversation: ConversationListItem) {
 }
 
 function isCustomerVisibleMessage(message: Message) {
-  return message.direction !== "system" || isProofDecisionMessage(message);
+  return message.direction !== "system" || isCustomerActionSystemMessage(message);
 }
 
-function isProofDecisionMessage(message: Message) {
+function isCustomerActionSystemMessage(message: Message) {
   const body = message.body.trim();
-  return body.startsWith("Proof approved by customer.") || body.startsWith("Proof changes requested by customer:");
+  return (
+    body.startsWith("Proof approved by customer.")
+    || body.startsWith("Proof changes requested by customer:")
+    || body.startsWith("Assets uploaded by customer:")
+  );
 }
 
 function formatDate(value: string | null | undefined) {
@@ -238,6 +245,9 @@ function proofDecisionClass(message: Message) {
   if (normalizedBody.startsWith("proof changes requested by customer")) {
     return "is-changes-requested";
   }
+  if (normalizedBody.startsWith("assets uploaded by customer")) {
+    return "is-assets-submitted";
+  }
   return "";
 }
 
@@ -245,6 +255,18 @@ function MessageBubble({ message, onMediaLoad }: { message: Message; onMediaLoad
   if (message.direction === "system") {
     return (
       <article className={`message-bubble system-event ${proofDecisionClass(message)}`}>
+        {message.attachments.map((attachment) => (
+          <a className="attachment-preview" href={attachment.url} key={attachment.url} rel="noreferrer" target="_blank">
+            {attachment.kind === "image" ? (
+              <img alt="Message attachment" onLoad={onMediaLoad} src={attachment.url} />
+            ) : (
+              <span>
+                <FileText size={18} />
+                Message attachment
+              </span>
+            )}
+          </a>
+        ))}
         <p>{message.body}</p>
         <footer>
           <span>{formatDate(message.createdAt)}</span>
@@ -690,6 +712,9 @@ export function App() {
   const [isProofRequestOpen, setIsProofRequestOpen] = useState(false);
   const [isSendingProofRequest, setIsSendingProofRequest] = useState(false);
   const [proofRequestError, setProofRequestError] = useState("");
+  const [isAssetsRequestOpen, setIsAssetsRequestOpen] = useState(false);
+  const [isSendingAssetsRequest, setIsSendingAssetsRequest] = useState(false);
+  const [assetsRequestError, setAssetsRequestError] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<ConversationStatusFilter>("open");
   const [draft, setDraft] = useState("");
@@ -1468,6 +1493,41 @@ export function App() {
     }
   }
 
+  async function handleSendAssetsRequest(payload: {
+    title: string;
+    customerMessage: string;
+    operatorNote: string;
+  }) {
+    if (!selectedId) return;
+    setIsSendingAssetsRequest(true);
+    setAssetsRequestError("");
+    setAppError("");
+    setCallStatus("");
+    try {
+      const response = await createAssetRequest(selectedId, {
+        title: payload.title || null,
+        customerMessage: payload.customerMessage || null,
+        operatorNote: payload.operatorNote || null,
+      });
+      setMessages((current) => {
+        const withoutDuplicate = current.filter((message) => message.id !== response.message.id);
+        return [...withoutDuplicate, response.message];
+      });
+      setCallStatus("Asset request sent.");
+      setIsAssetsRequestOpen(false);
+      await refreshDetail(selectedId, { force: true });
+      await loadConversations(selectedId);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setIsAuthenticated(false);
+      } else {
+        setAssetsRequestError(error instanceof Error ? error.message : "Could not send the asset request.");
+      }
+    } finally {
+      setIsSendingAssetsRequest(false);
+    }
+  }
+
   async function updateActiveConversationStatus(nextStatus: ConversationStatus) {
     if (!selectedId || !activeConversation) {
       closeAuditLog("status update aborted", {
@@ -1932,6 +1992,13 @@ export function App() {
                       setIsProofRequestOpen(true);
                     }}
                   />
+                  <AssetActionButton
+                    disabled={!selectedId || status !== "open" || isSendingAssetsRequest}
+                    onClick={() => {
+                      setAssetsRequestError("");
+                      setIsAssetsRequestOpen(true);
+                    }}
+                  />
                   <button
                     className="conversation-call-action"
                     disabled={!selectedId || isCallingCustomer}
@@ -2103,6 +2170,20 @@ export function App() {
         }}
         onSend={handleSendProofRequest}
         open={isProofRequestOpen}
+      />
+      <AssetsRequestModal
+        channel={channel}
+        customerName={customerName}
+        customerPhone={displayPhone}
+        error={assetsRequestError}
+        isSending={isSendingAssetsRequest}
+        onClose={() => {
+          if (isSendingAssetsRequest) return;
+          setAssetsRequestError("");
+          setIsAssetsRequestOpen(false);
+        }}
+        onSend={handleSendAssetsRequest}
+        open={isAssetsRequestOpen}
       />
       <SettingsModal onClose={() => setIsSettingsOpen(false)} open={isSettingsOpen}>
         <OperationalStatusView />

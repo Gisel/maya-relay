@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
 from app.ai_triage import _extract_response_text
-from app.attachments import AttachmentStore, UploadedAttachment
+from app.attachments import AttachmentStore, StoredAttachment, UploadedAttachment
 from app.auth import SESSION_COOKIE, admin_enabled, require_admin, session_value
 from app.config import Settings, get_settings, normalize_phone_number
 from app.customer_actions import CustomerActionFileInput
@@ -46,6 +46,43 @@ PROOF_ALLOWED_CONTENT_TYPES = {
     "image/png",
     "image/tiff",
     "image/webp",
+}
+ASSET_MAX_FILES = 8
+ASSET_MAX_FILE_SIZE_BYTES = 32 * 1024 * 1024
+ASSET_MAX_TOTAL_SIZE_BYTES = 100 * 1024 * 1024
+ASSET_ALLOWED_CONTENT_TYPES = {
+    "application/illustrator",
+    "application/msword",
+    "application/pdf",
+    "application/postscript",
+    "application/vnd.adobe.photoshop",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/x-photoshop",
+    "application/zip",
+    "image/gif",
+    "image/jpeg",
+    "image/png",
+    "image/svg+xml",
+    "image/tiff",
+    "image/vnd.adobe.photoshop",
+    "image/webp",
+}
+ASSET_ALLOWED_EXTENSIONS = {
+    ".ai",
+    ".doc",
+    ".docx",
+    ".eps",
+    ".gif",
+    ".jpeg",
+    ".jpg",
+    ".pdf",
+    ".png",
+    ".psd",
+    ".svg",
+    ".tif",
+    ".tiff",
+    ".webp",
+    ".zip",
 }
 
 
@@ -521,6 +558,81 @@ def api_create_proof_request(
     }
 
 
+@router.post("/conversations/{conversation_id}/asset-requests")
+def api_create_asset_request(
+    conversation_id: str,
+    request: Request,
+    title: str = Form(""),
+    operator_note: str = Form(""),
+    customer_message: str = Form(""),
+    settings: Settings = Depends(get_settings),
+    repository: RelayRepository = Depends(get_repository),
+    sender: MessageSender = Depends(get_sender),
+    service: CustomerActionService = Depends(get_customer_action_service),
+) -> dict[str, Any]:
+    require_admin(request, settings)
+    conversation = repository.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404)
+    public_base_url = _public_base_url(request, settings)
+    if _is_local_base_url(public_base_url):
+        raise HTTPException(
+            status_code=503,
+            detail="APP_BASE_URL must be set to the public Maya Relay URL before sending asset links.",
+        )
+    try:
+        result = service.create_assets_request(
+            conversation_id=conversation_id,
+            title=title,
+            operator_note=operator_note,
+            public_base_url=public_base_url,
+        )
+    except CustomerActionValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    message_body = _asset_request_message_body(
+        public_url=result["public_url"],
+        customer_message=customer_message,
+    )
+    try:
+        outbound_sid = sender.send_message(
+            to_phone=conversation.customer_phone,
+            body=message_body,
+            channel=conversation.customer_channel,
+        )
+    except Exception as exc:
+        logger.exception("Could not send asset request %s.", result["request"].get("id"))
+        raise HTTPException(
+            status_code=502,
+            detail="Asset request was created, but the customer message could not be sent.",
+        ) from exc
+
+    created_message = repository.create_message(
+        conversation_id=conversation.id,
+        direction="employee_to_customer",
+        from_phone=settings.maya_business_number,
+        to_phone=conversation.customer_phone,
+        body=message_body,
+        twilio_message_sid=outbound_sid,
+    )
+    repository.create_customer_action_event(
+        request_id=result["request"]["id"],
+        conversation_id=conversation.id,
+        event_type="sent",
+        comment=None,
+        metadata={
+            "message_id": created_message["id"],
+            "twilio_message_sid": outbound_sid,
+            "channel": conversation.customer_channel,
+        },
+    )
+    return {
+        "assetRequest": _serialize_customer_action_request(result["request"]),
+        "publicUrl": result["public_url"],
+        "message": _serialize_message(created_message),
+    }
+
+
 @router.get("/proof/{public_token}")
 def api_public_proof_request(
     public_token: str,
@@ -531,6 +643,82 @@ def api_public_proof_request(
     except CustomerActionNotFound as exc:
         raise HTTPException(status_code=404) from exc
     return {"proofRequest": _serialize_public_customer_action(result)}
+
+
+@router.get("/assets/{public_token}")
+def api_public_assets_request(
+    public_token: str,
+    service: CustomerActionService = Depends(get_customer_action_service),
+) -> dict[str, Any]:
+    try:
+        result = service.get_public_assets_request(public_token=public_token)
+    except CustomerActionNotFound as exc:
+        raise HTTPException(status_code=404) from exc
+    return {"assetRequest": _serialize_public_customer_action(result)}
+
+
+@router.post("/assets/{public_token}/submit")
+def api_submit_public_assets(
+    public_token: str,
+    note: str = Form(""),
+    asset_files: list[UploadFile] = File(default=[]),
+    settings: Settings = Depends(get_settings),
+    repository: RelayRepository = Depends(get_repository),
+    attachment_store: AttachmentStore = Depends(get_attachment_store),
+    service: CustomerActionService = Depends(get_customer_action_service),
+) -> dict[str, Any]:
+    try:
+        existing = service.get_public_assets_request(public_token=public_token)["request"]
+    except CustomerActionNotFound as exc:
+        raise HTTPException(status_code=404) from exc
+
+    uploads = _validated_asset_uploads(read_uploads(asset_files))
+    try:
+        stored_files = attachment_store.store_uploaded_attachments(
+            object_prefix=f"customer-assets/{existing['id']}",
+            files=uploads,
+        )
+    except Exception as exc:
+        logger.exception("Could not store asset files for request %s.", existing["id"])
+        raise HTTPException(status_code=502, detail="Could not store uploaded assets.") from exc
+
+    file_inputs = tuple(
+        CustomerActionFileInput(
+            role="customer_asset",
+            bucket=stored_file.bucket,
+            object_path=stored_file.object_path,
+            public_url=stored_file.public_url,
+            original_filename=upload.filename,
+            content_type=stored_file.content_type,
+            size_bytes=len(upload.content),
+        )
+        for stored_file, upload in zip(stored_files, uploads, strict=True)
+    )
+    try:
+        request_row = service.submit_assets(public_token=public_token, files=file_inputs, comment=note)
+    except CustomerActionNotFound as exc:
+        attachment_store.delete_uploaded_attachments(stored_files)
+        raise HTTPException(status_code=404) from exc
+    except CustomerActionValidationError as exc:
+        attachment_store.delete_uploaded_attachments(stored_files)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except CustomerActionStateError as exc:
+        attachment_store.delete_uploaded_attachments(stored_files)
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception as exc:
+        attachment_store.delete_uploaded_attachments(stored_files)
+        logger.exception("Could not submit asset request %s.", existing["id"])
+        raise HTTPException(status_code=502, detail="Assets were uploaded, but the request could not be submitted.") from exc
+
+    _record_customer_action_message(
+        repository=repository,
+        settings=settings,
+        request_row=request_row,
+        body=_assets_submitted_message(file_count=len(stored_files), note=note),
+        attachments=stored_files,
+    )
+    result = service.get_public_assets_request(public_token=public_token)
+    return {"assetRequest": _serialize_public_customer_action(result)}
 
 
 @router.post("/proof/{public_token}/approve")
@@ -1178,24 +1366,46 @@ def _proof_request_message_body(*, public_url: str, customer_message: str | None
     return f"{note}\n\n{base}"
 
 
+def _asset_request_message_body(*, public_url: str, customer_message: str | None) -> str:
+    base = f"Please upload your files here: {public_url}"
+    note = _clean_optional_text(customer_message)
+    if not note:
+        return base
+    return f"{note}\n\n{base}"
+
+
 def _record_customer_action_message(
     *,
     repository: RelayRepository,
     settings: Settings,
     request_row: dict[str, Any],
     body: str,
+    attachments: tuple[StoredAttachment, ...] = (),
 ) -> None:
     conversation = repository.get_conversation(str(request_row["conversation_id"]))
     if conversation is None:
         logger.warning("Could not record customer action message for missing conversation %s.", request_row["conversation_id"])
         return
-    repository.create_message(
+    message = repository.create_message(
         conversation_id=conversation.id,
         direction="system",
         from_phone=settings.maya_business_number,
         to_phone=conversation.assigned_employee,
         body=body,
+        num_media=len(attachments),
+        media_urls=tuple(attachment.public_url for attachment in attachments),
+        media_content_types=tuple(attachment.content_type for attachment in attachments),
     )
+    for attachment in attachments:
+        repository.create_message_attachment(
+            message_id=message["id"],
+            bucket=attachment.bucket,
+            object_path=attachment.object_path,
+            public_url=attachment.public_url,
+            source_url=attachment.source_url,
+            content_type=attachment.content_type,
+            size_bytes=None,
+        )
 
 
 def _proof_approved_message(comment: str | None) -> str:
@@ -1211,6 +1421,15 @@ def _proof_changes_message(comment: str) -> str:
     if clean_comment:
         return f"Proof changes requested by customer:\n{clean_comment}"
     return "Proof changes requested by customer."
+
+
+def _assets_submitted_message(*, file_count: int, note: str | None) -> str:
+    file_label = "file" if file_count == 1 else "files"
+    body = f"Assets uploaded by customer: {file_count} {file_label}."
+    clean_note = _clean_optional_text(note)
+    if clean_note:
+        return f"{body}\nNote: {clean_note}"
+    return body
 
 
 def _serialize_call_conversation(row: dict[str, Any]) -> dict[str, Any]:
@@ -1433,6 +1652,45 @@ def _proof_content_matches_type(content: bytes, content_type: str) -> bool:
     if content_type == "image/tiff":
         return content.startswith((b"II*\x00", b"MM\x00*"))
     return False
+
+
+def _validated_asset_uploads(uploads: tuple[UploadedAttachment, ...]) -> tuple[UploadedAttachment, ...]:
+    if not uploads:
+        raise HTTPException(status_code=400, detail="At least one asset file is required.")
+    if len(uploads) > ASSET_MAX_FILES:
+        raise HTTPException(status_code=400, detail=f"Upload {ASSET_MAX_FILES} files or fewer.")
+    total_size = sum(len(upload.content) for upload in uploads)
+    if total_size > ASSET_MAX_TOTAL_SIZE_BYTES:
+        raise HTTPException(status_code=413, detail="Asset upload total must be 100 MB or smaller.")
+
+    validated: list[UploadedAttachment] = []
+    for upload in uploads:
+        if len(upload.content) > ASSET_MAX_FILE_SIZE_BYTES:
+            raise HTTPException(status_code=413, detail="Each asset file must be 32 MB or smaller.")
+        content_type = _asset_content_type(upload)
+        extension = _filename_extension(upload.filename)
+        if content_type not in ASSET_ALLOWED_CONTENT_TYPES and extension not in ASSET_ALLOWED_EXTENSIONS:
+            raise HTTPException(
+                status_code=400,
+                detail="Asset files must be PDF, image, design, document, or ZIP files.",
+            )
+        validated.append(UploadedAttachment(filename=upload.filename, content=upload.content, content_type=content_type))
+    return tuple(validated)
+
+
+def _asset_content_type(upload: UploadedAttachment) -> str:
+    content_type = upload.content_type.split(";")[0].strip().lower()
+    if content_type and content_type != "application/octet-stream":
+        return content_type
+    guessed_type = mimetypes.guess_type(upload.filename)[0]
+    return (guessed_type or content_type or "application/octet-stream").split(";")[0].strip().lower()
+
+
+def _filename_extension(filename: str) -> str:
+    name = filename.lower().strip().replace("\\", "/").split("/")[-1]
+    if "." not in name:
+        return ""
+    return f".{name.rsplit('.', 1)[-1]}"
 
 
 def _serialize_attachments(media_urls: tuple[str, ...] | list[str], content_types: tuple[str, ...] | list[str]) -> list[dict[str, str]]:

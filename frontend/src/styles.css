@@ -228,6 +228,11 @@ button {
   color: #a3352c;
 }
 
+.status-submitted {
+  background: #dff5e8;
+  color: #17633b;
+}
+
 .public-proof-preview {
   background: #f8fafc;
   border: 1px solid #d9e1ec;
@@ -299,6 +304,121 @@ button {
   display: grid;
   gap: 16px;
   padding-top: 22px;
+}
+
+.public-asset-dropzone {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px dashed #b9c8db;
+  border-radius: 8px;
+  color: #475366;
+  cursor: pointer;
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  min-height: 160px;
+  padding: 22px;
+  text-align: center;
+  transition: background .16s ease, border-color .16s ease, box-shadow .16s ease;
+}
+
+.public-asset-dropzone.is-dragging-file {
+  background: var(--brand-blue-soft);
+  border-color: #7aa8dc;
+  box-shadow: inset 0 0 0 1px #7aa8dc;
+}
+
+.public-asset-dropzone input {
+  height: 1px;
+  opacity: 0;
+  position: absolute;
+  width: 1px;
+}
+
+.public-asset-dropzone-main {
+  align-items: center;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.public-asset-dropzone-main svg {
+  color: var(--brand-blue);
+}
+
+.public-asset-dropzone-main strong {
+  color: #172033;
+  font-weight: 650;
+}
+
+.public-asset-dropzone-hint {
+  color: #667085;
+  font-size: 13px;
+}
+
+.public-asset-file-list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.public-asset-file-list li {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #d9e1ec;
+  border-radius: 8px;
+  color: #344054;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  min-height: 44px;
+  min-width: 0;
+  padding: 0 10px 0 12px;
+}
+
+.public-asset-file-list li span {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.public-asset-file-list button {
+  align-items: center;
+  background: #eef1f5;
+  border: 0;
+  border-radius: 7px;
+  color: #475366;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 30px;
+  justify-content: center;
+  width: 30px;
+}
+
+.public-asset-note-field {
+  color: #475366;
+  display: grid;
+  font-weight: 560;
+  gap: 8px;
+}
+
+.public-asset-note-field textarea {
+  border: 1px solid #cdd5e1;
+  border-radius: 8px;
+  color: #172033;
+  font-weight: 400;
+  line-height: 1.45;
+  min-width: 0;
+  padding: 12px 14px;
+  resize: vertical;
+  width: 100%;
 }
 
 .public-proof-approve,
@@ -980,6 +1100,12 @@ button {
   color: #146a3a;
 }
 
+.conversation-asset-action {
+  background: var(--brand-blue-soft);
+  border-color: #bfd5f8;
+  color: var(--brand-blue-dark);
+}
+
 .conversation-status-action.is-close-action {
   border-color: #f4b4ad;
   color: #b42318;
@@ -1048,6 +1174,12 @@ button {
   color: #8a4b00;
 }
 
+.message-bubble.system-event.is-assets-submitted {
+  background: #eef6ff;
+  border-color: #a9cff5;
+  color: #24547e;
+}
+
 .message-bubble.system-event p {
   font-weight: 520;
   white-space: pre-wrap;
@@ -1063,6 +1195,10 @@ button {
 
 .message-bubble.system-event.is-changes-requested footer {
   color: #9a6a2f;
+}
+
+.message-bubble.system-event.is-assets-submitted footer {
+  color: #527aa3;
 }
 
 .conversation-panel.channel-whatsapp .message-bubble.outbound {
