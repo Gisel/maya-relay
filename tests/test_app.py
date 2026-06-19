@@ -2113,6 +2113,10 @@ def test_api_proof_request_uses_whatsapp_template_when_conversation_is_whatsapp(
         "content_sid": "HXproof",
         "content_variables": {"1": "Proof approval", "2": token},
     }
+    assert repository.messages[-1]["body"] == (
+        "Your proof for Proof approval is ready. Please review it using the secure Maya Graphics link below.\n\n"
+        f"Review proof: {response.json()['publicUrl']}"
+    )
     assert repository.customer_action_events[-1]["metadata"] == {
         "message_id": "message-1",
         "twilio_message_sid": "SMfake1",
@@ -2343,6 +2347,10 @@ def test_api_asset_request_uses_whatsapp_template_when_conversation_is_whatsapp(
         "content_sid": "HXassets",
         "content_variables": {"1": "Banner order", "2": token},
     }
+    assert repository.messages[-1]["body"] == (
+        "We need your files for Banner order. Please upload them using the secure Maya Graphics link below.\n\n"
+        f"Upload files: {response.json()['publicUrl']}"
+    )
     assert repository.customer_action_events[-1]["metadata"]["send_mode"] == "template"
     assert repository.customer_action_events[-1]["metadata"]["template_key"] == "assets_needed"
 

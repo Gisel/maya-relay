@@ -172,7 +172,7 @@ Features:
 - The app must respect WhatsApp's 24-hour free-form service window.
 - Approved Twilio Content templates are used for Proof and Assets action links:
   - `maya_proof_ready`: `HX7f7896c1911956f2817e11158289dc5d`
-  - `maya_assets_needed`: `HX590dbe4e79f340f2cd5cbc9ae5e42eeb`
+  - `maya_assets_needed`: `HX63099b79862bbb7dd9d608e0652aa026`
 - Railway must define `WHATSAPP_TEMPLATE_PROOF_READY_CONTENT_SID` and `WHATSAPP_TEMPLATE_ASSETS_NEEDED_CONTENT_SID` before WhatsApp action-link sends work.
 
 ### Customer Action Workflows

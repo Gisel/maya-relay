@@ -543,7 +543,7 @@ def api_create_proof_request(
         direction="employee_to_customer",
         from_phone=settings.maya_business_number,
         to_phone=conversation.customer_phone,
-        body=message_body,
+        body=send_result["body"],
         twilio_message_sid=send_result["sid"],
     )
     repository.create_customer_action_event(
@@ -625,7 +625,7 @@ def api_create_asset_request(
         direction="employee_to_customer",
         from_phone=settings.maya_business_number,
         to_phone=conversation.customer_phone,
-        body=message_body,
+        body=send_result["body"],
         twilio_message_sid=send_result["sid"],
     )
     repository.create_customer_action_event(
@@ -1422,26 +1422,32 @@ def _send_customer_action_request_message(
             body=body,
             channel=channel,
         )
-        return {"sid": sid, "metadata": {"send_mode": "free_form"}}
+        return {"sid": sid, "body": body, "metadata": {"send_mode": "free_form"}}
 
     content_sid = _customer_action_template_content_sid(settings, template_kind)
     token = _public_action_token(public_url)
+    template_title = _clean_template_value(title)
     sid = sender.send_template_message(
         to_phone=conversation.customer_phone,
         channel=channel,
         content_sid=content_sid,
         content_variables={
-            "1": _clean_template_value(title),
+            "1": template_title,
             "2": token,
         },
     )
     return {
         "sid": sid,
+        "body": _customer_action_template_timeline_body(
+            template_kind=template_kind,
+            title=template_title,
+            public_url=public_url,
+        ),
         "metadata": {
             "send_mode": "template",
             "template_key": template_kind,
             "content_sid": content_sid,
-            "content_variables": {"1": _clean_template_value(title), "2": token},
+            "content_variables": {"1": template_title, "2": token},
         },
     }
 
@@ -1474,6 +1480,23 @@ def _public_action_token(public_url: str) -> str:
 def _clean_template_value(value: str) -> str:
     cleaned = _clean_optional_text(value)
     return cleaned or "your order"
+
+
+def _customer_action_template_timeline_body(
+    *,
+    template_kind: Literal["proof_ready", "assets_needed"],
+    title: str,
+    public_url: str,
+) -> str:
+    if template_kind == "assets_needed":
+        return (
+            f"We need your files for {title}. Please upload them using the secure Maya Graphics link below.\n\n"
+            f"Upload files: {public_url}"
+        )
+    return (
+        f"Your proof for {title} is ready. Please review it using the secure Maya Graphics link below.\n\n"
+        f"Review proof: {public_url}"
+    )
 
 
 def _effective_customer_channel(channel: str | None, customer_phone: str | None) -> Literal["sms", "whatsapp"]:

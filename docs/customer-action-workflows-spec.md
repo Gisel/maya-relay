@@ -323,8 +323,10 @@ Allowed production options:
 
 Recommended future templates:
 
-- `proof_ready`: "Your proof for {{1}} is ready. Review it here: {{2}}"
-- `assets_needed`: "We need files for {{1}}. Upload them here: {{2}}"
+- `proof_ready`: "Your proof for {{1}} is ready. Please review it using the secure Maya Graphics link below." with CTA URL `https://mayagraphics.co/proof/{{2}}`
+- `assets_needed`: "We need your files for {{1}}. Please upload them using the secure Maya Graphics link below." with CTA URL `https://mayagraphics.co/assets/{{2}}`
+
+For WhatsApp CTA templates, `{{1}}` is the job/request title and `{{2}}` is the public action token only.
 
 Template management remains pending until:
 

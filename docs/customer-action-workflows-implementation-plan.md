@@ -368,11 +368,12 @@ Current implementation status as of 2026-06-19:
   - `WHATSAPP_TEMPLATE_ASSETS_NEEDED_CONTENT_SID`
 - Current Twilio templates:
   - `maya_proof_ready`: `HX7f7896c1911956f2817e11158289dc5d`
-  - `maya_assets_needed`: `HX590dbe4e79f340f2cd5cbc9ae5e42eeb`
+  - `maya_assets_needed`: `HX63099b79862bbb7dd9d608e0652aa026`
 - The call-to-action templates use variable `{{1}}` for the job/request title and variable `{{2}}` for the public action token.
 - The template URLs are configured in Twilio as:
   - `https://mayagraphics.co/proof/{{2}}`
   - `https://mayagraphics.co/assets/{{2}}`
+- The app stores a template-aware timeline body for WhatsApp sends, including the CTA URL for operator visibility. SMS continues to store and send the free-form body with the public link.
 
 If a WhatsApp action template SID is not configured, the API blocks the send with a clear configuration error instead of attempting a free-form WhatsApp send.
 
