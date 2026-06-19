@@ -1,3 +1,5 @@
+from datetime import UTC, datetime, timedelta
+
 from fastapi.testclient import TestClient
 from twilio.request_validator import RequestValidator
 
@@ -22,6 +24,10 @@ def make_client(
     openai_api_key: str = "",
     whatsapp_template_proof_ready_content_sid: str = "",
     whatsapp_template_assets_needed_content_sid: str = "",
+    whatsapp_template_new_customer_intro_content_sid: str = "",
+    whatsapp_template_quote_follow_up_content_sid: str = "",
+    whatsapp_template_pickup_reminder_content_sid: str = "",
+    whatsapp_template_payment_reminder_content_sid: str = "",
 ) -> tuple[TestClient, FakeRepository, FakeSender]:
     settings = Settings(
         FRANCISCO_PHONE="+15551234567",
@@ -41,6 +47,10 @@ def make_client(
         CUSTOMER_ACTION_TOKEN_SECRET="test-action-secret",
         WHATSAPP_TEMPLATE_PROOF_READY_CONTENT_SID=whatsapp_template_proof_ready_content_sid,
         WHATSAPP_TEMPLATE_ASSETS_NEEDED_CONTENT_SID=whatsapp_template_assets_needed_content_sid,
+        WHATSAPP_TEMPLATE_NEW_CUSTOMER_INTRO_CONTENT_SID=whatsapp_template_new_customer_intro_content_sid,
+        WHATSAPP_TEMPLATE_QUOTE_FOLLOW_UP_CONTENT_SID=whatsapp_template_quote_follow_up_content_sid,
+        WHATSAPP_TEMPLATE_PICKUP_REMINDER_CONTENT_SID=whatsapp_template_pickup_reminder_content_sid,
+        WHATSAPP_TEMPLATE_PAYMENT_REMINDER_CONTENT_SID=whatsapp_template_payment_reminder_content_sid,
     )
     repository = FakeRepository()
     sender = FakeSender()
@@ -328,7 +338,7 @@ def test_api_json_login_and_logout():
     assert "maya_admin" in logout.headers["set-cookie"]
 
 
-def test_api_quick_responses_include_whatsapp_drafts():
+def test_api_quick_responses_include_template_mapped_actions():
     client, _, _ = make_client(admin_password="secret")
 
     unauthenticated = client.get("/api/quick-responses")
@@ -341,11 +351,135 @@ def test_api_quick_responses_include_whatsapp_drafts():
     quick_responses = response.json()["quickResponses"]
     response_by_id = {item["id"]: item for item in quick_responses}
 
+    assert "proof_approval" not in response_by_id
+    assert "whatsapp_proof_ready" not in response_by_id
     assert response_by_id["missing_job_specs"]["channels"] == ["sms", "whatsapp"]
-    assert response_by_id["whatsapp_quote_follow_up"]["group"] == "whatsapp_draft"
-    assert response_by_id["whatsapp_quote_follow_up"]["channels"] == ["whatsapp"]
-    assert response_by_id["whatsapp_quote_follow_up"]["requiresActiveWindow"] is True
-    assert response_by_id["whatsapp_payment_reminder"]["body"]
+    assert response_by_id["shop_hours"]["label"] == "Shop hours"
+    assert "M-F: 9:00am - 5:30pm | SAT: By Appointment" in response_by_id["shop_hours"]["body"]
+    assert response_by_id["maya_new_customer_intro"]["templateKey"] == "new_customer_intro"
+    assert response_by_id["maya_quote_follow_up"]["group"] == "template_response"
+    assert response_by_id["maya_quote_follow_up"]["channels"] == ["sms", "whatsapp"]
+    assert response_by_id["maya_quote_follow_up"]["variables"][0]["defaultSource"] == "customer_name"
+    assert response_by_id["maya_pickup_reminder"]["templateKey"] == "pickup_reminder"
+    assert response_by_id["maya_payment_reminder"]["templateKey"] == "payment_reminder"
+
+
+def test_api_send_quick_response_uses_free_form_for_sms():
+    client, repository, sender = make_client(admin_password="secret")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    login = client.post("/api/auth/login", json={"password": "secret"})
+
+    response = client.post(
+        "/api/conversations/conversation-1/quick-responses/maya_quote_follow_up/send",
+        json={"variables": {"customer_name": "Gisel"}, "client_request_id": "quick-1"},
+        headers={"cookie": login.headers["set-cookie"]},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["sendMode"] == "free_form"
+    assert sender.sent_messages[-1] == {
+        "sid": "SMfake1",
+        "to_phone": "+15550000001",
+        "body": "Hi Gisel, following up on your quote request. Reply here with any questions or updates.",
+    }
+    assert repository.messages[-1]["client_request_id"] == "quick-1"
+
+
+def test_api_send_quick_response_uses_free_form_for_active_whatsapp_window():
+    client, repository, sender = make_client(
+        admin_password="secret",
+        whatsapp_template_quote_follow_up_content_sid="HXquote",
+    )
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+        customer_channel="whatsapp",
+    )
+    repository.create_message(
+        conversation_id="conversation-1",
+        direction="customer_to_employee",
+        from_phone="+15550000001",
+        to_phone="+15551234567",
+        body="Hi",
+    )
+    repository.messages[-1]["created_at"] = datetime.now(UTC).isoformat()
+    login = client.post("/api/auth/login", json={"password": "secret"})
+
+    response = client.post(
+        "/api/conversations/conversation-1/quick-responses/maya_quote_follow_up/send",
+        json={"variables": {"customer_name": "Gisel"}, "client_request_id": "quick-1"},
+        headers={"cookie": login.headers["set-cookie"]},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["sendMode"] == "free_form"
+    assert sender.sent_messages[-1]["channel"] == "whatsapp"
+    assert "content_sid" not in sender.sent_messages[-1]
+
+
+def test_api_send_quick_response_uses_template_for_stale_whatsapp_window():
+    client, repository, sender = make_client(
+        admin_password="secret",
+        whatsapp_template_quote_follow_up_content_sid="HXquote",
+    )
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+        customer_channel="whatsapp",
+    )
+    repository.create_message(
+        conversation_id="conversation-1",
+        direction="customer_to_employee",
+        from_phone="+15550000001",
+        to_phone="+15551234567",
+        body="Hi",
+    )
+    repository.messages[-1]["created_at"] = (datetime.now(UTC) - timedelta(hours=25)).isoformat()
+    login = client.post("/api/auth/login", json={"password": "secret"})
+
+    response = client.post(
+        "/api/conversations/conversation-1/quick-responses/maya_quote_follow_up/send",
+        json={"variables": {"customer_name": "Gisel"}, "client_request_id": "quick-1"},
+        headers={"cookie": login.headers["set-cookie"]},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["sendMode"] == "template"
+    assert response.json()["templateKey"] == "quote_follow_up"
+    assert sender.sent_messages[-1] == {
+        "sid": "SMfake1",
+        "to_phone": "+15550000001",
+        "channel": "whatsapp",
+        "content_sid": "HXquote",
+        "content_variables": {"1": "Gisel"},
+    }
+    assert repository.messages[-1]["body"] == (
+        "Hi Gisel, following up on your quote request. Reply here with any questions or updates."
+    )
+
+
+def test_api_send_quick_response_requires_template_config_outside_whatsapp_window():
+    client, repository, _ = make_client(admin_password="secret")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+        customer_channel="whatsapp",
+    )
+    login = client.post("/api/auth/login", json={"password": "secret"})
+
+    response = client.post(
+        "/api/conversations/conversation-1/quick-responses/maya_quote_follow_up/send",
+        json={"variables": {"customer_name": "Gisel"}, "client_request_id": "quick-1"},
+        headers={"cookie": login.headers["set-cookie"]},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == (
+        "WHATSAPP_TEMPLATE_QUOTE_FOLLOW_UP_CONTENT_SID must be configured before sending this WhatsApp quick response."
+    )
 
 
 def test_api_operations_status_reports_recent_message_and_call_issues():

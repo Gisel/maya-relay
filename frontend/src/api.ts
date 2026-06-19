@@ -135,9 +135,21 @@ export type QuickResponse = {
   id: string;
   label: string;
   body: string;
-  group?: "quick_response" | "whatsapp_draft" | string;
+  bodyTemplate?: string;
+  group?: "quick_response" | "template_response" | "whatsapp_draft" | string;
   channels?: Channel[];
   requiresActiveWindow?: boolean;
+  templateKey?: string;
+  variables?: QuickResponseVariable[];
+};
+
+export type QuickResponseVariable = {
+  key: string;
+  label: string;
+  placeholder?: string;
+  required?: boolean;
+  defaultValue?: string;
+  defaultSource?: "customer_name" | string;
 };
 
 export type CustomerActionRequest = {
@@ -448,6 +460,26 @@ export function sendReply(conversationId: string, body: string, files: File[], c
     method: "POST",
     body: form,
   });
+}
+
+export function sendQuickResponse(
+  conversationId: string,
+  quickResponseId: string,
+  payload: {
+    variables?: Record<string, string>;
+    clientRequestId: string;
+  },
+) {
+  return request<ReplyResponse & { sendMode?: string; templateKey?: string | null; contentSid?: string | null }>(
+    `/api/conversations/${conversationId}/quick-responses/${quickResponseId}/send`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        variables: payload.variables || {},
+        client_request_id: payload.clientRequestId,
+      }),
+    },
+  );
 }
 
 export function createProofRequest(

@@ -4,7 +4,7 @@ import { Channel, QuickResponse } from "../api";
 type QuickResponsesPanelProps = {
   channel: Channel;
   responses: QuickResponse[];
-  onUseResponse: (body: string) => void;
+  onUseResponse: (response: QuickResponse) => void;
   variant?: "section" | "embedded";
 };
 
@@ -30,7 +30,7 @@ function responseIcon(response: QuickResponse, index: number) {
 export function QuickResponsesPanel({ channel, responses, onUseResponse, variant = "section" }: QuickResponsesPanelProps) {
   const availableResponses = responses.filter((response) => {
     const group = responseGroup(response);
-    return (group === "quick_response" || group === "whatsapp_draft") && channelAllows(response, channel);
+    return (group === "quick_response" || group === "template_response" || group === "whatsapp_draft") && channelAllows(response, channel);
   });
 
   const content = (
@@ -38,9 +38,10 @@ export function QuickResponsesPanel({ channel, responses, onUseResponse, variant
       {variant === "section" && <h2>Quick Responses</h2>}
       <div className="quick-responses">
         {availableResponses.map((response, index) => (
-          <button key={response.id} onClick={() => onUseResponse(response.body)} type="button">
+          <button key={response.id} onClick={() => onUseResponse(response)} type="button">
             {responseIcon(response, index)}
             <span>{response.label}</span>
+            {response.templateKey && <small>Template</small>}
           </button>
         ))}
       </div>

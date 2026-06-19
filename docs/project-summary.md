@@ -174,6 +174,13 @@ Features:
   - `maya_proof_ready`: `HX7f7896c1911956f2817e11158289dc5d`
   - `maya_assets_needed`: `HX63099b79862bbb7dd9d608e0652aa026`
 - Railway must define `WHATSAPP_TEMPLATE_PROOF_READY_CONTENT_SID` and `WHATSAPP_TEMPLATE_ASSETS_NEEDED_CONTENT_SID` before WhatsApp action-link sends work.
+- Template-aware quick responses are implemented for:
+  - `maya_new_customer_intro`
+  - `maya_quote_follow_up`
+  - `maya_pickup_reminder`
+  - `maya_payment_reminder`
+- Quick responses use free-form sends for SMS and active WhatsApp windows. For stale WhatsApp windows, mapped responses use the configured Twilio Content template.
+- Current Maya hours quick response: `Maya hours` / `M-F: 9:00am - 5:30pm | SAT: By Appointment`.
 
 ### Customer Action Workflows
 
@@ -212,10 +219,13 @@ UI action color language:
 
 Pending:
 
-- Live WhatsApp proof smoke test inside a fresh 24-hour WhatsApp service window.
-- Approved WhatsApp template send path for proof/assets links is implemented locally; deployment and live smoke are pending.
-- Pending request visibility/cancel UI is implemented locally and awaits verification/deployment.
+- Twilio/Meta approval for business-initiated `maya_proof_ready` and `maya_assets_needed`.
+- True older-than-24-hours WhatsApp smoke test for Proof and Assets after approval.
+- Live smoke test template-aware quick responses inside and outside the WhatsApp 24-hour window.
 - Retry UI for failed customer-action sends remains pending.
+- Asset/proof retention and deletion remains pending.
+- Auth hardening remains pending.
+- AI suggested reply strengthening remains pending.
 - Formal frontend/e2e automation for proof and assets flows.
 
 ### React Operator Inbox

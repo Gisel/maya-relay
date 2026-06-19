@@ -526,29 +526,38 @@ Validation plan:
 
 ## WhatsApp Templates Production Slice
 
-### Slice W1: Quick Template Drafts For Active Windows
+### Slice W1: Template-Aware Quick Responses
 
 Feature goal:
 
-Give operators reusable WhatsApp/SMS reply drafts without pretending we have full WhatsApp business-initiated template management.
+Give operators reusable quick responses that choose free-form or Twilio Content template sends according to channel and WhatsApp 24-hour window state.
 
 In scope:
 
-- Add quick template drafts:
+- Clean quick response list:
+  - request missing job specs
+  - shop hours
+  - new customer intro
   - quote follow-up
-  - proof ready
   - pickup reminder
   - payment reminder
-- Insert selected draft into the composer.
-- Use only inside active customer conversations.
-- Make clear these are drafts, not Twilio-approved outbound templates.
+- Remove proof-related quick responses because Proof is a dedicated customer-action workflow.
+- Add template mappings:
+  - `maya_new_customer_intro`
+  - `maya_quote_follow_up`
+  - `maya_pickup_reminder`
+  - `maya_payment_reminder`
+- SMS sends use free-form text.
+- WhatsApp inside an active 24-hour window uses free-form text.
+- WhatsApp outside the active 24-hour window uses the mapped Twilio Content template.
+- Add a focused confirmation modal for template-aware responses and required variables.
 
 Out of scope:
 
 - Twilio template approval tooling.
-- Business-initiated WhatsApp sends outside the 24-hour service window.
-- Template usage tracking.
 - Template editor/management UI.
+- General composer template conversion.
+- Retry UI for failed sends.
 
 Data contract:
 
@@ -558,35 +567,41 @@ Data contract:
 API contract:
 
 - Existing `GET /api/quick-responses` may be extended.
-- Response should distinguish quick replies/drafts from approved WhatsApp templates if needed:
+- Add `POST /api/conversations/{conversation_id}/quick-responses/{quick_response_id}/send`.
+- Response should distinguish plain quick replies from template-aware responses:
   - `id`
   - `label`
   - `body`
   - `channels`
-  - `kind`
+  - `group`
+  - `templateKey`
+  - `variables`
 
 UI contract:
 
-- Drafts appear in the existing quick responses area.
-- Selecting a draft fills the composer; it does not auto-send.
-- Operator can edit before sending.
+- Plain quick responses continue to fill the composer.
+- Template-aware quick responses open a small confirmation modal.
+- Variable fields prefill from selected customer context when possible.
+- Mobile layout must keep the modal within the viewport and make the send action reachable.
 
 Tests:
 
-- API test for quick response payload if backend changes.
-- Frontend/e2e test that selecting a draft fills composer without sending.
+- API tests for quick response payload, SMS free-form send, WhatsApp active-window free-form send, WhatsApp stale-window template send, and missing template config.
+- Frontend build must pass.
+- Formal frontend/e2e tests remain a future hardening item.
 
 Risks:
 
-- Users may confuse drafts with approved WhatsApp templates.
+- Twilio templates must have variable shapes that match the app mapping.
 - WhatsApp 24-hour window rules must not be bypassed.
 
 Acceptance criteria:
 
-- Drafts are visible.
-- Selecting each draft fills composer text.
-- Nothing sends automatically.
-- Existing SMS and WhatsApp send flows remain unchanged.
+- Cleaned quick response list appears in the right panel.
+- Plain responses still fill the composer.
+- Template-aware responses can be sent from the confirmation modal.
+- Older-than-24-hour WhatsApp mapped responses use `ContentSid`.
+- Existing composer, Proof, Assets, Calls, Requests, and AI Suggested Reply behavior remain intact.
 
 ## Observability Production Slice
 

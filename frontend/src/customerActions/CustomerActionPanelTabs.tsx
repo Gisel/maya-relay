@@ -7,7 +7,7 @@ type CustomerActionPanelTabsProps = {
   cancelingRequestId?: string;
   channel: Channel;
   onCancelRequest: (requestId: string) => void;
-  onUseResponse: (body: string) => void;
+  onUseResponse: (response: QuickResponse) => void;
   requests: CustomerActionRequest[];
   responses: QuickResponse[];
 };

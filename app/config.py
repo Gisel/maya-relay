@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     francisco_phone: str = Field(default="", alias="FRANCISCO_PHONE")
     employee_phone_numbers: str = Field(default="", alias="EMPLOYEE_PHONE_NUMBERS")
     business_hours_text: str = Field(
-        default="Monday-Friday 9:00 AM-6:00 PM. Saturday is by appointment.",
+        default="M-F: 9:00am - 5:30pm | SAT: By Appointment",
         alias="BUSINESS_HOURS_TEXT",
     )
 

@@ -51,6 +51,7 @@ import {
   importContactsCsv,
   login,
   logout,
+  sendQuickResponse,
   sendReply,
   startNewCall,
   transcribeCall,
@@ -70,6 +71,7 @@ import { AssetsRequestModal } from "./customerActions/AssetsRequestModal";
 import { CustomerActionPanelTabs } from "./customerActions/CustomerActionPanelTabs";
 import { ProofActionButton } from "./customerActions/ProofActionButton";
 import { ProofRequestModal } from "./customerActions/ProofRequestModal";
+import { QuickResponseSendModal } from "./messaging/QuickResponseSendModal";
 import { UnifiedSearchResults } from "./search/UnifiedSearchResults";
 import { ContactCsvImport } from "./settings/ContactCsvImport";
 import { OperationalStatusView } from "./settings/OperationalStatusView";
@@ -719,6 +721,9 @@ export function App() {
   const [isSendingAssetsRequest, setIsSendingAssetsRequest] = useState(false);
   const [assetsRequestError, setAssetsRequestError] = useState("");
   const [cancelingCustomerActionId, setCancelingCustomerActionId] = useState("");
+  const [selectedQuickResponse, setSelectedQuickResponse] = useState<QuickResponse | null>(null);
+  const [isSendingQuickResponse, setIsSendingQuickResponse] = useState(false);
+  const [quickResponseError, setQuickResponseError] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<ConversationStatusFilter>("open");
   const [draft, setDraft] = useState("");
@@ -1472,6 +1477,44 @@ export function App() {
     }
   }
 
+  function handleUseQuickResponse(response: QuickResponse) {
+    setQuickResponseError("");
+    if (response.templateKey) {
+      setSelectedQuickResponse(response);
+      return;
+    }
+    setDraft(response.body);
+  }
+
+  async function handleSendQuickResponse(variables: Record<string, string>) {
+    if (!selectedId || !selectedQuickResponse) return;
+    setIsSendingQuickResponse(true);
+    setQuickResponseError("");
+    setAppError("");
+    try {
+      const response = await sendQuickResponse(selectedId, selectedQuickResponse.id, {
+        variables,
+        clientRequestId: newClientRequestId(),
+      });
+      setMessages((current) => {
+        const withoutDuplicate = current.filter((message) => message.id !== response.message.id);
+        return [...withoutDuplicate, response.message];
+      });
+      setCallStatus("Quick response sent.");
+      setSelectedQuickResponse(null);
+      await refreshDetail(selectedId, { force: true });
+      await loadConversations(selectedId);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setIsAuthenticated(false);
+      } else {
+        setQuickResponseError(error instanceof Error ? error.message : "Could not send the quick response.");
+      }
+    } finally {
+      setIsSendingQuickResponse(false);
+    }
+  }
+
   async function handleSendProofRequest(payload: {
     proofFile: File;
     title: string;
@@ -2189,7 +2232,7 @@ export function App() {
             cancelingRequestId={cancelingCustomerActionId}
             channel={channel}
             onCancelRequest={handleCancelCustomerAction}
-            onUseResponse={setDraft}
+            onUseResponse={handleUseQuickResponse}
             requests={customerActions}
             responses={quickResponses}
           />
@@ -2238,6 +2281,18 @@ export function App() {
         }}
         onSend={handleSendAssetsRequest}
         open={isAssetsRequestOpen}
+      />
+      <QuickResponseSendModal
+        customerName={contextCustomerName}
+        error={quickResponseError}
+        isSending={isSendingQuickResponse}
+        onClose={() => {
+          if (isSendingQuickResponse) return;
+          setQuickResponseError("");
+          setSelectedQuickResponse(null);
+        }}
+        onSend={handleSendQuickResponse}
+        response={selectedQuickResponse}
       />
       <SettingsModal onClose={() => setIsSettingsOpen(false)} open={isSettingsOpen}>
         <OperationalStatusView />

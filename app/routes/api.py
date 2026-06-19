@@ -2,13 +2,14 @@ import hmac
 import logging
 import mimetypes
 import time
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 from urllib.parse import urlparse
 
 import requests
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.ai_triage import _extract_response_text
 from app.attachments import AttachmentStore, StoredAttachment, UploadedAttachment
@@ -116,6 +117,11 @@ class ProofRequestApproval(BaseModel):
     comment: str | None = None
 
 
+class QuickResponseSendRequest(BaseModel):
+    variables: dict[str, str] = Field(default_factory=dict)
+    client_request_id: str | None = None
+
+
 class LoginRequest(BaseModel):
     password: str
 
@@ -200,72 +206,143 @@ def api_quick_responses(
     settings: Settings = Depends(get_settings),
 ) -> dict[str, list[dict[str, Any]]]:
     require_admin(request, settings)
-    return {
-        "quickResponses": [
-            {
-                "id": "missing_job_specs",
-                "label": "Request missing job specs",
-                "body": (
-                    "Thanks. Can you send the size, quantity, material/finish, "
-                    "artwork status, and when you need it?"
-                ),
-                "group": "quick_response",
-                "channels": ["sms", "whatsapp"],
-            },
-            {
-                "id": "proof_approval",
-                "label": "Send standard proof approval request",
-                "body": "Please review the proof and reply approved or send any changes needed.",
-                "group": "quick_response",
-                "channels": ["sms", "whatsapp"],
-            },
-            {
-                "id": "shop_hours",
-                "label": "Provide shop hours and pickup info",
-                "body": f"We are open {settings.business_hours_text}",
-                "group": "quick_response",
-                "channels": ["sms", "whatsapp"],
-            },
-            {
-                "id": "whatsapp_quote_follow_up",
-                "label": "Quote follow-up",
-                "body": (
-                    "Hi - following up on your quote request. Please send size, quantity, "
-                    "material/finish, artwork status, and deadline so we can confirm pricing."
-                ),
-                "group": "whatsapp_draft",
-                "channels": ["whatsapp"],
-                "requiresActiveWindow": True,
-            },
-            {
-                "id": "whatsapp_proof_ready",
-                "label": "Proof ready",
-                "body": "Your proof is ready for review. Please reply approved or send any changes needed.",
-                "group": "whatsapp_draft",
-                "channels": ["whatsapp"],
-                "requiresActiveWindow": True,
-            },
-            {
-                "id": "whatsapp_pickup_reminder",
-                "label": "Pickup reminder",
-                "body": f"Your order is ready for pickup. We are open {settings.business_hours_text}",
-                "group": "whatsapp_draft",
-                "channels": ["whatsapp"],
-                "requiresActiveWindow": True,
-            },
-            {
-                "id": "whatsapp_payment_reminder",
-                "label": "Payment reminder",
-                "body": (
-                    "Your order is ready. Please complete payment before pickup. "
-                    "Let us know if you need the payment link resent."
-                ),
-                "group": "whatsapp_draft",
-                "channels": ["whatsapp"],
-                "requiresActiveWindow": True,
-            },
-        ]
-    }
+    return {"quickResponses": _quick_response_payloads(settings)}
+
+
+def _quick_response_payloads(settings: Settings) -> list[dict[str, Any]]:
+    return [_public_quick_response(response) for response in _quick_response_definitions(settings)]
+
+
+def _quick_response_by_id(settings: Settings, quick_response_id: str) -> dict[str, Any] | None:
+    return next(
+        (response for response in _quick_response_definitions(settings) if response["id"] == quick_response_id),
+        None,
+    )
+
+
+def _quick_response_definitions(settings: Settings) -> list[dict[str, Any]]:
+    hours = settings.business_hours_text.strip() or "M-F: 9:00am - 5:30pm | SAT: By Appointment"
+    return [
+        {
+            "id": "missing_job_specs",
+            "label": "Request missing job specs",
+            "bodyTemplate": (
+                "Thanks. Can you send the size, quantity, material/finish, artwork status, "
+                "and when you need it?"
+            ),
+            "group": "quick_response",
+            "channels": ["sms", "whatsapp"],
+        },
+        {
+            "id": "shop_hours",
+            "label": "Shop hours",
+            "bodyTemplate": f"Maya hours\n{hours}",
+            "group": "quick_response",
+            "channels": ["sms", "whatsapp"],
+        },
+        {
+            "id": "maya_new_customer_intro",
+            "label": "New customer intro",
+            "bodyTemplate": (
+                "Thanks for contacting Maya Graphics. Tell us what you need printed, "
+                "the size, quantity, deadline, and whether you already have artwork."
+            ),
+            "group": "template_response",
+            "channels": ["sms", "whatsapp"],
+            "templateKey": "new_customer_intro",
+            "variables": [],
+        },
+        {
+            "id": "maya_quote_follow_up",
+            "label": "Quote follow-up",
+            "bodyTemplate": (
+                "Hi {customer_name}, following up on your quote request. "
+                "Reply here with any questions or updates."
+            ),
+            "group": "template_response",
+            "channels": ["sms", "whatsapp"],
+            "templateKey": "quote_follow_up",
+            "variables": [
+                {
+                    "key": "customer_name",
+                    "label": "Customer name",
+                    "placeholder": "Customer name",
+                    "required": True,
+                    "defaultValue": "there",
+                    "defaultSource": "customer_name",
+                    "contentIndex": "1",
+                }
+            ],
+        },
+        {
+            "id": "maya_pickup_reminder",
+            "label": "Pickup reminder",
+            "bodyTemplate": "Your order for {order_name} is ready for pickup.",
+            "group": "template_response",
+            "channels": ["sms", "whatsapp"],
+            "templateKey": "pickup_reminder",
+            "variables": [
+                {
+                    "key": "order_name",
+                    "label": "Order name",
+                    "placeholder": "Business cards",
+                    "required": True,
+                    "defaultValue": "your order",
+                    "contentIndex": "1",
+                }
+            ],
+        },
+        {
+            "id": "maya_payment_reminder",
+            "label": "Payment reminder",
+            "bodyTemplate": (
+                "Your order is ready. Please complete payment before pickup. "
+                "Let us know if you need the payment link resent."
+            ),
+            "group": "template_response",
+            "channels": ["sms", "whatsapp"],
+            "templateKey": "payment_reminder",
+            "variables": [],
+        },
+    ]
+
+
+def _public_quick_response(response: dict[str, Any]) -> dict[str, Any]:
+    public_response = dict(response)
+    public_response["body"] = _render_quick_response_body(response, {})
+    return public_response
+
+
+def _quick_response_variables(response: dict[str, Any], submitted_variables: dict[str, str]) -> dict[str, str]:
+    variables: dict[str, str] = {}
+    for variable in response.get("variables", []):
+        key = str(variable["key"])
+        value = _clean_optional_text(submitted_variables.get(key))
+        if not value:
+            value = str(variable.get("defaultValue") or "")
+        if variable.get("required") and not value:
+            raise HTTPException(status_code=400, detail=f"{variable['label']} is required.")
+        variables[key] = value
+    return variables
+
+
+def _render_quick_response_body(response: dict[str, Any], variables: dict[str, str]) -> str:
+    body = str(response.get("bodyTemplate") or "")
+    for variable in response.get("variables", []):
+        key = str(variable["key"])
+        value = variables.get(key) or str(variable.get("defaultValue") or "")
+        body = body.replace("{" + key + "}", value)
+    return body
+
+
+def _quick_response_content_variables(response: dict[str, Any], variables: dict[str, str]) -> dict[str, str]:
+    content_variables: dict[str, str] = {}
+    for variable in response.get("variables", []):
+        content_index = str(variable.get("contentIndex") or "")
+        if content_index:
+            key = str(variable["key"])
+            content_variables[content_index] = variables.get(key) or str(variable.get("defaultValue") or "")
+    return content_variables
 
 
 @router.get("/operations/status")
@@ -895,6 +972,76 @@ def api_send_conversation_reply(
     return {"status": "sent", "message": _serialize_message(created_message)}
 
 
+@router.post("/conversations/{conversation_id}/quick-responses/{quick_response_id}/send")
+def api_send_quick_response(
+    conversation_id: str,
+    quick_response_id: str,
+    payload: QuickResponseSendRequest,
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    repository: RelayRepository = Depends(get_repository),
+    sender: MessageSender = Depends(get_sender),
+) -> dict[str, Any]:
+    require_admin(request, settings)
+    conversation = repository.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404)
+
+    quick_response = _quick_response_by_id(settings, quick_response_id)
+    if quick_response is None:
+        raise HTTPException(status_code=404, detail="Quick response not found.")
+
+    normalized_client_request_id = (payload.client_request_id or "").strip() or None
+    if normalized_client_request_id:
+        existing = repository.get_message_by_client_request_id(
+            conversation_id=conversation.id,
+            client_request_id=normalized_client_request_id,
+        )
+        if existing is not None:
+            return {"status": "duplicate", "message": _serialize_message(existing)}
+
+    channel = _effective_customer_channel(conversation.customer_channel, conversation.customer_phone)
+    variables = _quick_response_variables(quick_response, payload.variables)
+    body = _render_quick_response_body(quick_response, variables)
+    template_key = quick_response.get("templateKey")
+    use_template = bool(template_key) and channel == "whatsapp" and not _has_active_whatsapp_window(repository, conversation.id)
+
+    if use_template:
+        content_sid = _quick_response_template_content_sid(settings, str(template_key))
+        outbound_sid = sender.send_template_message(
+            to_phone=conversation.customer_phone,
+            channel="whatsapp",
+            content_sid=content_sid,
+            content_variables=_quick_response_content_variables(quick_response, variables),
+        )
+        send_mode = "template"
+    else:
+        outbound_sid = sender.send_message(
+            to_phone=conversation.customer_phone,
+            body=body,
+            channel=channel,
+        )
+        content_sid = None
+        send_mode = "free_form"
+
+    created_message = repository.create_message(
+        conversation_id=conversation.id,
+        direction="employee_to_customer",
+        from_phone=settings.maya_business_number,
+        to_phone=conversation.customer_phone,
+        body=body,
+        twilio_message_sid=outbound_sid,
+        client_request_id=normalized_client_request_id,
+    )
+    return {
+        "status": "sent",
+        "sendMode": send_mode,
+        "templateKey": template_key if use_template else None,
+        "contentSid": content_sid,
+        "message": _serialize_message(created_message),
+    }
+
+
 @router.post("/conversations/{conversation_id}/call")
 def api_call_conversation_customer(
     conversation_id: str,
@@ -1470,6 +1617,34 @@ def _customer_action_template_content_sid(settings: Settings, template_kind: str
     )
 
 
+def _quick_response_template_content_sid(settings: Settings, template_key: str) -> str:
+    template_config = {
+        "new_customer_intro": (
+            settings.whatsapp_template_new_customer_intro_content_sid.strip(),
+            "WHATSAPP_TEMPLATE_NEW_CUSTOMER_INTRO_CONTENT_SID",
+        ),
+        "quote_follow_up": (
+            settings.whatsapp_template_quote_follow_up_content_sid.strip(),
+            "WHATSAPP_TEMPLATE_QUOTE_FOLLOW_UP_CONTENT_SID",
+        ),
+        "pickup_reminder": (
+            settings.whatsapp_template_pickup_reminder_content_sid.strip(),
+            "WHATSAPP_TEMPLATE_PICKUP_REMINDER_CONTENT_SID",
+        ),
+        "payment_reminder": (
+            settings.whatsapp_template_payment_reminder_content_sid.strip(),
+            "WHATSAPP_TEMPLATE_PAYMENT_REMINDER_CONTENT_SID",
+        ),
+    }
+    content_sid, template_label = template_config.get(template_key, ("", "WhatsApp quick response template Content SID"))
+    if content_sid:
+        return content_sid
+    raise HTTPException(
+        status_code=503,
+        detail=f"{template_label} must be configured before sending this WhatsApp quick response.",
+    )
+
+
 def _public_action_token(public_url: str) -> str:
     parsed = urlparse(public_url)
     path = parsed.path.rstrip("/")
@@ -1480,6 +1655,37 @@ def _public_action_token(public_url: str) -> str:
 def _clean_template_value(value: str) -> str:
     cleaned = _clean_optional_text(value)
     return cleaned or "your order"
+
+
+def _has_active_whatsapp_window(repository: RelayRepository, conversation_id: str) -> bool:
+    latest_inbound = next(
+        (
+            message
+            for message in reversed(repository.list_messages_for_conversation(conversation_id, limit=100))
+            if message.get("direction") == "customer_to_employee"
+        ),
+        None,
+    )
+    if latest_inbound is None:
+        return False
+
+    created_at = _parse_iso_datetime(str(latest_inbound.get("created_at") or ""))
+    if created_at is None:
+        return False
+    return datetime.now(UTC) - created_at < timedelta(hours=24)
+
+
+def _parse_iso_datetime(value: str) -> datetime | None:
+    if not value:
+        return None
+    normalized = value.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 def _customer_action_template_timeline_body(
