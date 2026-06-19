@@ -58,9 +58,12 @@ The conversation code is required while Francisco stays in a native SMS app, bec
 - AI does not auto-reply to customers.
 - The relay fails open if the AI call fails.
 - AI knows Maya has one location.
-- Office hours: Monday-Friday 9:00 AM-6:00 PM.
+- Office hours: Monday-Friday 9:00 AM-5:30 PM.
 - Saturday is by appointment only.
 - Suggested replies include the conversation code for easier copy/paste.
+- The operator dashboard now refreshes the AI Suggested Reply panel live when the latest visible message is from the customer.
+- Live dashboard suggestions use the last 6 visible customer/operator messages as context and ignore internal system relay messages.
+- If the latest visible message is from Maya/operator, the dashboard clears the suggestion instead of generating another reply.
 
 ### Voice System
 
@@ -181,6 +184,7 @@ Features:
   - `maya_payment_reminder`
 - Quick responses use free-form sends for SMS and active WhatsApp windows. For stale WhatsApp windows, mapped responses use the configured Twilio Content template.
 - Current Maya hours quick response: `Maya hours` / `M-F: 9:00am - 5:30pm | SAT: By Appointment`.
+- The operator quick response list has been cleaned to remove duplicate proof-related actions. Proof and Assets now remain dedicated customer-action workflows.
 
 ### Customer Action Workflows
 
@@ -209,6 +213,14 @@ Current Assets status:
 - Maya Relay shows `Assets uploaded by customer` in the conversation timeline with the uploaded files attached.
 - SMS and WhatsApp asset request flows have been live-smoke tested.
 
+Current operator request visibility:
+
+- The right details panel has `Quick Responses` and `Requests` tabs.
+- The `Requests` tab shows recent Proof and Assets requests for the selected conversation.
+- Pending requests are highlighted and can be canceled.
+- Pending same-type Proof or Assets requests block duplicate sends until canceled or completed.
+- Canceling records a durable `canceled` customer-action event.
+
 UI action color language:
 
 - `Open`: status green.
@@ -225,8 +237,8 @@ Pending:
 - Retry UI for failed customer-action sends remains pending.
 - Asset/proof retention and deletion remains pending.
 - Auth hardening remains pending.
-- AI suggested reply strengthening remains pending.
-- Formal frontend/e2e automation for proof and assets flows.
+- AI behavior should be monitored in production after the live-refresh fix; broader AI auto-response remains out of scope.
+- Formal frontend/e2e automation for public proof and assets flows remains pending.
 
 ### React Operator Inbox
 

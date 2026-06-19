@@ -6,7 +6,7 @@ Source spec: `docs/customer-action-workflows-spec.md`
 
 This plan turns the Proof and Assets customer-action workflow into implementation slices. The first build target is Proof. Assets must reuse the same foundation and should not require replacing the Proof work later.
 
-## Slice Status As Of 2026-06-18
+## Slice Status As Of 2026-06-19
 
 Proof approval is implemented and live-smoke tested for the SMS path.
 
@@ -30,11 +30,10 @@ Verified:
 
 Not done yet:
 
-- WhatsApp template send path for proof links outside the 24-hour service window.
-- Live WhatsApp proof smoke test inside a fresh 24-hour conversation.
-- Formal frontend/e2e automation; no frontend Playwright script exists yet.
-- Admin list/cancel/retry UI for pending customer-action requests.
-- Assets workflow.
+- Twilio/Meta approval confirmation for `maya_proof_ready`.
+- True older-than-24-hours WhatsApp proof smoke test after approval.
+- Formal frontend/e2e automation for the public Proof page.
+- Retry UI for failed customer-action sends.
 
 ## Assets Slice Status As Of 2026-06-18
 
@@ -57,8 +56,9 @@ Implemented:
 
 Verified locally:
 
-- `.venv/bin/python -m pytest`: 140 passed.
+- `.venv/bin/python -m pytest`: 154 passed after the current dashboard/AI updates.
 - `npm --workspace frontend run build`: passed.
+- `npm run test:e2e`: 42 mobile Playwright tests passed for the operator app.
 
 Verified in production:
 
@@ -67,13 +67,15 @@ Verified in production:
 - Uploaded assets appeared in the Maya Relay conversation.
 - Live WhatsApp asset request worked inside an active 24-hour WhatsApp conversation.
 
-Pending before calling the Assets slice production-ready:
+Pending before calling the broader Assets WhatsApp template path production-ready:
 
-- Formal frontend/e2e automation; no frontend Playwright script exists yet.
+- Twilio/Meta approval confirmation for `maya_assets_needed`.
+- True older-than-24-hours WhatsApp Assets smoke test after approval.
+- Formal frontend/e2e automation for the public Assets page.
 
 ## Pending Request Visibility Slice Status As Of 2026-06-19
 
-Implemented locally:
+Implemented, tested, committed, and pushed:
 
 - Conversation detail responses already include recent `customerActions`; the React app now stores that list in state.
 - The right details panel now has a compact `Quick Responses` / `Requests` tab set.
@@ -84,11 +86,17 @@ Implemented locally:
 - Backend cancel endpoint added: `POST /api/customer-actions/{request_id}/cancel`.
 - Cancel transitions only allow `pending -> canceled` and record a `canceled` customer-action event.
 
-Pending verification:
+Verified:
 
-- Backend test suite.
-- Frontend production build.
-- Live production smoke after deployment.
+- Backend test suite passed.
+- Frontend production build passed.
+- Mobile Playwright tests passed.
+- Live production interaction showed request visibility and cancel state.
+
+Pending:
+
+- Retry UI for failed sends remains pending.
+- Canceling a request does not clear a previously failed outbound message's `undelivered` status; this is a separate message-status history concern.
 
 ## Scope Guardrails
 

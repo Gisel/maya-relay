@@ -489,7 +489,7 @@ Current status:
 - Frontend build passes.
 - Live SMS and WhatsApp smoke passed.
 - Live acceptance criteria passed for the declared Assets scope.
-- Formal frontend/e2e automation remains pending because the frontend package has no Playwright script yet.
+- Mobile operator-app Playwright coverage exists and passes; formal public `/assets/{token}` e2e coverage remains pending.
 
 In scope:
 
@@ -531,6 +531,25 @@ Validation plan:
 Feature goal:
 
 Give operators reusable quick responses that choose free-form or Twilio Content template sends according to channel and WhatsApp 24-hour window state.
+
+Current status as of 2026-06-19:
+
+- Implemented, tested locally, committed, and pushed.
+- Quick response list has been cleaned to:
+  - request missing job specs
+  - shop hours
+  - new customer intro
+  - quote follow-up
+  - pickup reminder
+  - payment reminder
+- Proof-related quick responses were removed because Proof and Assets are now dedicated customer-action workflows.
+- Template-aware quick responses open a focused confirmation modal and prefill known customer variables.
+- SMS and active-window WhatsApp sends use free-form text.
+- Stale WhatsApp conversations use configured Twilio Content templates when a mapped template exists.
+- Backend tests passed with 151 tests at implementation time.
+- Frontend build passed.
+- Mobile Playwright coverage was added and passed with 42 tests.
+- Pending live verification: production smoke for template-aware quick responses inside and outside the WhatsApp 24-hour window after template approval/configuration is stable.
 
 In scope:
 
@@ -602,6 +621,67 @@ Acceptance criteria:
 - Template-aware responses can be sent from the confirmation modal.
 - Older-than-24-hour WhatsApp mapped responses use `ContentSid`.
 - Existing composer, Proof, Assets, Calls, Requests, and AI Suggested Reply behavior remain intact.
+
+### Slice W2: Proof And Assets WhatsApp Action Templates
+
+Feature goal:
+
+Allow Proof and Assets customer-action links to send through approved WhatsApp templates outside the 24-hour service window.
+
+Current status as of 2026-06-19:
+
+- Backend send path is implemented for Proof and Assets action-link templates.
+- Production Railway variables have been added for the core action templates:
+  - `WHATSAPP_TEMPLATE_PROOF_READY_CONTENT_SID`
+  - `WHATSAPP_TEMPLATE_ASSETS_NEEDED_CONTENT_SID`
+- Current Twilio template SIDs:
+  - `maya_proof_ready`: `HX7f7896c1911956f2817e11158289dc5d`
+  - `maya_assets_needed`: `HX63099b79862bbb7dd9d608e0652aa026`
+- The Assets template was recreated after a Twilio variable-placement issue and Railway was updated to the new SID.
+- Railway deployment succeeded after the sender/template-send fix.
+- Pending: Twilio/Meta approval and true older-than-24-hours WhatsApp smoke test.
+
+Acceptance criteria:
+
+- Proof request sent to an older-than-24-hours WhatsApp conversation uses the approved `maya_proof_ready` template and is delivered.
+- Assets request sent to an older-than-24-hours WhatsApp conversation uses the approved `maya_assets_needed` template and is delivered.
+- Timeline remains operator-readable with the public action URL visible.
+- If a required Content SID is missing, the app blocks send with a clear configuration error.
+- SMS and active-window WhatsApp action links remain unchanged.
+
+## AI Suggested Reply Slice
+
+### Slice AI1: Live Suggested Reply Refresh
+
+Feature goal:
+
+Keep the right-panel AI Suggested Reply current as customers respond, without auto-replying or using stale relay notes.
+
+Current status as of 2026-06-19:
+
+- Implemented, tested locally, committed, and pushed.
+- Added `POST /api/conversations/{conversation_id}/suggested-reply`.
+- The dashboard auto-refreshes suggestions when the latest visible message is from the customer.
+- The dashboard clears suggestions when the latest visible message is from Maya/operator.
+- A manual `Refresh` button was added to the AI Suggested Reply panel.
+- AI receives the last 6 visible customer/operator messages as context and ignores internal system messages.
+- Stale response protection prevents an in-flight suggestion from updating the wrong selected conversation.
+- Backend tests passed with 154 tests.
+- Frontend build passed.
+- Mobile Playwright tests passed with 42 tests.
+
+Out of scope:
+
+- AI auto-response.
+- Full conversation memory.
+- Job/order-aware context.
+- Automatic pricing, timeline, or policy commitments.
+
+Production watch items:
+
+- Monitor whether AI asks for details the customer already provided.
+- Keep the current 6-message context unless real production behavior shows repeated misses.
+- If needed, tune to 8-10 recent visible messages or add focused context from pending Proof/Assets requests.
 
 ## Observability Production Slice
 
@@ -708,6 +788,23 @@ These remain pending or Phase 2. Foundations are allowed, but they should not be
 - Call analytics.
 - Advanced customer tags/VIP/status.
 - Business pricing refinement.
+
+## Current Next Steps As Of 2026-06-19
+
+Immediate validation queue:
+
+- Wait for Twilio/Meta approval state to settle for `maya_proof_ready` and `maya_assets_needed`.
+- Smoke test older-than-24-hours WhatsApp Proof and Assets sends after approval.
+- Smoke test template-aware quick responses inside and outside the WhatsApp 24-hour window.
+- Monitor live AI Suggested Reply behavior with the current last-6-visible-message context.
+
+Recommended next production slices:
+
+- Asset/proof retention and deletion controls so storage only keeps live project files.
+- Retry UI for failed customer-action sends.
+- Public Proof/Assets frontend/e2e automation.
+- Auth hardening: move beyond shared `ADMIN_PASSWORD` when ready.
+- AI suggested reply refinement after enough real production examples are observed.
 
 ## Agent Usage
 

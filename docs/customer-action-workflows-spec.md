@@ -9,9 +9,9 @@ This spec defines a production-grade foundation for customer-facing action links
 
 The goal is to support SMS and WhatsApp with the same durable workflow, then add Twilio WhatsApp templates and richer buttons later without rebuilding the core system.
 
-## Current Status As Of 2026-06-18
+## Current Status As Of 2026-06-19
 
-Proof approval is implemented, committed, pushed, and live-smoke tested for SMS.
+Proof approval and Assets upload are implemented, committed, pushed, and live-smoke tested for SMS. Assets has also been live-smoke tested inside an active WhatsApp 24-hour window.
 
 Completed:
 
@@ -25,22 +25,29 @@ Completed:
 - Maya Relay conversation timeline shows customer proof decisions as internal system events.
 - `PUBLIC_BASE_URL` / request-host handling prevents localhost links in production and uses the production domain when configured.
 - Proof modal and public proof page typography have been softened after live UX testing.
+- `Assets` action, public `/assets/{token}` upload page, customer asset files, and timeline attachments are implemented.
+- Operator request visibility is implemented in the right details panel under the `Requests` tab.
+- Operators can cancel pending Proof/Assets requests, and same-type duplicate sends are blocked while a request is pending.
+- WhatsApp action-link template send support is implemented for Proof and Assets when the required Content SIDs are configured.
 
 Verified:
 
-- Backend tests: `.venv/bin/python -m pytest` passed with 137 tests.
+- Backend tests: `.venv/bin/python -m pytest` passed with 154 tests after the current dashboard/AI updates.
 - Frontend build: `npm --workspace frontend run build` passed.
+- Mobile Playwright tests: `npm run test:e2e` passed with 42 tests.
 - Live SMS proof request delivered.
 - Live public proof approval updated Maya Relay.
 - Live public change request with comment updated Maya Relay.
+- Live SMS Assets request/upload passed.
+- Live WhatsApp Assets request/upload passed inside an active 24-hour window.
 
-Pending before calling the broader Proof workflow fully production-ready:
+Pending before calling the broader WhatsApp action-link workflow fully production-ready:
 
-- Live WhatsApp proof request test inside an active 24-hour WhatsApp service window.
-- Approved WhatsApp template support for proof links outside the 24-hour window.
-- Formal frontend/e2e automation; the frontend package currently has no Playwright script.
-- Optional pending-request visibility/cancel/retry UI for operators.
-- Asset upload workflow.
+- Twilio/Meta approval confirmation for business-initiated `maya_proof_ready` and `maya_assets_needed`.
+- True older-than-24-hours WhatsApp smoke test for Proof and Assets after approval.
+- Formal frontend/e2e automation for public Proof and Assets pages remains pending.
+- Retry UI for failed sends remains pending.
+- Asset/proof retention and deletion remains pending.
 
 ## Working Rules
 
@@ -335,6 +342,17 @@ Template management remains pending until:
 - `ContentSid` is stored in config or DB.
 - Send path supports `contentSid` and `contentVariables`.
 - Production smoke test proves delivery.
+
+Current implementation note as of 2026-06-19:
+
+- Proof and Assets action-link sends already support configured Twilio Content SIDs.
+- Required Railway/env variables:
+  - `WHATSAPP_TEMPLATE_PROOF_READY_CONTENT_SID`
+  - `WHATSAPP_TEMPLATE_ASSETS_NEEDED_CONTENT_SID`
+- Current Twilio templates:
+  - `maya_proof_ready`: `HX7f7896c1911956f2817e11158289dc5d`
+  - `maya_assets_needed`: `HX63099b79862bbb7dd9d608e0652aa026`
+- Remaining blocker is live approval/delivery validation, not core backend send-path implementation.
 
 ## AI Agent Contract
 
