@@ -554,11 +554,13 @@ def test_customer_action_request_file_and_event_round_trip():
     )
 
     by_token = repository.get_customer_action_by_token_hash("token-hash-1")
+    by_id = repository.get_customer_action_request(request["id"])
     actions = repository.list_customer_actions_for_conversation("conversation-1")
     files = repository.list_customer_action_files(request["id"])
     events = repository.list_customer_action_events(request["id"])
 
     assert by_token == request
+    assert by_id == request
     assert actions == [request]
     assert files == [file_row]
     assert events == [event]

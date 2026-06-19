@@ -31,6 +31,8 @@ import {
   ContactImportResponse,
   ContactProfile,
   ContactSearchItem,
+  CustomerActionRequest,
+  cancelCustomerActionRequest,
   createAssetRequest,
   createProofRequest,
   DeliveryStatus,
@@ -65,9 +67,9 @@ import { CustomerProfileSummary } from "./customers/CustomerProfileSummary";
 import { EditCustomerProfileModal } from "./customers/EditCustomerProfileModal";
 import { AssetActionButton } from "./customerActions/AssetActionButton";
 import { AssetsRequestModal } from "./customerActions/AssetsRequestModal";
+import { CustomerActionPanelTabs } from "./customerActions/CustomerActionPanelTabs";
 import { ProofActionButton } from "./customerActions/ProofActionButton";
 import { ProofRequestModal } from "./customerActions/ProofRequestModal";
-import { QuickResponsesPanel } from "./messaging/QuickResponsesPanel";
 import { UnifiedSearchResults } from "./search/UnifiedSearchResults";
 import { ContactCsvImport } from "./settings/ContactCsvImport";
 import { OperationalStatusView } from "./settings/OperationalStatusView";
@@ -697,6 +699,7 @@ export function App() {
   const [selectedConversation, setSelectedConversation] = useState<ConversationDetail | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [calls, setCalls] = useState<CallRecord[]>([]);
+  const [customerActions, setCustomerActions] = useState<CustomerActionRequest[]>([]);
   const [selectedCallId, setSelectedCallId] = useState("");
   const [quickResponses, setQuickResponses] = useState<QuickResponse[]>([]);
   const [suggestedReply, setSuggestedReply] = useState("");
@@ -715,6 +718,7 @@ export function App() {
   const [isAssetsRequestOpen, setIsAssetsRequestOpen] = useState(false);
   const [isSendingAssetsRequest, setIsSendingAssetsRequest] = useState(false);
   const [assetsRequestError, setAssetsRequestError] = useState("");
+  const [cancelingCustomerActionId, setCancelingCustomerActionId] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<ConversationStatusFilter>("open");
   const [draft, setDraft] = useState("");
@@ -784,6 +788,14 @@ export function App() {
     [messages],
   );
   const latestVisibleMessageId = visibleMessages[visibleMessages.length - 1]?.id || "";
+  const pendingProofRequest = useMemo(
+    () => customerActions.find((request) => request.type === "proof" && request.status === "pending") || null,
+    [customerActions],
+  );
+  const pendingAssetsRequest = useMemo(
+    () => customerActions.find((request) => request.type === "assets" && request.status === "pending") || null,
+    [customerActions],
+  );
 
   const scrollMessagesToLatest = useCallback(() => {
     const messageThread = messageThreadRef.current;
@@ -851,6 +863,7 @@ export function App() {
       setSelectedConversation(null);
       setMessages([]);
       setCalls([]);
+      setCustomerActions([]);
       setSelectedCallId("");
       setSuggestedReply("");
       setCallStatus("");
@@ -862,6 +875,7 @@ export function App() {
     setSelectedConversation(null);
     setMessages([]);
     setCalls([]);
+    setCustomerActions([]);
     setSelectedCallId("");
     setSuggestedReply("");
     setCallStatus("");
@@ -870,6 +884,7 @@ export function App() {
       setSelectedConversation(payload.conversation);
       setMessages(payload.messages);
       setCalls(payload.calls || []);
+      setCustomerActions(payload.customerActions || []);
       setSuggestedReply(payload.suggestedReply || "");
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
@@ -977,6 +992,7 @@ export function App() {
       setSelectedConversation(payload.conversation);
       setMessages(payload.messages);
       setCalls(payload.calls || []);
+      setCustomerActions(payload.customerActions || []);
       setSuggestedReply(payload.suggestedReply || "");
       setDetailError("");
     } catch (error) {
@@ -1463,6 +1479,10 @@ export function App() {
     operatorNote: string;
   }) {
     if (!selectedId) return;
+    if (pendingProofRequest) {
+      setProofRequestError("Cancel the pending proof request before sending another one.");
+      return;
+    }
     setIsSendingProofRequest(true);
     setProofRequestError("");
     setAppError("");
@@ -1499,6 +1519,10 @@ export function App() {
     operatorNote: string;
   }) {
     if (!selectedId) return;
+    if (pendingAssetsRequest) {
+      setAssetsRequestError("Cancel the pending asset request before sending another one.");
+      return;
+    }
     setIsSendingAssetsRequest(true);
     setAssetsRequestError("");
     setAppError("");
@@ -1525,6 +1549,29 @@ export function App() {
       }
     } finally {
       setIsSendingAssetsRequest(false);
+    }
+  }
+
+  async function handleCancelCustomerAction(requestId: string) {
+    if (!selectedId || !requestId) return;
+    setCancelingCustomerActionId(requestId);
+    setAppError("");
+    setCallStatus("");
+    try {
+      const response = await cancelCustomerActionRequest(requestId);
+      setCustomerActions((current) =>
+        current.map((request) => (request.id === requestId ? response.customerAction : request)),
+      );
+      setCallStatus("Request canceled.");
+      await refreshDetail(selectedId, { force: true });
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setIsAuthenticated(false);
+      } else {
+        setAppError(error instanceof Error ? error.message : "Could not cancel the request.");
+      }
+    } finally {
+      setCancelingCustomerActionId("");
     }
   }
 
@@ -1986,14 +2033,14 @@ export function App() {
                 <div className="conversation-header-actions">
                   <StatusPill status={status} />
                   <ProofActionButton
-                    disabled={!selectedId || status !== "open" || isSendingProofRequest}
+                    disabled={!selectedId || status !== "open" || isSendingProofRequest || Boolean(pendingProofRequest)}
                     onClick={() => {
                       setProofRequestError("");
                       setIsProofRequestOpen(true);
                     }}
                   />
                   <AssetActionButton
-                    disabled={!selectedId || status !== "open" || isSendingAssetsRequest}
+                    disabled={!selectedId || status !== "open" || isSendingAssetsRequest || Boolean(pendingAssetsRequest)}
                     onClick={() => {
                       setAssetsRequestError("");
                       setIsAssetsRequestOpen(true);
@@ -2138,7 +2185,14 @@ export function App() {
             </div>
           </section>
 
-          <QuickResponsesPanel channel={channel} onUseResponse={setDraft} responses={quickResponses} />
+          <CustomerActionPanelTabs
+            cancelingRequestId={cancelingCustomerActionId}
+            channel={channel}
+            onCancelRequest={handleCancelCustomerAction}
+            onUseResponse={setDraft}
+            requests={customerActions}
+            responses={quickResponses}
+          />
         </aside>
       </main>
       <NewCallDrawer

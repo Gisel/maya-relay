@@ -211,7 +211,8 @@ Pending:
 
 - Live WhatsApp proof smoke test inside a fresh 24-hour WhatsApp service window.
 - Approved WhatsApp template send path for proof links outside the 24-hour service window.
-- Pending request list/cancel/retry UI for operators.
+- Pending request visibility/cancel UI is implemented locally and awaits verification/deployment.
+- Retry UI for failed customer-action sends remains pending.
 - Formal frontend/e2e automation for proof and assets flows.
 
 ### React Operator Inbox

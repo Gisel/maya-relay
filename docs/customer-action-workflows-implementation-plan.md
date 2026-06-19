@@ -71,6 +71,25 @@ Pending before calling the Assets slice production-ready:
 
 - Formal frontend/e2e automation; no frontend Playwright script exists yet.
 
+## Pending Request Visibility Slice Status As Of 2026-06-19
+
+Implemented locally:
+
+- Conversation detail responses already include recent `customerActions`; the React app now stores that list in state.
+- The right details panel now has a compact `Quick Responses` / `Requests` tab set.
+- The `Requests` tab shows recent Proof and Assets requests with type, title, status, created time, and operator note.
+- Pending requests are highlighted.
+- Operators can cancel pending requests from the `Requests` tab.
+- Same-type duplicate Proof or Assets requests are blocked while a request is still pending.
+- Backend cancel endpoint added: `POST /api/customer-actions/{request_id}/cancel`.
+- Cancel transitions only allow `pending -> canceled` and record a `canceled` customer-action event.
+
+Pending verification:
+
+- Backend test suite.
+- Frontend production build.
+- Live production smoke after deployment.
+
 ## Scope Guardrails
 
 - Additive only. Do not break existing SMS, WhatsApp, calls, AI suggested replies, quick responses, customer profile, CSV import, observability, or native reply-code flows.

@@ -171,6 +171,34 @@ def test_request_proof_changes_updates_status_and_records_comment():
     assert repository.customer_action_events[-1]["comment"] == "Please use the other logo."
 
 
+def test_cancel_request_updates_pending_request_and_records_event():
+    service, repository = build_service()
+    created = service.create_assets_request(
+        conversation_id="conversation-1",
+        title="Upload logo files",
+    )
+
+    canceled = service.cancel_request(request_id=created["request"]["id"], comment="Duplicate request.")
+
+    assert canceled["status"] == "canceled"
+    assert canceled["canceled_at"] is not None
+    assert canceled["completed_at"] is None
+    assert repository.customer_action_events[-1]["event_type"] == "canceled"
+    assert repository.customer_action_events[-1]["comment"] == "Duplicate request."
+
+
+def test_cancel_request_blocks_final_request():
+    service, _ = build_service()
+    created = service.create_proof_request(
+        conversation_id="conversation-1",
+        proof_url="https://files.example/proof.pdf",
+    )
+    service.approve_proof_request(public_token=created["public_token"])
+
+    with pytest.raises(CustomerActionStateError):
+        service.cancel_request(request_id=created["request"]["id"])
+
+
 def test_unknown_token_is_not_found():
     service, _ = build_service()
 

@@ -490,6 +490,12 @@ export function createAssetRequest(
   });
 }
 
+export function cancelCustomerActionRequest(requestId: string) {
+  return request<{ customerAction: CustomerActionRequest }>(`/api/customer-actions/${requestId}/cancel`, {
+    method: "POST",
+  });
+}
+
 export function getPublicProofRequest(token: string) {
   return request<PublicProofRequestResponse>(`/api/proof/${encodeURIComponent(token)}`);
 }

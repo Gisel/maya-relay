@@ -657,6 +657,23 @@ def api_public_assets_request(
     return {"assetRequest": _serialize_public_customer_action(result)}
 
 
+@router.post("/customer-actions/{request_id}/cancel")
+def api_cancel_customer_action_request(
+    request_id: str,
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    service: CustomerActionService = Depends(get_customer_action_service),
+) -> dict[str, Any]:
+    require_admin(request, settings)
+    try:
+        request_row = service.cancel_request(request_id=request_id)
+    except CustomerActionNotFound as exc:
+        raise HTTPException(status_code=404) from exc
+    except CustomerActionStateError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"customerAction": _serialize_customer_action_request(request_row)}
+
+
 @router.post("/assets/{public_token}/submit")
 def api_submit_public_assets(
     public_token: str,

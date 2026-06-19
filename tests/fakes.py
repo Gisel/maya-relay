@@ -722,6 +722,12 @@ class FakeRepository:
                 return request
         return None
 
+    def get_customer_action_request(self, request_id: str) -> dict[str, Any] | None:
+        for request in self.customer_action_requests:
+            if request["id"] == request_id:
+                return request
+        return None
+
     def list_customer_actions_for_conversation(self, conversation_id: str, limit: int = 20) -> list[dict[str, Any]]:
         rows = [
             request

@@ -324,6 +324,9 @@ class RelayRepository(Protocol):
     def get_customer_action_by_token_hash(self, public_token_hash: str) -> dict[str, Any] | None:
         ...
 
+    def get_customer_action_request(self, request_id: str) -> dict[str, Any] | None:
+        ...
+
     def list_customer_actions_for_conversation(self, conversation_id: str, limit: int = 20) -> list[dict[str, Any]]:
         ...
 
@@ -1319,6 +1322,18 @@ class SupabaseRelayRepository:
             self.client.table("customer_action_requests")
             .select("*")
             .eq("public_token_hash", public_token_hash)
+            .limit(1)
+            .execute()
+        )
+        if not result.data:
+            return None
+        return result.data[0]
+
+    def get_customer_action_request(self, request_id: str) -> dict[str, Any] | None:
+        result = (
+            self.client.table("customer_action_requests")
+            .select("*")
+            .eq("id", request_id)
             .limit(1)
             .execute()
         )

@@ -2124,6 +2124,40 @@ def test_api_proof_request_keeps_request_when_twilio_send_fails():
     assert repository.messages == []
 
 
+def test_api_cancel_customer_action_request_requires_auth_and_blocks_completed_request():
+    client, repository, _ = make_client(admin_password="secret")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    login = client.post("/api/auth/login", json={"password": "secret"})
+    created = client.post(
+        "/api/conversations/conversation-1/asset-requests",
+        data={"title": "Upload logo files"},
+        headers={"cookie": login.headers["set-cookie"]},
+    ).json()
+    request_id = created["assetRequest"]["id"]
+
+    unauthenticated = client.post(f"/api/customer-actions/{request_id}/cancel")
+    canceled = client.post(
+        f"/api/customer-actions/{request_id}/cancel",
+        headers={"cookie": login.headers["set-cookie"]},
+    )
+    second_cancel = client.post(
+        f"/api/customer-actions/{request_id}/cancel",
+        headers={"cookie": login.headers["set-cookie"]},
+    )
+    detail = client.get("/api/conversations/conversation-1", headers={"cookie": login.headers["set-cookie"]})
+
+    assert unauthenticated.status_code == 401
+    assert canceled.status_code == 200
+    assert canceled.json()["customerAction"]["status"] == "canceled"
+    assert canceled.json()["customerAction"]["canceledAt"] is not None
+    assert repository.customer_action_events[-1]["event_type"] == "canceled"
+    assert second_cancel.status_code == 409
+    assert detail.json()["customerActions"][0]["status"] == "canceled"
+
+
 def test_api_creates_asset_request_and_customer_upload_arrives_in_conversation():
     client, repository, sender = make_client(admin_password="secret")
     repository.get_or_create_customer_conversation(

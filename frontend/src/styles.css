@@ -2687,6 +2687,161 @@ button {
   gap: 8px;
 }
 
+.customer-action-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.context-tab-list {
+  background: #f3f6fa;
+  border: 1px solid #dfe4ec;
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  grid-template-columns: 1fr 1fr;
+  padding: 4px;
+}
+
+.context-tab-list button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: #667085;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 620;
+  gap: 7px;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 10px;
+}
+
+.context-tab-list button.is-active {
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgb(16 24 40 / 8%);
+  color: var(--brand-blue-dark);
+}
+
+.context-tab-list button span {
+  align-items: center;
+  background: #ddf8e9;
+  border-radius: 999px;
+  color: #16743c;
+  display: inline-flex;
+  font-size: 11px;
+  justify-content: center;
+  min-width: 20px;
+  padding: 2px 6px;
+}
+
+.customer-action-requests {
+  display: grid;
+  gap: 10px;
+}
+
+.customer-action-empty {
+  background: #f7f9fc;
+  border: 1px solid #e3e8f0;
+  border-radius: 8px;
+  color: #667085;
+  font-size: 13px;
+  margin: 0;
+  padding: 12px;
+}
+
+.customer-action-card {
+  background: #ffffff;
+  border: 1px solid #dfe4ec;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.customer-action-card.status-pending {
+  background: #fffaf0;
+  border-color: #f3d39b;
+}
+
+.customer-action-card-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.customer-action-title {
+  align-items: center;
+  color: #344054;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.customer-action-title strong {
+  font-size: 14px;
+  font-weight: 620;
+  overflow-wrap: anywhere;
+}
+
+.customer-action-status {
+  align-items: center;
+  border-radius: 999px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 620;
+  gap: 4px;
+  padding: 4px 8px;
+}
+
+.customer-action-status.status-pending {
+  background: #fff1d6;
+  color: #9a5600;
+}
+
+.customer-action-status:not(.status-pending) {
+  background: #eef1f5;
+  color: #667085;
+}
+
+.customer-action-meta,
+.customer-action-note {
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.customer-action-note {
+  background: #f7f9fc;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.customer-action-cancel {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #f1b9b7;
+  border-radius: 8px;
+  color: #c7352f;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 560;
+  gap: 7px;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 12px;
+}
+
+.customer-action-cancel:disabled {
+  background: #f5f7fa;
+  border-color: #dfe4ec;
+  color: #98a2b6;
+  cursor: not-allowed;
+}
+
 .secondary-action {
   background: var(--brand-blue);
   border: 0;

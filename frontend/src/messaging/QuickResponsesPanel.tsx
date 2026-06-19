@@ -5,6 +5,7 @@ type QuickResponsesPanelProps = {
   channel: Channel;
   responses: QuickResponse[];
   onUseResponse: (body: string) => void;
+  variant?: "section" | "embedded";
 };
 
 function channelAllows(response: QuickResponse, channel: Channel) {
@@ -26,15 +27,15 @@ function responseIcon(response: QuickResponse, index: number) {
   return <Sparkles size={16} />;
 }
 
-export function QuickResponsesPanel({ channel, responses, onUseResponse }: QuickResponsesPanelProps) {
+export function QuickResponsesPanel({ channel, responses, onUseResponse, variant = "section" }: QuickResponsesPanelProps) {
   const availableResponses = responses.filter((response) => {
     const group = responseGroup(response);
     return (group === "quick_response" || group === "whatsapp_draft") && channelAllows(response, channel);
   });
 
-  return (
-    <section className="context-section">
-      <h2>Quick Responses</h2>
+  const content = (
+    <>
+      {variant === "section" && <h2>Quick Responses</h2>}
       <div className="quick-responses">
         {availableResponses.map((response, index) => (
           <button key={response.id} onClick={() => onUseResponse(response.body)} type="button">
@@ -43,6 +44,14 @@ export function QuickResponsesPanel({ channel, responses, onUseResponse }: Quick
           </button>
         ))}
       </div>
+    </>
+  );
+
+  if (variant === "embedded") return <div className="quick-responses-embedded">{content}</div>;
+
+  return (
+    <section className="context-section">
+      {content}
     </section>
   );
 }

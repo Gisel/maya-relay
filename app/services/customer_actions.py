@@ -242,6 +242,29 @@ class CustomerActionService:
         )
         return updated
 
+    def cancel_request(self, *, request_id: str, comment: str | None = None) -> dict[str, Any]:
+        request = self.repository.get_customer_action_request(request_id)
+        if request is None:
+            raise CustomerActionNotFound("Customer action request not found.")
+        self._ensure_pending(request, action_name="Customer action request")
+
+        updated = self.repository.update_customer_action_request_status(
+            request_id=request["id"],
+            status="canceled",
+            completed_at=None,
+            canceled_at=_now_iso(),
+        )
+        if updated is None:
+            raise CustomerActionNotFound("Customer action request not found.")
+        self.repository.create_customer_action_event(
+            request_id=request["id"],
+            conversation_id=request["conversation_id"],
+            event_type="canceled",
+            comment=_clean_optional_text(comment),
+            metadata={},
+        )
+        return updated
+
     def _get_pending_or_final_proof(self, public_token: str) -> dict[str, Any]:
         token_hash = hash_public_token(public_token, customer_action_token_secret(self.settings))
         request = self.repository.get_customer_action_by_token_hash(token_hash)
