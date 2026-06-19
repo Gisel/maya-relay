@@ -8,6 +8,7 @@ type QuickResponsesPanelProps = {
 };
 
 function channelAllows(response: QuickResponse, channel: Channel) {
+  if (responseGroup(response) === "whatsapp_draft" && channel === "sms") return true;
   return !response.channels || response.channels.includes(channel);
 }
 
