@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
-from app.ai_triage import _extract_response_text
+from app.ai_triage import MessageTriage, _extract_response_text
 from app.attachments import AttachmentStore, StoredAttachment, UploadedAttachment
 from app.auth import SESSION_COOKIE, admin_enabled, require_admin, session_value
 from app.config import Settings, get_settings, normalize_phone_number
@@ -20,6 +20,7 @@ from app.db import RelayRepository
 from app.dependencies import (
     get_attachment_store,
     get_customer_action_service,
+    get_message_triage,
     get_repository,
     get_sender,
     get_voice_caller,
@@ -511,6 +512,28 @@ def api_conversation_detail(
         "customerActions": [_serialize_customer_action_request(action) for action in customer_actions],
         "suggestedReply": _suggested_reply(messages, conversation.conversation_code),
     }
+
+
+@router.post("/conversations/{conversation_id}/suggested-reply")
+def api_generate_suggested_reply(
+    conversation_id: str,
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    repository: RelayRepository = Depends(get_repository),
+    message_triage: MessageTriage = Depends(get_message_triage),
+) -> dict[str, str]:
+    require_admin(request, settings)
+    conversation = repository.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404)
+
+    messages = repository.list_messages_for_conversation(conversation_id)
+    suggestion = _generate_live_suggested_reply(
+        conversation=conversation,
+        messages=messages,
+        message_triage=message_triage,
+    )
+    return {"suggestedReply": suggestion or ""}
 
 
 @router.get("/conversations/{conversation_id}/messages")
@@ -2104,6 +2127,59 @@ def _suggested_reply(messages: list[dict[str, Any]], conversation_code: str) -> 
             if clean.upper().startswith(prefix):
                 return clean[len(prefix):].strip()
     return ""
+
+
+def _generate_live_suggested_reply(
+    *,
+    conversation: Conversation,
+    messages: list[dict[str, Any]],
+    message_triage: MessageTriage,
+) -> str:
+    latest_visible = next(
+        (message for message in reversed(messages) if message.get("direction") in {"customer_to_employee", "employee_to_customer"}),
+        None,
+    )
+    if latest_visible is None or latest_visible.get("direction") != "customer_to_employee":
+        return ""
+
+    recent_lines: list[str] = []
+    for message in messages:
+        body = str(message.get("body") or "").strip()
+        if not body:
+            continue
+        direction = message.get("direction")
+        if direction == "customer_to_employee":
+            recent_lines.append(f"Customer: {body}")
+        elif direction == "employee_to_customer":
+            recent_lines.append(f"Maya: {body}")
+    recent_context = "\n".join(recent_lines[-6:])
+    has_attachments = bool(latest_visible.get("num_media") or latest_visible.get("media_urls"))
+    triage_note = message_triage.summarize(
+        body=recent_context or str(latest_visible.get("body") or ""),
+        has_attachments=has_attachments,
+        conversation_code=conversation.conversation_code,
+    )
+    suggested_reply = _suggested_reply_from_triage_note(triage_note, conversation.conversation_code)
+    return _strip_conversation_code(suggested_reply, conversation.conversation_code)
+
+
+def _suggested_reply_from_triage_note(triage_note: str | None, conversation_code: str) -> str:
+    if not triage_note:
+        return ""
+    prefix = f"#{conversation_code.upper()} "
+    for line in reversed(triage_note.splitlines()):
+        clean = line.strip()
+        if clean.upper().startswith(prefix):
+            return clean
+    return ""
+
+
+def _strip_conversation_code(reply: str, conversation_code: str) -> str:
+    prefix = f"#{conversation_code.upper()} "
+    clean = reply.strip()
+    if clean.upper().startswith(prefix):
+        return clean[len(prefix):].strip()
+    return clean
 
 
 def _public_base_url(request: Request, settings: Settings) -> str:

@@ -439,6 +439,12 @@ export function getConversationDetail(conversationId: string) {
   return request<ConversationDetailResponse>(`/api/conversations/${conversationId}`);
 }
 
+export function generateSuggestedReply(conversationId: string) {
+  return request<{ suggestedReply: string }>(`/api/conversations/${conversationId}/suggested-reply`, {
+    method: "POST",
+  });
+}
+
 export function getQuickResponses() {
   return request<{ quickResponses: QuickResponse[] }>("/api/quick-responses");
 }

@@ -70,6 +70,7 @@ async function mockMayaRelayApi(
     contactUpdates: 0,
     contactImports: 0,
     operationalStatus: 0,
+    suggestedReplies: 0,
   };
   const calls = [
     {
@@ -290,6 +291,22 @@ async function mockMayaRelayApi(
         calls: [],
         suggestedReply: "",
       },
+    });
+  });
+
+  await page.route("**/api/conversations/conversation-1/suggested-reply", async (route) => {
+    requestCounts.suggestedReplies += 1;
+    await route.fulfill({
+      contentType: "application/json",
+      json: { suggestedReply: "Fresh generated reply from the latest customer message." },
+    });
+  });
+
+  await page.route("**/api/conversations/conversation-2/suggested-reply", async (route) => {
+    requestCounts.suggestedReplies += 1;
+    await route.fulfill({
+      contentType: "application/json",
+      json: { suggestedReply: "Fresh WhatsApp quote follow-up suggestion." },
     });
   });
 
@@ -837,10 +854,10 @@ test("system relay and AI suggestion messages stay out of the chat timeline", as
   await expect(page.getByRole("article").getByText(/Reply with #C0001/)).toHaveCount(0);
   await expect(page.getByRole("article").getByText(/https:\/\/files\.example\/proof\.png/)).toHaveCount(0);
   await page.getByRole("button", { name: "Details" }).click();
-  await expect(page.getByText("Please send size and deadline.")).toHaveCount(1);
+  await expect(page.getByText("Fresh generated reply from the latest customer message.")).toBeVisible();
 
   await page.getByRole("button", { name: "Use suggested reply" }).click();
-  await expect(page.getByLabel("Reply message")).toHaveValue("Please send size and deadline.");
+  await expect(page.getByLabel("Reply message")).toHaveValue("Fresh generated reply from the latest customer message.");
   await expect(page.getByText("No AI suggestion is available for this conversation yet.")).toBeVisible();
 });
 

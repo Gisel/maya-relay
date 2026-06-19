@@ -12,7 +12,6 @@ import {
   Search,
   Send,
   Settings as SettingsIcon,
-  Sparkles,
   X,
 } from "lucide-react";
 import { DragEvent, FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -48,6 +47,7 @@ import {
   getConversations,
   getMe,
   getQuickResponses,
+  generateSuggestedReply,
   importContactsCsv,
   login,
   logout,
@@ -71,6 +71,7 @@ import { AssetsRequestModal } from "./customerActions/AssetsRequestModal";
 import { CustomerActionPanelTabs } from "./customerActions/CustomerActionPanelTabs";
 import { ProofActionButton } from "./customerActions/ProofActionButton";
 import { ProofRequestModal } from "./customerActions/ProofRequestModal";
+import { AiSuggestedReplyPanel } from "./messaging/AiSuggestedReplyPanel";
 import { QuickResponseSendModal } from "./messaging/QuickResponseSendModal";
 import { UnifiedSearchResults } from "./search/UnifiedSearchResults";
 import { ContactCsvImport } from "./settings/ContactCsvImport";
@@ -705,6 +706,8 @@ export function App() {
   const [selectedCallId, setSelectedCallId] = useState("");
   const [quickResponses, setQuickResponses] = useState<QuickResponse[]>([]);
   const [suggestedReply, setSuggestedReply] = useState("");
+  const [isGeneratingSuggestedReply, setIsGeneratingSuggestedReply] = useState(false);
+  const [suggestedReplyError, setSuggestedReplyError] = useState("");
   const [activeContact, setActiveContact] = useState<ContactProfile | null>(null);
   const [contactSearchResults, setContactSearchResults] = useState<ContactSearchItem[]>([]);
   const [isSearchingContacts, setIsSearchingContacts] = useState(false);
@@ -751,6 +754,8 @@ export function App() {
   const didRunInitialSearchEffect = useRef(false);
   const searchRequestId = useRef(0);
   const callSearchRequestId = useRef(0);
+  const selectedIdRef = useRef("");
+  const suggestedReplyRequestId = useRef(0);
   const isRefreshingList = useRef(false);
   const isRefreshingCalls = useRef(false);
   const isRefreshingDetail = useRef(false);
@@ -793,6 +798,7 @@ export function App() {
     [messages],
   );
   const latestVisibleMessageId = visibleMessages[visibleMessages.length - 1]?.id || "";
+  const latestVisibleMessageDirection = visibleMessages[visibleMessages.length - 1]?.direction || "";
   const pendingProofRequest = useMemo(
     () => customerActions.find((request) => request.type === "proof" && request.status === "pending") || null,
     [customerActions],
@@ -1197,10 +1203,24 @@ export function App() {
   }, [isAuthenticated, selectedCallRow, selectedId, workspaceMode]);
 
   useEffect(() => {
+    selectedIdRef.current = selectedId;
+  }, [selectedId]);
+
+  useEffect(() => {
     scrollMessagesToLatest();
     const timeoutId = window.setTimeout(scrollMessagesToLatest, 120);
     return () => window.clearTimeout(timeoutId);
   }, [latestVisibleMessageId, scrollMessagesToLatest, selectedId]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !selectedId || isLoadingDetail || latestVisibleMessageId === "") return;
+    if (latestVisibleMessageDirection !== "customer_to_employee") {
+      setSuggestedReply("");
+      setSuggestedReplyError("");
+      return;
+    }
+    void handleGenerateSuggestedReply(selectedId);
+  }, [isAuthenticated, isLoadingDetail, latestVisibleMessageDirection, latestVisibleMessageId, selectedId]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -1474,6 +1494,34 @@ export function App() {
         setAppError(error instanceof Error ? error.message : "Could not send the message. Please try again.");
       }
       throw error;
+    }
+  }
+
+  async function handleGenerateSuggestedReply(conversationId = selectedIdRef.current) {
+    const targetConversationId = conversationId || selectedIdRef.current;
+    if (!targetConversationId) return;
+    const requestId = suggestedReplyRequestId.current + 1;
+    suggestedReplyRequestId.current = requestId;
+    setIsGeneratingSuggestedReply(true);
+    setSuggestedReplyError("");
+    try {
+      const response = await generateSuggestedReply(targetConversationId);
+      if (requestId === suggestedReplyRequestId.current && targetConversationId === selectedIdRef.current) {
+        setSuggestedReply(response.suggestedReply || "");
+        if (!response.suggestedReply) {
+          setSuggestedReplyError("No fresh suggestion is available for this conversation yet.");
+        }
+      }
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setIsAuthenticated(false);
+      } else if (requestId === suggestedReplyRequestId.current && targetConversationId === selectedIdRef.current) {
+        setSuggestedReplyError(error instanceof Error ? error.message : "Could not generate a suggested reply.");
+      }
+    } finally {
+      if (requestId === suggestedReplyRequestId.current) {
+        setIsGeneratingSuggestedReply(false);
+      }
     }
   }
 
@@ -2201,32 +2249,19 @@ export function App() {
             sessionCode={contextCode}
           />
 
-          <section className="context-section">
-            <div className="ai-suggestion-heading">
-              <h2>
-                <Sparkles size={18} />
-                AI Suggested Reply
-              </h2>
-              <span className={`suggestion-status-pill ${suggestedReply ? "ready" : "empty"}`}>
-                {suggestedReply ? "Ready" : "No suggestion"}
-              </span>
-            </div>
-            <div className={`intent-box ${suggestedReply ? "has-suggestion" : "is-empty"}`}>
-              <p>{suggestedReply || "No AI suggestion is available for this conversation yet."}</p>
-              {suggestedReply && (
-                <button
-                  className="secondary-action compact"
-                  onClick={() => {
-                    setDraft(suggestedReply);
-                    setSuggestedReply("");
-                  }}
-                  type="button"
-                >
-                  Use suggested reply
-                </button>
-              )}
-            </div>
-          </section>
+          <AiSuggestedReplyPanel
+            error={suggestedReplyError}
+            isLoading={isGeneratingSuggestedReply}
+            onRefresh={() => {
+              void handleGenerateSuggestedReply();
+            }}
+            onUseReply={() => {
+              setDraft(suggestedReply);
+              setSuggestedReply("");
+              setSuggestedReplyError("");
+            }}
+            suggestedReply={suggestedReply}
+          />
 
           <CustomerActionPanelTabs
             cancelingRequestId={cancelingCustomerActionId}

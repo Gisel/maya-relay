@@ -2858,6 +2858,22 @@ button {
   padding: 0 12px;
 }
 
+.ai-suggestion-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.ghost-button.compact {
+  align-items: center;
+  display: inline-flex;
+  gap: 7px;
+  min-height: 32px;
+  padding: 0 12px;
+}
+
 .quick-responses button {
   align-items: center;
   background: #ffffff;

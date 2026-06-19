@@ -4,10 +4,17 @@ from fastapi.testclient import TestClient
 from twilio.request_validator import RequestValidator
 
 from app.config import Settings, get_settings
-from app.dependencies import get_attachment_store, get_relay_service, get_repository, get_sender, get_voice_caller
+from app.dependencies import (
+    get_attachment_store,
+    get_message_triage,
+    get_relay_service,
+    get_repository,
+    get_sender,
+    get_voice_caller,
+)
 from app.main import create_app
 from app.services.relay import RelayService
-from tests.fakes import FakeAttachmentStore, FakeRepository, FakeSender, FakeVoiceCaller
+from tests.fakes import FakeAttachmentStore, FakeRepository, FakeSender, FakeTriage, FakeVoiceCaller
 
 
 PROOF_PDF_BYTES = b"%PDF-1.4\nfake proof"
@@ -28,6 +35,7 @@ def make_client(
     whatsapp_template_quote_follow_up_content_sid: str = "",
     whatsapp_template_pickup_reminder_content_sid: str = "",
     whatsapp_template_payment_reminder_content_sid: str = "",
+    message_triage: FakeTriage | None = None,
 ) -> tuple[TestClient, FakeRepository, FakeSender]:
     settings = Settings(
         FRANCISCO_PHONE="+15551234567",
@@ -66,6 +74,8 @@ def make_client(
     app.dependency_overrides[get_sender] = lambda: sender
     app.dependency_overrides[get_voice_caller] = lambda: voice_caller
     app.dependency_overrides[get_attachment_store] = lambda: attachment_store
+    if message_triage is not None:
+        app.dependency_overrides[get_message_triage] = lambda: message_triage
     app.dependency_overrides[get_settings] = lambda: settings
     app.state.fake_voice_caller = voice_caller
     return TestClient(app), repository, sender
@@ -641,6 +651,100 @@ def test_api_conversation_contract_and_idempotent_reply():
     assert duplicate.status_code == 200
     assert duplicate.json()["status"] == "duplicate"
     assert len(sender.sent_messages) == 1
+
+
+def test_api_generates_fresh_suggested_reply_for_latest_customer_message():
+    triage = FakeTriage(
+        "Intent: proof timing question\n"
+        "Missing: exact production timing\n"
+        "#C0001 Let me confirm the production time for that proof and I will update you here."
+    )
+    client, repository, _ = make_client(admin_password="secret", message_triage=triage)
+    conversation = repository.get_or_create_customer_conversation(
+        "+15550000001",
+        "+15551234567",
+        customer_channel="whatsapp",
+    )
+    repository.create_message(
+        conversation_id=conversation.id,
+        direction="employee_to_customer",
+        from_phone="+13852208404",
+        to_phone="+15550000001",
+        body="Your proof is ready. Review here: https://maya-relay.example/proof/token",
+    )
+    repository.create_message(
+        conversation_id=conversation.id,
+        direction="customer_to_employee",
+        from_phone="+15550000001",
+        to_phone="+13852208404",
+        body="If I approve the proof, how long will it take?",
+    )
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    response = client.post(
+        f"/api/conversations/{conversation.id}/suggested-reply",
+        headers={"cookie": cookie},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "suggestedReply": "Let me confirm the production time for that proof and I will update you here."
+    }
+    assert triage.calls == [
+        {
+            "body": (
+                "Maya: Your proof is ready. Review here: https://maya-relay.example/proof/token\n"
+                "Customer: If I approve the proof, how long will it take?"
+            ),
+            "has_attachments": False,
+            "conversation_code": "C0001",
+        }
+    ]
+
+
+def test_api_suggested_reply_returns_empty_when_operator_replied_last():
+    triage = FakeTriage("#C0001 This should not be used.")
+    client, repository, _ = make_client(admin_password="secret", message_triage=triage)
+    conversation = repository.get_or_create_customer_conversation(
+        "+15550000001",
+        "+15551234567",
+        customer_channel="sms",
+    )
+    repository.create_message(
+        conversation_id=conversation.id,
+        direction="customer_to_employee",
+        from_phone="+15550000001",
+        to_phone="+13852208404",
+        body="Can you quote business cards?",
+    )
+    repository.create_message(
+        conversation_id=conversation.id,
+        direction="employee_to_customer",
+        from_phone="+13852208404",
+        to_phone="+15550000001",
+        body="Sure, please send the quantity and finish.",
+    )
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    response = client.post(
+        f"/api/conversations/{conversation.id}/suggested-reply",
+        headers={"cookie": cookie},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"suggestedReply": ""}
+    assert triage.calls == []
+
+
+def test_api_suggested_reply_requires_admin_session():
+    client, repository, _ = make_client(admin_password="secret", message_triage=FakeTriage("#C0001 Hello."))
+    conversation = repository.get_or_create_customer_conversation("+15550000001", "+15551234567")
+
+    response = client.post(f"/api/conversations/{conversation.id}/suggested-reply")
+
+    assert response.status_code == 401
 
 
 def test_api_search_checks_beyond_first_conversation_page():
