@@ -75,10 +75,7 @@ export function CallWorkspace({
       <header className="call-workspace-header">
         <div>
           <span className="workspace-kicker">Calls</span>
-          <div className="call-workspace-title-row">
-            <h1>{customerName(selectedRow)}</h1>
-            {headerActions}
-          </div>
+          <h1>{customerName(selectedRow)}</h1>
           <p>
             {cleanPhone(selectedRow.customer.phone || latestCall.customerPhone)}
             {selectedRow.conversation?.code && <span>Session ID: #{selectedRow.conversation.code}</span>}
@@ -88,6 +85,7 @@ export function CallWorkspace({
           <span className={`workflow-pill workflow-${selectedRow.workflowStatus || "pending_follow_up"}`}>
             {workflowLabel(selectedRow.workflowStatus)}
           </span>
+          {headerActions}
         </div>
       </header>
 

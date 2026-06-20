@@ -2197,10 +2197,7 @@ export function App() {
         <section className={`conversation-panel channel-${channel}`}>
           <header className="conversation-header">
             <div className="conversation-title-block">
-              <div className="conversation-title-row">
-                <h1>{customerName}</h1>
-                {profilePanelToggle}
-              </div>
+              <h1>{customerName}</h1>
               {activeConversation?.code && <span className="session-id">Session ID: #{activeConversation.code}</span>}
               <div className="conversation-meta-row">
                 <p>
@@ -2267,6 +2264,7 @@ export function App() {
                 </div>
               </div>
             </div>
+            {profilePanelToggle}
           </header>
 
           <div className="message-thread" ref={messageThreadRef}>

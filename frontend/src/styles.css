@@ -1023,6 +1023,7 @@ button {
   background: #fbfdff;
   border-bottom: 1px solid #dfe4ec;
   display: flex;
+  gap: 14px;
   justify-content: flex-start;
   min-height: 74px;
   min-width: 0;
@@ -1039,7 +1040,7 @@ button {
   font-size: 18px;
   font-weight: 620;
   line-height: 1.1;
-  margin: 0;
+  margin: 0 0 6px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1077,24 +1078,6 @@ button {
   width: 100%;
 }
 
-.conversation-title-row,
-.call-workspace-title-row {
-  align-items: center;
-  display: inline-flex;
-  gap: 8px;
-  max-width: 100%;
-  min-width: 0;
-}
-
-.conversation-title-row h1,
-.call-workspace-title-row h1 {
-  min-width: 0;
-}
-
-.conversation-title-row {
-  margin-bottom: 6px;
-}
-
 .conversation-meta-row {
   align-items: center;
   display: flex;
@@ -1127,24 +1110,26 @@ button {
 
 .profile-panel-toggle {
   align-items: center;
-  background: #ffffff;
-  border: 1px solid #d7dde7;
+  background: #eaf4ff;
+  border: 1px solid #8fc8ff;
   border-radius: 50%;
-  color: #475366;
+  color: var(--brand-blue);
   display: none;
   font-size: 12px;
   font-weight: 560;
-  height: 30px;
+  flex: 0 0 auto;
+  height: 36px;
   justify-content: center;
-  min-height: 30px;
-  min-width: 30px;
+  min-height: 36px;
+  min-width: 36px;
   padding: 0;
-  width: 30px;
+  width: 36px;
 }
 
 .profile-panel-toggle:hover {
-  border-color: #b8c6d8;
-  color: #1f2a3d;
+  background: #d9ecff;
+  border-color: var(--brand-blue);
+  color: #005bbb;
 }
 
 .conversation-status-action,
@@ -2436,7 +2421,7 @@ button {
 .call-workspace-header h1 {
   font-size: 20px;
   line-height: 1.15;
-  margin: 0;
+  margin: 0 0 6px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2457,10 +2442,6 @@ button {
   display: flex;
   flex: 0 0 auto;
   gap: 10px;
-}
-
-.call-workspace-title-row {
-  margin-bottom: 6px;
 }
 
 .workspace-kicker {
