@@ -443,6 +443,36 @@ async function mockMayaRelayApi(
   });
 
   await page.route(/\/api\/calls(?:\?.*)?$/, async (route) => {
+    if (route.request().method() === "POST") {
+      requestCounts.callStarts += 1;
+      const payload = JSON.parse(route.request().postData() || "{}") as {
+        display_name?: string | null;
+        phone_number?: string;
+      };
+      const manualCallConversation = {
+        ...conversation,
+        assignedEmployee: "+15551234567",
+        createdAt: "2026-06-06T14:08:00Z",
+        customer: {
+          phone: payload.phone_number || "+15550000001",
+          displayName: payload.display_name || null,
+          lookupName: null,
+          name: payload.display_name || payload.phone_number || "Test Customer",
+        },
+      };
+      await route.fulfill({
+        contentType: "application/json",
+        json: {
+          status: "calling",
+          callSid: "CAmanual",
+          to: payload.phone_number || "+15550000001",
+          employeePhone: "+15551234567",
+          conversation: manualCallConversation,
+        },
+      });
+      return;
+    }
+
     requestCounts.callLists += 1;
     const url = new URL(route.request().url());
     const query = (url.searchParams.get("q") || "").toLowerCase();
@@ -790,6 +820,30 @@ test("New Call drawer stays inside the mobile viewport", async ({ page }) => {
   ]) {
     await expectInsideViewport(control);
   }
+});
+
+test("operator can start a new call from a saved customer", async ({ page }) => {
+  const requestCounts = await mockMayaRelayApi(page);
+
+  await page.goto("/app/");
+  await expect(page.getByRole("article").getByText("Hello")).toBeVisible();
+
+  await page.getByRole("button", { name: /new call/i }).click();
+  const drawer = page.getByRole("dialog", { name: "New call" });
+  await expect(drawer).toBeVisible();
+
+  await drawer.getByLabel("Find customer").fill("Test");
+  const customerResult = drawer.locator(".contact-picker-result", { hasText: "Test Customer" });
+  await expect(customerResult).toBeVisible();
+  await customerResult.click();
+
+  await expect(drawer.getByLabel("Customer phone")).toHaveValue("+15550000001");
+  await expect(drawer.getByLabel("Customer name")).toHaveValue("Test Customer");
+  await drawer.getByRole("button", { name: /start call/i }).click();
+
+  await expect.poll(() => requestCounts.callStarts).toBe(1);
+  await expect(drawer).toBeHidden();
+  await expect(page.getByText("Calling Francisco first, then +15550000001.")).toBeVisible();
 });
 
 test("operator can start a new SMS conversation from a saved customer", async ({ page }) => {

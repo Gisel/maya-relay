@@ -348,6 +348,10 @@ This dated snapshot is the current planning source for the first production rele
 - Contact/client search foundation: done.
 - CSV import: done.
 - Observability/error explanations: done for first release; remaining improvements are low priority.
+- New outbound SMS/WhatsApp conversation start: done.
+  - Operators can start SMS or WhatsApp conversations from the top-bar Message action.
+  - Saved-customer search, manual phone/name fallback, SMS free-form sends, and WhatsApp owner-message template sends are implemented.
+  - WhatsApp owner-written first messages use the approved `maya_owner_message` Twilio template and require `WHATSAPP_TEMPLATE_OWNER_MESSAGE_CONTENT_SID` in local `.env` and Railway.
 
 ### Partially Done / Needs Focused Follow-Up
 
@@ -368,9 +372,10 @@ This dated snapshot is the current planning source for the first production rele
 
 ### High Priority New Production Slices
 
-1. New outbound text/WhatsApp conversation start.
-   - Operators currently need a way to start a new text or WhatsApp conversation, similar to how they can start a new phone call.
-   - WhatsApp owner-written first messages use the approved `maya_owner_message` Twilio template and require `WHATSAPP_TEMPLATE_OWNER_MESSAGE_CONTENT_SID` in local `.env` and Railway.
+1. Reusable saved-customer selector for New Call.
+   - Reuse the New Message customer selector in the New Call drawer.
+   - Preserve manual phone/name fallback and the existing backend call-start contract.
+   - This does not yet implement a phone-number keypad/picker inside the phone field.
 2. Role/user-routed outbound calls.
    - New phone calls need to route through the correct line/team context, such as Signs versus General Orders.
    - The call button should be linked to the logged-in user or role so the call rings/routes to that user's configured phone line.

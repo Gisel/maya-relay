@@ -65,6 +65,7 @@ import { CallDetailsForm, CallDetailsPayload } from "./calls/CallDetailsForm";
 import { CallsPanel } from "./calls/CallsPanel";
 import { CallWorkspace } from "./calls/CallWorkspace";
 import { WorkspaceMode, WorkspaceTabs } from "./calls/WorkspaceTabs";
+import { CustomerContactPicker, CustomerContactSelection } from "./customers/CustomerContactPicker";
 import { CustomerProfileSummary } from "./customers/CustomerProfileSummary";
 import { EditCustomerProfileModal } from "./customers/EditCustomerProfileModal";
 import { AssetActionButton } from "./customerActions/AssetActionButton";
@@ -393,27 +394,36 @@ function Drawer({
 }
 
 function NewCallDrawer({
+  onAuthExpired,
   open,
   onClose,
   onStartCall,
 }: {
+  onAuthExpired?: () => void;
   open: boolean;
   onClose: () => void;
   onStartCall: (phoneNumber: string, displayName: string) => Promise<void>;
 }) {
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [displayName, setDisplayName] = useState("");
+  const [selection, setSelection] = useState<CustomerContactSelection>({
+    contact: null,
+    displayName: "",
+    phoneNumber: "",
+  });
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const phoneNumber = selection.phoneNumber;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setIsSubmitting(true);
     try {
-      await onStartCall(phoneNumber, displayName);
-      setPhoneNumber("");
-      setDisplayName("");
+      await onStartCall(selection.phoneNumber, selection.displayName);
+      setSelection({
+        contact: null,
+        displayName: "",
+        phoneNumber: "",
+      });
     } catch (error) {
       setError(error instanceof Error ? error.message : "Could not start the call.");
     } finally {
@@ -430,27 +440,12 @@ function NewCallDrawer({
       title="New call"
     >
       <form className="drawer-form" onSubmit={handleSubmit}>
-        <label>
-          <span>Customer phone</span>
-          <input
-            autoFocus
-            inputMode="tel"
-            onChange={(event) => setPhoneNumber(event.target.value)}
-            placeholder="+1 555 000 0000"
-            required
-            type="tel"
-            value={phoneNumber}
-          />
-        </label>
-        <label>
-          <span>Customer name</span>
-          <input
-            onChange={(event) => setDisplayName(event.target.value)}
-            placeholder="Optional"
-            type="text"
-            value={displayName}
-          />
-        </label>
+        <CustomerContactPicker
+          disabled={isSubmitting}
+          onAuthExpired={onAuthExpired}
+          onChange={setSelection}
+          selection={selection}
+        />
         {error && <p className="form-error">{error}</p>}
         <div className="drawer-actions">
           <button className="ghost-button" disabled={isSubmitting} onClick={onClose} type="button">
@@ -2330,6 +2325,7 @@ export function App() {
         </aside>
       </main>
       <NewCallDrawer
+        onAuthExpired={handleAuthExpired}
         onClose={() => setIsNewCallOpen(false)}
         onStartCall={handleStartNewCall}
         open={isNewCallOpen}
