@@ -352,6 +352,10 @@ This dated snapshot is the current planning source for the first production rele
   - Operators can start SMS or WhatsApp conversations from the top-bar Message action.
   - Saved-customer search, manual phone/name fallback, SMS free-form sends, and WhatsApp owner-message template sends are implemented.
   - WhatsApp owner-written first messages use the approved `maya_owner_message` Twilio template and require `WHATSAPP_TEMPLATE_OWNER_MESSAGE_CONTENT_SID` in local `.env` and Railway.
+- Reusable saved-customer selector for New Call: done.
+  - New Call reuses the same saved-customer selector pattern as New Message.
+  - Operators can search/select a saved customer or manually enter phone/name.
+  - Existing `POST /api/calls` behavior is preserved.
 
 ### Partially Done / Needs Focused Follow-Up
 
@@ -369,17 +373,17 @@ This dated snapshot is the current planning source for the first production rele
 ### Pending
 
 - Production auth/users: pending.
+- Mobile phone-number keypad/picker inside phone fields: pending.
+  - This is distinct from saved-customer search.
+  - Desired behavior is a mobile-friendly number picker/keypad experience when entering a phone number.
+  - Deferred intentionally; current manual phone entry remains available.
 
 ### High Priority New Production Slices
 
-1. Reusable saved-customer selector for New Call.
-   - Reuse the New Message customer selector in the New Call drawer.
-   - Preserve manual phone/name fallback and the existing backend call-start contract.
-   - This does not yet implement a phone-number keypad/picker inside the phone field.
-2. Role/user-routed outbound calls.
+1. Role/user-routed outbound calls.
    - New phone calls need to route through the correct line/team context, such as Signs versus General Orders.
    - The call button should be linked to the logged-in user or role so the call rings/routes to that user's configured phone line.
-3. Authentication foundation for role/user routing.
+2. Authentication foundation for role/user routing.
    - Auth is required for role-aware call routing and future production user separation.
    - This should be planned as a production auth slice, not a quick login patch.
 
