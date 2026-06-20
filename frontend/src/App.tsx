@@ -8,7 +8,6 @@ import {
   PanelRightOpen,
   Paperclip,
   Phone,
-  Plus,
   RefreshCw,
   Search,
   Send,
@@ -2009,10 +2008,7 @@ export function App() {
             Refresh
           </button>
           <button aria-label="New call" className="new-call-button" onClick={() => setIsNewCallOpen(true)} title="New call" type="button">
-            <span aria-hidden="true" className="compound-icon">
-              <Phone size={18} />
-              <Plus className="icon-plus" size={11} />
-            </span>
+            <Phone size={18} />
             <span className="topbar-action-label">Call</span>
           </button>
           <button

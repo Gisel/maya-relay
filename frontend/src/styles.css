@@ -1,13 +1,14 @@
 :root {
   --topbar-height: 72px;
-  --brand-blue: #3b6f9f;
-  --brand-blue-dark: #2c557a;
-  --brand-blue-soft: #f0f6fb;
+  --brand-blue: #0a84ff;
+  --brand-blue-dark: #0759a8;
+  --brand-blue-soft: #a5d1fa;
   --brand-green: #4f9a68;
   --brand-green-dark: #35724a;
   --whatsapp-green: #25d366;
   --whatsapp-green-dark: #128c4a;
   --whatsapp-green-soft: #e9fbf1;
+  --message-green-soft: #e3fcdb;
   --font-sans:
     "Roboto", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
@@ -638,25 +639,6 @@ button {
   padding: 0 18px;
 }
 
-.compound-icon {
-  display: inline-grid;
-  height: 20px;
-  place-items: center;
-  position: relative;
-  width: 22px;
-}
-
-.compound-icon .icon-plus {
-  color: inherit;
-  position: absolute;
-  right: -5px;
-  top: -5px;
-}
-
-.compound-icon .icon-plus path {
-  stroke: #ffffff;
-}
-
 .settings-button {
   background: #ffffff;
   border: 1px solid #cbd8e6;
@@ -1190,9 +1172,9 @@ button {
 }
 
 .message-bubble.outbound {
-  background: var(--whatsapp-green);
-  border-color: var(--whatsapp-green);
-  color: #ffffff;
+  background: var(--message-green-soft);
+  border-color: #b8efaa;
+  color: #17351f;
   justify-self: end;
 }
 
@@ -1244,12 +1226,12 @@ button {
 }
 
 .conversation-panel.channel-whatsapp .message-bubble.outbound {
-  background: var(--whatsapp-green);
-  border-color: var(--whatsapp-green);
+  background: var(--message-green-soft);
+  border-color: #b8efaa;
 }
 
 .conversation-panel.channel-whatsapp .message-bubble.outbound footer {
-  color: rgb(255 255 255 / 88%);
+  color: #4d7255;
 }
 
 .closed-note {
@@ -1340,7 +1322,7 @@ button {
 }
 
 .message-bubble.outbound footer {
-  color: #d9efff;
+  color: #4d7255;
 }
 
 .attachment-preview {
