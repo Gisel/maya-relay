@@ -949,6 +949,12 @@ test("mobile conversation header keeps customer and action controls usable", asy
   const callAction = header.getByRole("button", { name: "Call" });
   await expect(callAction).toHaveCSS("background-color", "rgb(255, 255, 255)");
   await expect(callAction).toHaveCSS("color", "rgb(10, 132, 255)");
+  await expect(callAction).toHaveCSS("font-size", "12px");
+  const proofBox = await header.getByRole("button", { name: "Send proof approval request" }).boundingBox();
+  const assetBox = await header.getByRole("button", { name: "Request customer assets" }).boundingBox();
+  const callBox = await callAction.boundingBox();
+  expect(callBox?.height).toBe(proofBox?.height);
+  expect(callBox?.height).toBe(assetBox?.height);
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);

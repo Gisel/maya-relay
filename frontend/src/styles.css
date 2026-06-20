@@ -4478,8 +4478,13 @@ button {
   .conversation-call-action {
     background: #ffffff;
     border: 1px solid #dfe4ec;
+    box-sizing: border-box;
     font-size: 12px;
+    font-weight: 560;
     gap: 5px;
+    height: 34px;
+    line-height: 1;
+    min-height: 34px;
     padding: 0 10px;
     width: auto;
   }
@@ -4508,10 +4513,6 @@ button {
 
   .conversation-status-action {
     color: #475366;
-  }
-
-  .conversation-call-action {
-    font-size: 0;
   }
 
   .context-toggle span {
