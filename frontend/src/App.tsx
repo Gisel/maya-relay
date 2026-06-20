@@ -2013,6 +2013,28 @@ export function App() {
       {isProfilePanelCollapsed ? <PanelRightOpen size={16} /> : <PanelRightClose size={16} />}
     </button>
   );
+  const mobileDetailsToggle = (
+    <button
+      aria-label={isContextOpen ? "Hide details" : "Details"}
+      className="context-toggle mobile-context-toggle"
+      onClick={() => setIsContextOpen((current) => !current)}
+      type="button"
+    >
+      {isContextOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
+      <span>{isContextOpen ? "Hide details" : "Details"}</span>
+    </button>
+  );
+  const headerDetailsToggle = (
+    <button
+      aria-label={isContextOpen ? "Hide details" : "Details"}
+      className="context-toggle header-context-toggle"
+      onClick={() => setIsContextOpen((current) => !current)}
+      type="button"
+    >
+      {isContextOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
+      <span>{isContextOpen ? "Hide details" : "Details"}</span>
+    </button>
+  );
 
   return (
     <div className="app-shell">
@@ -2197,7 +2219,10 @@ export function App() {
         <section className={`conversation-panel channel-${channel}`}>
           <header className="conversation-header">
             <div className="conversation-title-block">
-              <h1>{customerName}</h1>
+              <div className="mobile-conversation-title-row">
+                <h1>{customerName}</h1>
+                {mobileDetailsToggle}
+              </div>
               {activeConversation?.code && <span className="session-id">Session ID: #{activeConversation.code}</span>}
               <div className="conversation-meta-row">
                 <p>
@@ -2252,15 +2277,7 @@ export function App() {
                     <Archive size={15} />
                     {status === "open" ? "Close" : "Reopen"}
                   </button>
-                  <button
-                    aria-label={isContextOpen ? "Hide details" : "Details"}
-                    className="context-toggle"
-                    onClick={() => setIsContextOpen((current) => !current)}
-                    type="button"
-                  >
-                    {isContextOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
-                    <span>{isContextOpen ? "Hide details" : "Details"}</span>
-                  </button>
+                  {headerDetailsToggle}
                 </div>
               </div>
             </div>

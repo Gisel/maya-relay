@@ -934,7 +934,7 @@ test("mobile conversation header keeps customer and action controls usable", asy
 
   const header = page.locator(".conversation-header");
   await expect(header.locator("h1")).toHaveText("Test Customer");
-  await expect(header.getByRole("button", { name: "Details" })).toBeVisible();
+  await expect(header.locator(".mobile-conversation-title-row").getByRole("button", { name: "Details" })).toBeVisible();
   await expect(header.getByRole("button", { name: "Send proof approval request" })).toBeVisible();
   await expect(header.getByRole("button", { name: "Request customer assets" })).toBeVisible();
 
