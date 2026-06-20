@@ -160,7 +160,7 @@ export function NewMessageDrawer({
           </button>
         </div>
 
-        <form className="drawer-form new-message-form" onSubmit={submit}>
+        <form className={`drawer-form new-message-form channel-${channel}`} onSubmit={submit}>
           <CustomerContactPicker
             disabled={isSending}
             onAuthExpired={onAuthExpired}
@@ -170,7 +170,7 @@ export function NewMessageDrawer({
 
           <fieldset className="channel-choice">
             <legend>Channel</legend>
-            <label className={channel === "sms" ? "selected" : ""}>
+            <label className={`channel-option sms-option ${channel === "sms" ? "selected" : ""}`}>
               <input
                 checked={channel === "sms"}
                 disabled={isSending}
@@ -180,7 +180,7 @@ export function NewMessageDrawer({
               />
               SMS
             </label>
-            <label className={channel === "whatsapp" ? "selected" : ""}>
+            <label className={`channel-option whatsapp-option ${channel === "whatsapp" ? "selected" : ""}`}>
               <input
                 checked={channel === "whatsapp"}
                 disabled={isSending}
@@ -257,7 +257,7 @@ export function NewMessageDrawer({
             <button className="ghost-button" disabled={isSending} onClick={resetAndClose} type="button">
               Cancel
             </button>
-            <button className="send-button" disabled={!canSubmit || isSending} type="submit">
+            <button className={`send-button ${channel === "whatsapp" ? "whatsapp-send-button" : ""}`} disabled={!canSubmit || isSending} type="submit">
               {channel === "sms" ? <Send size={17} /> : <MessageSquare size={17} />}
               {isSending ? "Sending..." : "Send message"}
             </button>
