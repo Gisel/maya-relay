@@ -2,6 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 from fastapi.testclient import TestClient
 from fastapi import HTTPException
+from gotrue.errors import AuthApiError
 from twilio.request_validator import RequestValidator
 
 from app.config import Settings, get_settings
@@ -464,6 +465,37 @@ def test_api_password_reset_rejects_localhost_redirects():
         "APP_BASE_URL must be set to the public HTTPS Maya Relay URL before sending password reset links."
     )
     assert operator_auth.password_reset_requests == []
+
+
+def test_operator_password_reset_reports_supabase_rate_limit():
+    settings = Settings(
+        SUPABASE_URL="https://example.supabase.co",
+        SUPABASE_ANON_KEY="anon",
+        SUPABASE_SERVICE_ROLE_KEY="service-role",
+    )
+    service = MayaOperatorAuthService(settings)
+
+    class RateLimitedAuth:
+        def reset_password_for_email(self, email: str, options: dict[str, str]) -> None:
+            raise AuthApiError("email rate limit exceeded", 429, "over_email_send_rate_limit")
+
+    class RateLimitedClient:
+        auth = RateLimitedAuth()
+
+    service._auth_client = RateLimitedClient()
+
+    try:
+        service.request_password_reset(
+            email="giselcrystal@gmail.com",
+            redirect_to="https://mayagraphics.co/reset-password",
+        )
+    except HTTPException as error:
+        assert error.status_code == 429
+        assert error.detail == (
+            "Password reset email was requested too recently. Please wait a few minutes before trying again."
+        )
+    else:
+        raise AssertionError("expected Supabase email rate limit to be surfaced")
 
 
 def test_api_password_update_uses_recovery_tokens():

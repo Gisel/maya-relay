@@ -62,11 +62,22 @@ class MayaOperatorAuthService:
         try:
             self.auth_client.auth.reset_password_for_email(normalized_email, {"redirect_to": redirect_to})
         except AuthApiError as error:
-            if "invalid api key" in str(error).lower():
+            error_message = str(error).lower()
+            if "invalid api key" in error_message:
                 raise HTTPException(status_code=503, detail="Supabase Auth is not configured correctly.") from error
+            if "rate limit" in error_message:
+                raise HTTPException(
+                    status_code=429,
+                    detail="Password reset email was requested too recently. Please wait a few minutes before trying again.",
+                ) from error
             logger.warning("Supabase password reset request failed for %s: %s", normalized_email, error)
             raise HTTPException(status_code=503, detail="Password reset email could not be sent.") from error
         except Exception as error:
+            if "rate limit" in str(error).lower():
+                raise HTTPException(
+                    status_code=429,
+                    detail="Password reset email was requested too recently. Please wait a few minutes before trying again.",
+                ) from error
             logger.warning("Supabase password reset request failed for %s: %s", normalized_email, error)
             raise HTTPException(status_code=503, detail="Password reset email could not be sent.") from error
 
