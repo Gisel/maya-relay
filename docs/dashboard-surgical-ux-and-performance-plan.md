@@ -356,6 +356,14 @@ This dated snapshot is the current planning source for the first production rele
   - New Call reuses the same saved-customer selector pattern as New Message.
   - Operators can search/select a saved customer or manually enter phone/name.
   - Existing `POST /api/calls` behavior is preserved.
+- Production auth/users foundation: done.
+  - Supabase Auth owns login/password.
+  - `operator_profiles` owns Maya Relay operator role, routing line, active flag, and click-to-call phone.
+  - Operators currently configured: Sales, Francisco, and Gisel/admin.
+- User-routed outbound calls: done.
+  - New Call and conversation Call route to the logged-in operator's configured phone.
+  - Legacy shared-admin sessions still fall back to `FRANCISCO_PHONE` during transition.
+  - No inbound Twilio Studio routing changes were made.
 
 ### Partially Done / Needs Focused Follow-Up
 
@@ -372,26 +380,19 @@ This dated snapshot is the current planning source for the first production rele
 
 ### Pending
 
-- Production auth/users: pending.
 - Mobile phone-number keypad/picker inside phone fields: pending.
   - This is distinct from saved-customer search.
   - Desired behavior is a mobile-friendly number picker/keypad experience when entering a phone number.
   - Deferred intentionally; current manual phone entry remains available.
+- Change temporary Supabase Auth passwords after production smoke validation.
+- Decide when to disable `ENABLE_ADMIN_PASSWORD_FALLBACK`.
 
 ### High Priority New Production Slices
 
 Planning note, June 20, 2026:
 
-- Execution order is auth foundation first, then user-routed outbound calls.
-- Both operators can share one app role for the first production release.
-- The key production need is trusted user identity so the Call action can route to the logged-in operator's configured phone line.
-
-1. Role/user-routed outbound calls.
-   - New phone calls need to route through the correct line/team context, such as Signs versus General Orders.
-   - The call button should be linked to the logged-in user or role so the call rings/routes to that user's configured phone line.
-2. Authentication foundation for role/user routing.
-   - Auth is required for role-aware call routing and future production user separation.
-   - This should be planned as a production auth slice, not a quick login patch.
+- Auth foundation and user-routed outbound calls are implemented.
+- Remaining high-priority work should be selected from the pending list after production smoke validation.
 
 ## Current Call Workflow Notes
 

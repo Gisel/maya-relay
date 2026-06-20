@@ -221,6 +221,15 @@ Current operator request visibility:
 - Pending same-type Proof or Assets requests block duplicate sends until canceled or completed.
 - Canceling records a durable `canceled` customer-action event.
 
+Current auth and outbound call routing status:
+
+- Supabase Auth login is implemented for operator email/password access.
+- `operator_profiles` stores Maya Relay role, routing line, active flag, and click-to-call phone.
+- Sales, Francisco, and Gisel/admin users exist in Supabase Auth and are synced to `operator_profiles`.
+- New outbound calls route to the logged-in operator's configured phone before bridging to the customer.
+- Conversation header Call uses the same logged-in-operator routing.
+- Legacy shared-admin fallback remains available during transition.
+
 UI action color language:
 
 - `Open`: status green.
@@ -236,7 +245,8 @@ Pending:
 - Live smoke test template-aware quick responses inside and outside the WhatsApp 24-hour window.
 - Retry UI for failed customer-action sends remains pending.
 - Asset/proof retention and deletion remains pending.
-- Auth hardening remains pending.
+- Temporary Supabase Auth passwords should be changed after production smoke validation.
+- Decide when to disable shared `ADMIN_PASSWORD` fallback.
 - AI behavior should be monitored in production after the live-refresh fix; broader AI auto-response remains out of scope.
 - Formal frontend/e2e automation for public proof and assets flows remains pending.
 
