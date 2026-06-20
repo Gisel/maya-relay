@@ -1019,11 +1019,11 @@ button {
 }
 
 .conversation-header {
-  align-items: center;
+  align-items: flex-start;
   background: #fbfdff;
   border-bottom: 1px solid #dfe4ec;
   display: flex;
-  gap: 14px;
+  gap: 10px;
   justify-content: flex-start;
   min-height: 74px;
   min-width: 0;
@@ -1110,26 +1110,31 @@ button {
 
 .profile-panel-toggle {
   align-items: center;
-  background: #eaf4ff;
-  border: 1px solid #8fc8ff;
-  border-radius: 50%;
-  color: var(--brand-blue);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: #667085;
   display: none;
   font-size: 12px;
   font-weight: 560;
   flex: 0 0 auto;
-  height: 36px;
+  height: 26px;
   justify-content: center;
-  min-height: 36px;
-  min-width: 36px;
+  margin-top: 1px;
+  min-height: 26px;
+  min-width: 26px;
   padding: 0;
-  width: 36px;
+  width: 26px;
 }
 
 .profile-panel-toggle:hover {
-  background: #d9ecff;
-  border-color: var(--brand-blue);
-  color: #005bbb;
+  background: #eef2f7;
+  color: #1f2a3d;
+}
+
+.profile-panel-toggle:focus-visible {
+  box-shadow: 0 0 0 3px rgb(10 132 255 / 18%);
+  outline: 0;
 }
 
 .conversation-status-action,
@@ -2408,11 +2413,11 @@ button {
 }
 
 .call-workspace-header {
-  align-items: center;
+  align-items: flex-start;
   background: #fbfdff;
   border-bottom: 1px solid #dfe4ec;
   display: flex;
-  gap: 16px;
+  gap: 10px;
   justify-content: space-between;
   min-width: 0;
   padding: 18px 24px;
