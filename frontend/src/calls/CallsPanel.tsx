@@ -6,6 +6,11 @@ function customerName(row: CallConversationListItem) {
   return row.customer.name || cleanPhone(row.customer.phone) || cleanPhone(row.latestCall.customerPhone) || "Unknown customer";
 }
 
+function compactWorkflowLabel(status: string | null | undefined) {
+  if (status === "pending_follow_up" || !status) return "Pending";
+  return workflowLabel(status);
+}
+
 export function CallsPanel({
   directionFilter,
   hasMore,
@@ -73,20 +78,22 @@ export function CallsPanel({
             </span>
             <span className="call-row-content">
               <span className="conversation-row-heading">
-                <strong>{customerName(row)}</strong>
+                <span className="call-row-heading-main">
+                  <strong>{customerName(row)}</strong>
+                  <span className="call-row-phone">{cleanPhone(row.customer.phone || row.latestCall.customerPhone)}</span>
+                </span>
                 <em>{relativeDate(row.latestCall.startedAt || row.latestCall.createdAt)}</em>
               </span>
-              <span className="call-row-phone">{cleanPhone(row.customer.phone || row.latestCall.customerPhone)}</span>
               <span className="call-row-meta">
                 <span>{callDirectionLabel(row.latestCall.direction)}</span>
                 <span className={`call-status-pill status-${row.latestCall.status || "unknown"}`}>
                   {row.latestCall.status || "unknown"}
                 </span>
                 <span className={`workflow-pill workflow-${row.workflowStatus || "pending_follow_up"}`}>
-                  {workflowLabel(row.workflowStatus)}
+                  {compactWorkflowLabel(row.workflowStatus)}
                 </span>
                 {row.callCount > 1 && <span>{row.callCount} calls</span>}
-                <span>
+                <span className="call-row-code">
                   <Clock size={12} />
                   {row.conversation?.code ? `#${row.conversation.code}` : "No conversation"}
                 </span>
