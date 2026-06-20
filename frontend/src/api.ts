@@ -5,6 +5,16 @@ export type CallDirectionFilter = "outgoing" | "incoming" | "all";
 export type DeliveryStatus = "delivered" | "failed" | "pending" | "queued" | "undelivered" | string;
 export type MessageDirection = "customer_to_employee" | "employee_to_customer" | "system" | string;
 
+export type AuthUser = {
+  id: string;
+  email: string;
+  displayName: string;
+  role: string;
+  routingLine: string;
+  clickToCallPhone: string;
+  callRoutingReady: boolean;
+};
+
 export type Metrics = {
   open: number;
   failed: number;
@@ -384,13 +394,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export function getMe() {
-  return request<{ authenticated: true; app: { name: string; environment: string } }>("/api/me");
+  return request<{ authenticated: true; user: AuthUser | null; app: { name: string; environment: string } }>("/api/me");
 }
 
-export function login(password: string) {
+export function login(email: string, password: string) {
   return request<{ authenticated: true }>("/api/auth/login", {
     method: "POST",
-    body: JSON.stringify({ password }),
+    body: JSON.stringify({ email, password }),
   });
 }
 

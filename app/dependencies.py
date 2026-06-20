@@ -7,6 +7,7 @@ from app.ai_triage import MessageTriage, NoopMessageTriage, OpenAIMessageTriage
 from app.config import Settings, get_settings
 from app.db import RelayRepository, SupabaseRelayRepository
 from app.lookup import ContactNameLookup, NoopContactNameLookup, TwilioContactNameLookup
+from app.operator_auth import MayaOperatorAuthService, OperatorAuthService
 from app.services.customer_actions import CustomerActionService
 from app.services.relay import RelayService
 from app.twilio_client import MessageSender, TwilioMessageSender, TwilioVoiceCaller, VoiceCaller
@@ -25,6 +26,11 @@ def get_sender() -> MessageSender:
 @lru_cache
 def get_voice_caller() -> VoiceCaller:
     return TwilioVoiceCaller(get_settings())
+
+
+@lru_cache
+def get_operator_auth_service() -> OperatorAuthService:
+    return MayaOperatorAuthService(get_settings())
 
 
 @lru_cache

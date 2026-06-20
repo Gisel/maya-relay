@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from app.ai_triage import MessageTriage, _extract_response_text
 from app.attachments import AttachmentStore, StoredAttachment, UploadedAttachment
-from app.auth import SESSION_COOKIE, admin_enabled, require_admin, session_value
+from app.auth import SESSION_COOKIE, admin_enabled, current_operator, operator_session_value, require_admin, session_value
 from app.config import Settings, get_settings, normalize_phone_number
 from app.customer_actions import CustomerActionFileInput
 from app.db import RelayRepository
@@ -21,11 +21,13 @@ from app.dependencies import (
     get_attachment_store,
     get_customer_action_service,
     get_message_triage,
+    get_operator_auth_service,
     get_repository,
     get_sender,
     get_voice_caller,
 )
 from app.models import Conversation
+from app.operator_auth import OperatorAuthService
 from app.reply_helpers import image_attachment_urls, read_uploads, reply_body_with_attachments
 from app.services.contact_import import ContactImportValidationError, import_contacts_csv
 from app.services.customer_actions import (
@@ -134,6 +136,7 @@ class QuickResponseSendRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
+    email: str | None = None
     password: str
 
 
@@ -141,8 +144,29 @@ class LoginRequest(BaseModel):
 def api_login(
     payload: LoginRequest,
     settings: Settings = Depends(get_settings),
+    operator_auth: OperatorAuthService = Depends(get_operator_auth_service),
 ) -> JSONResponse:
     admin_enabled(settings)
+    email = (payload.email or "").strip().lower()
+    if email:
+        operator = operator_auth.authenticate(email=email, password=payload.password)
+        response = JSONResponse(
+            {
+                "authenticated": True,
+                "user": _serialize_operator(operator),
+            }
+        )
+        response.set_cookie(
+            SESSION_COOKIE,
+            operator_session_value(settings, operator),
+            httponly=True,
+            secure=True,
+            samesite="lax",
+        )
+        return response
+
+    if not settings.enable_admin_password_fallback or not settings.admin_password:
+        raise HTTPException(status_code=401)
     if not hmac.compare_digest(payload.password, settings.admin_password):
         raise HTTPException(status_code=401)
     response = JSONResponse({"authenticated": True})
@@ -164,11 +188,13 @@ def api_me(
     settings: Settings = Depends(get_settings),
 ) -> dict[str, Any]:
     require_admin(request, settings)
+    operator = current_operator(request, settings)
     return {
         "authenticated": True,
         "session": {
             "cookieName": SESSION_COOKIE,
         },
+        "user": _serialize_operator(operator) if operator else None,
         "app": {
             "name": "Maya Relay",
             "environment": settings.app_env,
@@ -193,6 +219,8 @@ def api_readiness(
         "twilioMessagingServiceSid": bool(settings.twilio_messaging_service_sid),
         "supabaseUrl": bool(settings.supabase_url),
         "supabaseServiceRoleKey": bool(settings.supabase_service_role_key),
+        "operatorAuth": settings.operator_auth_configured,
+        "authSessionSecret": bool(settings.auth_cookie_secret),
         "openaiApiKey": bool(settings.openai_api_key) if settings.enable_ai_triage else True,
     }
     return {
@@ -222,6 +250,18 @@ def api_quick_responses(
 
 def _quick_response_payloads(settings: Settings) -> list[dict[str, Any]]:
     return [_public_quick_response(response) for response in _quick_response_definitions(settings)]
+
+
+def _serialize_operator(operator: Any) -> dict[str, Any]:
+    return {
+        "id": operator.id,
+        "email": operator.email,
+        "displayName": operator.display_name,
+        "role": operator.role,
+        "routingLine": operator.routing_line,
+        "clickToCallPhone": operator.click_to_call_phone,
+        "callRoutingReady": bool(operator.click_to_call_phone),
+    }
 
 
 def _quick_response_by_id(settings: Settings, quick_response_id: str) -> dict[str, Any] | None:

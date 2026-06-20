@@ -90,6 +90,19 @@ create table if not exists public.call_events (
   received_at timestamptz not null default now()
 );
 
+create table if not exists public.operator_profiles (
+  id uuid primary key default gen_random_uuid(),
+  supabase_user_id uuid unique,
+  email text not null unique,
+  display_name text not null,
+  role text not null default 'operator' check (role in ('operator')),
+  routing_line text not null default 'operator',
+  click_to_call_phone text,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.customer_action_requests (
   id uuid primary key default gen_random_uuid(),
   conversation_id uuid not null references public.conversations(id) on delete cascade,
@@ -187,6 +200,12 @@ create index if not exists call_events_call_received_idx
 create index if not exists call_events_twilio_sid_received_idx
   on public.call_events (twilio_call_sid, received_at desc)
   where twilio_call_sid is not null;
+
+create index if not exists operator_profiles_email_idx
+  on public.operator_profiles (lower(email));
+
+create index if not exists operator_profiles_active_idx
+  on public.operator_profiles (active);
 
 create index if not exists customer_action_requests_conversation_created_idx
   on public.customer_action_requests (conversation_id, created_at desc);

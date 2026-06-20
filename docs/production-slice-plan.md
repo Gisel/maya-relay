@@ -962,6 +962,24 @@ Deploy/validation plan:
 - Confirm old unauthenticated access is rejected.
 - Confirm existing SMS/WhatsApp/call screens load after login.
 
+Implementation note, June 20, 2026:
+
+- Auth uses Supabase Auth for email/password verification when Supabase Auth keys are configured.
+- Maya Relay keeps a local `operator_profiles` table synced to the Supabase Auth user by email and `supabase_user_id`.
+- The first implementation keeps the old `ADMIN_PASSWORD` path as a controlled fallback through `ENABLE_ADMIN_PASSWORD_FALLBACK`.
+- Required Railway/local variables for the auth foundation:
+  - `AUTH_SESSION_SECRET`
+  - `SUPABASE_URL`
+  - `SUPABASE_SERVICE_ROLE_KEY`
+  - `SUPABASE_ANON_KEY` if available; server falls back to service role for auth calls when absent
+  - `OPERATOR_1_EMAIL`
+  - `OPERATOR_1_PASSWORD`
+  - `OPERATOR_1_NAME`
+  - `OPERATOR_1_CALL_PHONE`
+  - `OPERATOR_1_ROUTING_LINE`
+  - matching `OPERATOR_2_*` values
+- Production Supabase migration `add_operator_profiles` has been applied.
+
 ### Slice A2: User-Routed Outbound Calls
 
 Feature goal:

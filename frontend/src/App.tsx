@@ -313,8 +313,9 @@ function LoginScreen({
   onLogin,
 }: {
   error: string;
-  onLogin: (password: string) => Promise<void>;
+  onLogin: (email: string, password: string) => Promise<void>;
 }) {
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -322,7 +323,7 @@ function LoginScreen({
     event.preventDefault();
     setIsSubmitting(true);
     try {
-      await onLogin(password);
+      await onLogin(email, password);
       setPassword("");
     } finally {
       setIsSubmitting(false);
@@ -340,17 +341,26 @@ function LoginScreen({
           </div>
         </div>
         <label>
+          <span>Email</span>
+          <input
+            autoComplete="username"
+            autoFocus
+            onChange={(event) => setEmail(event.target.value)}
+            type="email"
+            value={email}
+          />
+        </label>
+        <label>
           <span>Password</span>
           <input
             autoComplete="current-password"
-            autoFocus
             onChange={(event) => setPassword(event.target.value)}
             type="password"
             value={password}
           />
         </label>
         {error && <p className="form-error">{error}</p>}
-        <button className="send-button" disabled={!password || isSubmitting} type="submit">
+        <button className="send-button" disabled={!email.trim() || !password || isSubmitting} type="submit">
           {isSubmitting ? "Signing in..." : "Sign in"}
         </button>
       </form>
@@ -1303,13 +1313,13 @@ export function App() {
     setIsContextOpen(!mediaQuery.matches);
   }, []);
 
-  async function handleLogin(password: string) {
+  async function handleLogin(email: string, password: string) {
     setAuthError("");
     try {
-      await login(password);
+      await login(email, password);
       setIsAuthenticated(true);
     } catch (error) {
-      setAuthError(error instanceof ApiError && error.status === 401 ? "Invalid password." : "Could not sign in.");
+      setAuthError(error instanceof ApiError && [401, 403].includes(error.status) ? "Invalid email or password." : "Could not sign in.");
     }
   }
 

@@ -2,6 +2,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from app.attachments import StoredAttachment
+from app.auth import OperatorProfile
 from app.models import Channel, Contact, Conversation
 
 
@@ -892,3 +893,42 @@ def _message_search_text(messages: list[dict[str, Any]]) -> str:
             if value
         )
     return " ".join(parts)
+
+
+class FakeOperatorAuthService:
+    def __init__(self):
+        self.operators: dict[str, tuple[str, OperatorProfile]] = {}
+
+    def add_operator(
+        self,
+        *,
+        email: str = "signs@mayagraphics.test",
+        password: str = "secret",
+        display_name: str = "Signs Operator",
+        routing_line: str = "signs",
+        click_to_call_phone: str = "+15551234567",
+        active: bool = True,
+    ) -> OperatorProfile:
+        profile = OperatorProfile(
+            id=f"operator-{len(self.operators) + 1}",
+            email=email,
+            display_name=display_name,
+            role="operator",
+            routing_line=routing_line,
+            click_to_call_phone=click_to_call_phone,
+            active=active,
+            supabase_user_id=f"auth-{len(self.operators) + 1}",
+        )
+        self.operators[email.lower()] = (password, profile)
+        return profile
+
+    def authenticate(self, *, email: str, password: str) -> OperatorProfile:
+        from fastapi import HTTPException
+
+        expected = self.operators.get(email.lower())
+        if expected is None or expected[0] != password:
+            raise HTTPException(status_code=401)
+        profile = expected[1]
+        if not profile.active:
+            raise HTTPException(status_code=403, detail="Operator is inactive.")
+        return profile

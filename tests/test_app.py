@@ -7,6 +7,7 @@ from app.config import Settings, get_settings
 from app.dependencies import (
     get_attachment_store,
     get_message_triage,
+    get_operator_auth_service,
     get_relay_service,
     get_repository,
     get_sender,
@@ -14,7 +15,7 @@ from app.dependencies import (
 )
 from app.main import create_app
 from app.services.relay import RelayService
-from tests.fakes import FakeAttachmentStore, FakeRepository, FakeSender, FakeTriage, FakeVoiceCaller
+from tests.fakes import FakeAttachmentStore, FakeOperatorAuthService, FakeRepository, FakeSender, FakeTriage, FakeVoiceCaller
 
 
 PROOF_PDF_BYTES = b"%PDF-1.4\nfake proof"
@@ -37,6 +38,7 @@ def make_client(
     whatsapp_template_payment_reminder_content_sid: str = "",
     whatsapp_template_owner_message_content_sid: str = "",
     message_triage: FakeTriage | None = None,
+    operator_auth: FakeOperatorAuthService | None = None,
 ) -> tuple[TestClient, FakeRepository, FakeSender]:
     settings = Settings(
         FRANCISCO_PHONE="+15551234567",
@@ -47,6 +49,7 @@ def make_client(
         OPENAI_MODEL="gpt-5-mini",
         ASSEMBLYAI_API_KEY=assemblyai_api_key,
         ADMIN_PASSWORD=admin_password,
+        AUTH_SESSION_SECRET="test-session-secret",
         TWILIO_ACCOUNT_SID=twilio_account_sid,
         TWILIO_AUTH_TOKEN=twilio_auth_token,
         TWILIO_MESSAGING_SERVICE_SID="",
@@ -76,6 +79,8 @@ def make_client(
     app.dependency_overrides[get_sender] = lambda: sender
     app.dependency_overrides[get_voice_caller] = lambda: voice_caller
     app.dependency_overrides[get_attachment_store] = lambda: attachment_store
+    if operator_auth is not None:
+        app.dependency_overrides[get_operator_auth_service] = lambda: operator_auth
     if message_triage is not None:
         app.dependency_overrides[get_message_triage] = lambda: message_triage
     app.dependency_overrides[get_settings] = lambda: settings
@@ -348,6 +353,53 @@ def test_api_json_login_and_logout():
     assert logout.status_code == 200
     assert logout.json() == {"authenticated": False}
     assert "maya_admin" in logout.headers["set-cookie"]
+
+
+def test_api_operator_login_returns_profile_and_me():
+    operator_auth = FakeOperatorAuthService()
+    operator_auth.add_operator(
+        email="signs@mayagraphics.test",
+        password="safe-password",
+        display_name="Signs Desk",
+        routing_line="signs",
+        click_to_call_phone="+15557654321",
+    )
+    client, _, _ = make_client(admin_password="legacy-secret", operator_auth=operator_auth)
+
+    bad_login = client.post(
+        "/api/auth/login",
+        json={"email": "signs@mayagraphics.test", "password": "wrong"},
+    )
+    assert bad_login.status_code == 401
+
+    login = client.post(
+        "/api/auth/login",
+        json={"email": "signs@mayagraphics.test", "password": "safe-password"},
+    )
+    assert login.status_code == 200
+    payload = login.json()
+    assert payload["authenticated"] is True
+    assert payload["user"]["email"] == "signs@mayagraphics.test"
+    assert payload["user"]["displayName"] == "Signs Desk"
+    assert payload["user"]["routingLine"] == "signs"
+    assert payload["user"]["clickToCallPhone"] == "+15557654321"
+
+    me = client.get("/api/me", headers={"cookie": login.headers["set-cookie"]})
+    assert me.status_code == 200
+    assert me.json()["user"]["email"] == "signs@mayagraphics.test"
+
+
+def test_api_operator_login_rejects_inactive_user():
+    operator_auth = FakeOperatorAuthService()
+    operator_auth.add_operator(email="orders@mayagraphics.test", password="secret", active=False)
+    client, _, _ = make_client(admin_password="legacy-secret", operator_auth=operator_auth)
+
+    response = client.post(
+        "/api/auth/login",
+        json={"email": "orders@mayagraphics.test", "password": "secret"},
+    )
+
+    assert response.status_code == 403
 
 
 def test_api_quick_responses_include_template_mapped_actions():

@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     assemblyai_poll_timeout_seconds: int = Field(default=600, alias="ASSEMBLYAI_POLL_TIMEOUT_SECONDS")
     assemblyai_poll_interval_seconds: int = Field(default=3, alias="ASSEMBLYAI_POLL_INTERVAL_SECONDS")
     admin_password: str = Field(default="", alias="ADMIN_PASSWORD")
+    auth_session_secret: str = Field(default="", alias="AUTH_SESSION_SECRET")
+    enable_admin_password_fallback: bool = Field(default=True, alias="ENABLE_ADMIN_PASSWORD_FALLBACK")
     app_base_url: str = Field(default="", alias="APP_BASE_URL")
     customer_action_token_secret: str = Field(default="", alias="CUSTOMER_ACTION_TOKEN_SECRET")
 
@@ -47,7 +49,22 @@ class Settings(BaseSettings):
 
     supabase_url: str = Field(default="", alias="SUPABASE_URL")
     supabase_service_role_key: str = Field(default="", alias="SUPABASE_SERVICE_ROLE_KEY")
+    supabase_anon_key: str = Field(default="", alias="SUPABASE_ANON_KEY")
     supabase_attachments_bucket: str = Field(default="attachments", alias="SUPABASE_ATTACHMENTS_BUCKET")
+
+    operator_1_email: str = Field(default="", alias="OPERATOR_1_EMAIL")
+    operator_1_password: str = Field(default="", alias="OPERATOR_1_PASSWORD")
+    operator_1_name: str = Field(default="", alias="OPERATOR_1_NAME")
+    operator_1_call_phone: str = Field(default="", alias="OPERATOR_1_CALL_PHONE")
+    operator_1_routing_line: str = Field(default="", alias="OPERATOR_1_ROUTING_LINE")
+    operator_1_supabase_user_id: str = Field(default="", alias="OPERATOR_1_SUPABASE_USER_ID")
+
+    operator_2_email: str = Field(default="", alias="OPERATOR_2_EMAIL")
+    operator_2_password: str = Field(default="", alias="OPERATOR_2_PASSWORD")
+    operator_2_name: str = Field(default="", alias="OPERATOR_2_NAME")
+    operator_2_call_phone: str = Field(default="", alias="OPERATOR_2_CALL_PHONE")
+    operator_2_routing_line: str = Field(default="", alias="OPERATOR_2_ROUTING_LINE")
+    operator_2_supabase_user_id: str = Field(default="", alias="OPERATOR_2_SUPABASE_USER_ID")
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -69,6 +86,37 @@ class Settings(BaseSettings):
         if self.francisco_phone_e164:
             phones.add(self.francisco_phone_e164)
         return frozenset(phones)
+
+    @property
+    def auth_cookie_secret(self) -> str:
+        return self.auth_session_secret or self.customer_action_token_secret or self.admin_password
+
+    @property
+    def supabase_auth_key(self) -> str:
+        return self.supabase_anon_key or self.supabase_service_role_key
+
+    @property
+    def operator_seed_configs(self) -> tuple[dict[str, str], ...]:
+        seeds: list[dict[str, str]] = []
+        for prefix in ("operator_1", "operator_2"):
+            email = getattr(self, f"{prefix}_email").strip().lower()
+            if not email:
+                continue
+            seeds.append(
+                {
+                    "email": email,
+                    "password": getattr(self, f"{prefix}_password"),
+                    "display_name": getattr(self, f"{prefix}_name").strip() or email,
+                    "click_to_call_phone": normalize_phone_number(getattr(self, f"{prefix}_call_phone")),
+                    "routing_line": getattr(self, f"{prefix}_routing_line").strip() or "operator",
+                    "supabase_user_id": getattr(self, f"{prefix}_supabase_user_id").strip(),
+                }
+            )
+        return tuple(seeds)
+
+    @property
+    def operator_auth_configured(self) -> bool:
+        return bool(self.operator_seed_configs or (self.supabase_url and self.supabase_auth_key and self.supabase_service_role_key))
 
 
 def normalize_phone_number(phone_number: str) -> str:
