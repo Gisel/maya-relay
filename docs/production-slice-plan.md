@@ -1074,3 +1074,17 @@ Deploy/validation plan:
   - start a call
   - confirm Operator B phone rings
 - Confirm no inbound Studio behavior changed.
+
+Implementation note, June 20, 2026:
+
+- User-routed outbound calls are implemented for both outbound call paths:
+  - `POST /api/calls`
+  - `POST /api/conversations/{conversation_id}/call`
+- Logged-in operator sessions route calls to `operator_profiles.click_to_call_phone`.
+- Legacy shared-admin sessions still fall back to `FRANCISCO_PHONE` during transition.
+- The actual first-leg phone remains stored in `calls.employee_phone`.
+- No Twilio Studio or inbound routing changes were made.
+- Verification:
+  - backend tests passed: 165
+  - frontend build passed
+  - mobile/e2e tests passed: 46

@@ -1686,6 +1686,32 @@ def test_api_starts_click_to_call_bridge():
     assert call["status"] == "initiated"
 
 
+def test_api_click_to_call_routes_to_logged_in_operator_phone():
+    operator_auth = FakeOperatorAuthService()
+    operator_auth.add_operator(
+        email="sales@msmaya.com",
+        password="secret",
+        display_name="Sales",
+        routing_line="general_orders",
+        click_to_call_phone="+18019414626",
+    )
+    client, repository, _ = make_client(admin_password="legacy-secret", operator_auth=operator_auth)
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    login = client.post("/api/auth/login", json={"email": "sales@msmaya.com", "password": "secret"})
+    cookie = login.headers["set-cookie"]
+
+    response = client.post("/api/conversations/conversation-1/call", headers={"cookie": cookie})
+
+    assert response.status_code == 200
+    assert response.json()["employeePhone"] == "+18019414626"
+    assert client.app.state.fake_voice_caller.calls[0]["employee_phone"] == "+18019414626"
+    assert repository.calls[0]["employee_phone"] == "+18019414626"
+    assert repository.calls[0]["call_type"] == "conversation_call"
+
+
 def test_api_rejects_duplicate_active_click_to_call():
     client, repository, _ = make_client(admin_password="secret")
     repository.get_or_create_customer_conversation(
@@ -1746,6 +1772,59 @@ def test_api_starts_new_call_and_creates_contact_conversation():
     assert repository.calls[0]["customer_phone"] == "+15550000003"
     assert repository.calls[0]["employee_phone"] == "+15551234567"
     assert repository.calls[0]["twilio_call_sid"] == "CAfake1"
+
+
+def test_api_new_call_routes_to_logged_in_operator_phone():
+    operator_auth = FakeOperatorAuthService()
+    operator_auth.add_operator(
+        email="francisco@msmaya.com",
+        password="secret",
+        display_name="Francisco",
+        routing_line="signs",
+        click_to_call_phone="+18016996148",
+    )
+    client, repository, _ = make_client(admin_password="legacy-secret", operator_auth=operator_auth)
+    login = client.post("/api/auth/login", json={"email": "francisco@msmaya.com", "password": "secret"})
+    cookie = login.headers["set-cookie"]
+
+    response = client.post(
+        "/api/calls",
+        json={"phone_number": "+15550000003", "display_name": "New Client"},
+        headers={"cookie": cookie},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["employeePhone"] == "+18016996148"
+    assert repository.conversations[0].assigned_employee == "+18016996148"
+    assert client.app.state.fake_voice_caller.calls[0]["employee_phone"] == "+18016996148"
+    assert repository.calls[0]["employee_phone"] == "+18016996148"
+    assert repository.calls[0]["call_type"] == "manual_outbound"
+
+
+def test_api_outbound_call_requires_logged_in_operator_phone():
+    operator_auth = FakeOperatorAuthService()
+    operator_auth.add_operator(
+        email="admin@mayagraphics.test",
+        password="secret",
+        display_name="Admin",
+        routing_line="admin",
+        click_to_call_phone="",
+    )
+    client, repository, _ = make_client(admin_password="legacy-secret", operator_auth=operator_auth)
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    login = client.post("/api/auth/login", json={"email": "admin@mayagraphics.test", "password": "secret"})
+    cookie = login.headers["set-cookie"]
+
+    response = client.post("/api/conversations/conversation-1/call", headers={"cookie": cookie})
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Logged-in operator does not have a call phone configured."
+    assert client.app.state.fake_voice_caller.calls == []
+    assert repository.calls == []
 
 
 def test_api_new_call_rejects_maya_business_number():

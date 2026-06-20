@@ -1275,6 +1275,7 @@ def api_call_conversation_customer(
         conversation=conversation,
         voice_caller=voice_caller,
         call_type="conversation_call",
+        employee_phone=_resolve_click_to_call_employee_phone(request, settings),
     )
 
 
@@ -1318,9 +1319,7 @@ def api_start_new_call(
     voice_caller: VoiceCaller = Depends(get_voice_caller),
 ) -> dict[str, Any]:
     require_admin(request, settings)
-    employee_phone = settings.francisco_phone_e164
-    if not employee_phone:
-        raise HTTPException(status_code=503, detail="FRANCISCO_PHONE is required for click-to-call.")
+    employee_phone = _resolve_click_to_call_employee_phone(request, settings)
 
     customer_phone = _voice_phone_number(payload.phone_number)
     if not customer_phone:
@@ -1344,6 +1343,7 @@ def api_start_new_call(
         conversation=conversation,
         voice_caller=voice_caller,
         call_type="manual_outbound",
+        employee_phone=employee_phone,
     )
     return {
         **call_response,
@@ -1456,11 +1456,9 @@ def _start_click_to_call(
     conversation: Conversation,
     voice_caller: VoiceCaller,
     call_type: Literal["conversation_call", "manual_outbound"],
+    employee_phone: str,
 ) -> dict[str, str]:
-    employee_phone = settings.francisco_phone_e164
     customer_phone = _voice_phone_number(conversation.customer_phone)
-    if not employee_phone:
-        raise HTTPException(status_code=503, detail="FRANCISCO_PHONE is required for click-to-call.")
     if not settings.maya_business_number_e164:
         raise HTTPException(status_code=503, detail="MAYA_BUSINESS_NUMBER is required for click-to-call.")
     if not customer_phone:
@@ -1495,6 +1493,20 @@ def _start_click_to_call(
         "to": customer_phone,
         "employeePhone": employee_phone,
     }
+
+
+def _resolve_click_to_call_employee_phone(request: Request, settings: Settings) -> str:
+    operator = current_operator(request, settings)
+    if operator is not None:
+        employee_phone = _voice_phone_number(operator.click_to_call_phone)
+        if not employee_phone:
+            raise HTTPException(status_code=503, detail="Logged-in operator does not have a call phone configured.")
+        return employee_phone
+
+    employee_phone = settings.francisco_phone_e164
+    if not employee_phone:
+        raise HTTPException(status_code=503, detail="FRANCISCO_PHONE is required for click-to-call.")
+    return employee_phone
 
 
 def _download_twilio_recording(settings: Settings, recording_url: str) -> requests.Response:
