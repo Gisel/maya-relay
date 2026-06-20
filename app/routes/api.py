@@ -266,6 +266,24 @@ def _quick_response_definitions(settings: Settings) -> list[dict[str, Any]]:
             "channels": ["sms", "whatsapp"],
         },
         {
+            "id": "maya_owner_message",
+            "label": "Custom WhatsApp message",
+            "bodyTemplate": "Maya Graphics:\n{message}",
+            "group": "template_response",
+            "channels": ["whatsapp"],
+            "templateKey": "owner_message",
+            "variables": [
+                {
+                    "key": "message",
+                    "label": "Message",
+                    "placeholder": "Can you send the size, quantity, deadline, and artwork?",
+                    "required": True,
+                    "defaultValue": "",
+                    "contentIndex": "1",
+                }
+            ],
+        },
+        {
             "id": "maya_new_customer_intro",
             "label": "New customer intro",
             "bodyTemplate": (
@@ -1789,6 +1807,10 @@ def _quick_response_template_content_sid(settings: Settings, template_key: str) 
         "payment_reminder": (
             settings.whatsapp_template_payment_reminder_content_sid.strip(),
             "WHATSAPP_TEMPLATE_PAYMENT_REMINDER_CONTENT_SID",
+        ),
+        "owner_message": (
+            settings.whatsapp_template_owner_message_content_sid.strip(),
+            "WHATSAPP_TEMPLATE_OWNER_MESSAGE_CONTENT_SID",
         ),
     }
     content_sid, template_label = template_config.get(template_key, ("", "WhatsApp quick response template Content SID"))

@@ -370,6 +370,7 @@ This dated snapshot is the current planning source for the first production rele
 
 1. New outbound text/WhatsApp conversation start.
    - Operators currently need a way to start a new text or WhatsApp conversation, similar to how they can start a new phone call.
+   - WhatsApp owner-written first messages use the approved `maya_owner_message` Twilio template and require `WHATSAPP_TEMPLATE_OWNER_MESSAGE_CONTENT_SID` in local `.env` and Railway.
 2. Role/user-routed outbound calls.
    - New phone calls need to route through the correct line/team context, such as Signs versus General Orders.
    - The call button should be linked to the logged-in user or role so the call rings/routes to that user's configured phone line.

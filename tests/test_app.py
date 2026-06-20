@@ -35,6 +35,7 @@ def make_client(
     whatsapp_template_quote_follow_up_content_sid: str = "",
     whatsapp_template_pickup_reminder_content_sid: str = "",
     whatsapp_template_payment_reminder_content_sid: str = "",
+    whatsapp_template_owner_message_content_sid: str = "",
     message_triage: FakeTriage | None = None,
 ) -> tuple[TestClient, FakeRepository, FakeSender]:
     settings = Settings(
@@ -59,6 +60,7 @@ def make_client(
         WHATSAPP_TEMPLATE_QUOTE_FOLLOW_UP_CONTENT_SID=whatsapp_template_quote_follow_up_content_sid,
         WHATSAPP_TEMPLATE_PICKUP_REMINDER_CONTENT_SID=whatsapp_template_pickup_reminder_content_sid,
         WHATSAPP_TEMPLATE_PAYMENT_REMINDER_CONTENT_SID=whatsapp_template_payment_reminder_content_sid,
+        WHATSAPP_TEMPLATE_OWNER_MESSAGE_CONTENT_SID=whatsapp_template_owner_message_content_sid,
     )
     repository = FakeRepository()
     sender = FakeSender()
@@ -366,6 +368,9 @@ def test_api_quick_responses_include_template_mapped_actions():
     assert response_by_id["missing_job_specs"]["channels"] == ["sms", "whatsapp"]
     assert response_by_id["shop_hours"]["label"] == "Shop hours"
     assert "M-F: 9:00am - 5:30pm | SAT: By Appointment" in response_by_id["shop_hours"]["body"]
+    assert response_by_id["maya_owner_message"]["templateKey"] == "owner_message"
+    assert response_by_id["maya_owner_message"]["channels"] == ["whatsapp"]
+    assert response_by_id["maya_owner_message"]["variables"][0]["contentIndex"] == "1"
     assert response_by_id["maya_new_customer_intro"]["templateKey"] == "new_customer_intro"
     assert response_by_id["maya_quote_follow_up"]["group"] == "template_response"
     assert response_by_id["maya_quote_follow_up"]["channels"] == ["sms", "whatsapp"]
@@ -613,6 +618,45 @@ def test_api_starts_whatsapp_conversation_with_template():
             "channel": "whatsapp",
             "content_sid": "HXquote",
             "content_variables": {"1": "Gisel"},
+        }
+    ]
+
+
+def test_api_starts_whatsapp_conversation_with_owner_message_template():
+    client, repository, sender = make_client(
+        admin_password="secret",
+        whatsapp_template_owner_message_content_sid="HXowner",
+    )
+    login = client.post("/api/auth/login", json={"password": "secret"})
+
+    response = client.post(
+        "/api/conversations/start",
+        json={
+            "phone_number": "+15550000003",
+            "channel": "whatsapp",
+            "template_key": "owner_message",
+            "variables": {"message": "Can you send the size, quantity, deadline, and artwork?"},
+            "client_request_id": "start-wa-owner-1",
+        },
+        headers={"cookie": login.headers["set-cookie"]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "sent"
+    assert payload["sendMode"] == "template"
+    assert payload["templateKey"] == "owner_message"
+    assert payload["contentSid"] == "HXowner"
+    assert repository.messages[0]["body"] == (
+        "Maya Graphics:\nCan you send the size, quantity, deadline, and artwork?"
+    )
+    assert sender.sent_messages == [
+        {
+            "sid": "SMfake1",
+            "to_phone": "+15550000003",
+            "channel": "whatsapp",
+            "content_sid": "HXowner",
+            "content_variables": {"1": "Can you send the size, quantity, deadline, and artwork?"},
         }
     ]
 

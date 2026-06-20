@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     whatsapp_template_quote_follow_up_content_sid: str = Field(default="", alias="WHATSAPP_TEMPLATE_QUOTE_FOLLOW_UP_CONTENT_SID")
     whatsapp_template_pickup_reminder_content_sid: str = Field(default="", alias="WHATSAPP_TEMPLATE_PICKUP_REMINDER_CONTENT_SID")
     whatsapp_template_payment_reminder_content_sid: str = Field(default="", alias="WHATSAPP_TEMPLATE_PAYMENT_REMINDER_CONTENT_SID")
+    whatsapp_template_owner_message_content_sid: str = Field(
+        default="",
+        alias="WHATSAPP_TEMPLATE_OWNER_MESSAGE_CONTENT_SID",
+    )
     twilio_studio_webhook_secret: str = Field(default="", alias="TWILIO_STUDIO_WEBHOOK_SECRET")
     maya_business_number: str = Field(default="", alias="MAYA_BUSINESS_NUMBER")
     francisco_phone: str = Field(default="", alias="FRANCISCO_PHONE")

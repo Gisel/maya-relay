@@ -40,7 +40,9 @@ function templateResponses(responses: QuickResponse[]) {
 
 function defaultTemplate(responses: QuickResponse[]) {
   return (
-    responses.find((response) => response.id === "maya_new_customer_intro")
+    responses.find((response) => response.id === "maya_owner_message")
+    || responses.find((response) => response.templateKey === "owner_message")
+    || responses.find((response) => response.id === "maya_new_customer_intro")
     || responses.find((response) => response.templateKey === "new_customer_intro")
     || responses[0]
     || null

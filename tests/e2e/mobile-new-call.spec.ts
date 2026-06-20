@@ -537,6 +537,25 @@ async function mockMayaRelayApi(
             channels: ["sms", "whatsapp"],
           },
           {
+            id: "maya_owner_message",
+            label: "Custom WhatsApp message",
+            body: "Maya Graphics:\n",
+            bodyTemplate: "Maya Graphics:\n{message}",
+            group: "template_response",
+            channels: ["whatsapp"],
+            templateKey: "owner_message",
+            variables: [
+              {
+                key: "message",
+                label: "Message",
+                placeholder: "Can you send the size, quantity, deadline, and artwork?",
+                required: true,
+                defaultValue: "",
+                contentIndex: "1",
+              },
+            ],
+          },
+          {
             id: "maya_quote_follow_up",
             label: "Quote follow-up",
             body: "Hi there, following up on your quote request. Reply here with any questions or updates.",
