@@ -1049,6 +1049,33 @@ test("calls workspace saves outcome follow-up notes recap and transcription", as
   await expect(workspace.getByLabel("Follow-up status")).toHaveValue("needed");
 });
 
+test("desktop calls workspace can collapse the customer profile panel", async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await mockMayaRelayApi(page);
+
+  await page.goto("/app/");
+  await page.getByRole("tab", { name: "Calls" }).click();
+
+  const workspace = page.locator(".call-workspace");
+  const contextPanel = page.locator(".context-panel");
+  await expect(workspace.getByRole("heading", { name: "Call details" })).toBeVisible();
+  await expect(contextPanel.getByRole("heading", { name: "Customer Profile" })).toBeVisible();
+
+  const expandedBox = await workspace.boundingBox();
+  await page.getByRole("button", { name: "Hide customer profile" }).click();
+
+  await expect(contextPanel).toBeHidden();
+  await expect(page.getByRole("button", { name: "Show customer profile" })).toBeVisible();
+  const collapsedBox = await workspace.boundingBox();
+
+  expect(expandedBox).not.toBeNull();
+  expect(collapsedBox).not.toBeNull();
+  expect(collapsedBox!.width).toBeGreaterThan(expandedBox!.width + 200);
+
+  await page.getByRole("button", { name: "Show customer profile" }).click();
+  await expect(contextPanel.getByRole("heading", { name: "Customer Profile" })).toBeVisible();
+});
+
 test("customer messages mark conversations as needing reply", async ({ page }) => {
   await mockMayaRelayApi(page);
 

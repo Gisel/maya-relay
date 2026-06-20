@@ -1,4 +1,5 @@
 import { Clock, Phone } from "lucide-react";
+import { ReactNode } from "react";
 import { CallConversationListItem, CallRecord } from "../api";
 import { CallDetailsForm, CallDetailsPayload } from "./CallDetailsForm";
 import {
@@ -42,8 +43,10 @@ export function CallWorkspace({
   onTranscribeCall,
   selectedCall,
   selectedRow,
+  headerActions,
 }: {
   calls: CallRecord[];
+  headerActions?: ReactNode;
   isLoadingDetail: boolean;
   onGenerateCallRecap: (callId: string) => Promise<void>;
   onSaveCallDetails: (callId: string, payload: CallDetailsPayload) => Promise<void>;
@@ -78,9 +81,12 @@ export function CallWorkspace({
             {selectedRow.conversation?.code && <span>Session ID: #{selectedRow.conversation.code}</span>}
           </p>
         </div>
-        <span className={`workflow-pill workflow-${selectedRow.workflowStatus || "pending_follow_up"}`}>
-          {workflowLabel(selectedRow.workflowStatus)}
-        </span>
+        <div className="call-workspace-header-actions">
+          <span className={`workflow-pill workflow-${selectedRow.workflowStatus || "pending_follow_up"}`}>
+            {workflowLabel(selectedRow.workflowStatus)}
+          </span>
+          {headerActions}
+        </div>
       </header>
 
       <div className="call-workspace-grid">

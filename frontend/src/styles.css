@@ -1107,6 +1107,26 @@ button {
   padding: 0 10px;
 }
 
+.profile-panel-toggle {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #d7dde7;
+  border-radius: 999px;
+  color: #475366;
+  display: none;
+  font-size: 12px;
+  font-weight: 560;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+.profile-panel-toggle:hover {
+  border-color: #b8c6d8;
+  color: #1f2a3d;
+}
+
 .conversation-status-action,
 .conversation-call-action,
 .conversation-proof-action {
@@ -2412,6 +2432,13 @@ button {
   margin: 0;
 }
 
+.call-workspace-header-actions {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 10px;
+}
+
 .workspace-kicker {
   color: #98a2b3;
   display: block;
@@ -3667,6 +3694,20 @@ button {
 
   .composer {
     padding: 8px 22px 10px;
+  }
+}
+
+@media (min-width: 1101px) {
+  .workspace.profile-panel-collapsed {
+    grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  }
+
+  .context-panel.is-desktop-collapsed {
+    display: none;
+  }
+
+  .profile-panel-toggle {
+    display: inline-flex;
   }
 }
 

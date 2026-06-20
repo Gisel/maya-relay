@@ -83,6 +83,7 @@ import { SettingsModal } from "./settings/SettingsModal";
 
 const INBOX_REFRESH_INTERVAL_MS = 15000;
 const CLOSE_AUDIT_LOG_PREFIX = "[Maya Relay Close Audit]";
+const PROFILE_PANEL_COLLAPSED_STORAGE_KEY = "maya-relay-profile-panel-collapsed";
 
 function closeAuditLog(event: string, details: Record<string, unknown> = {}) {
   console.info(CLOSE_AUDIT_LOG_PREFIX, event, {
@@ -764,6 +765,10 @@ export function App() {
     if (typeof window === "undefined") return true;
     return !window.matchMedia("(max-width: 760px)").matches;
   });
+  const [isProfilePanelCollapsed, setIsProfilePanelCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(PROFILE_PANEL_COLLAPSED_STORAGE_KEY) === "true";
+  });
   const didRunInitialSearchEffect = useRef(false);
   const searchRequestId = useRef(0);
   const callSearchRequestId = useRef(0);
@@ -1315,6 +1320,10 @@ export function App() {
     const mediaQuery = window.matchMedia("(max-width: 760px)");
     setIsContextOpen(!mediaQuery.matches);
   }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(PROFILE_PANEL_COLLAPSED_STORAGE_KEY, String(isProfilePanelCollapsed));
+  }, [isProfilePanelCollapsed]);
 
   async function handleLogin(email: string, password: string) {
     setAuthError("");
@@ -1993,6 +2002,18 @@ export function App() {
       ? cleanPhone(selectedCallRow.customer.phone || selectedCallRow.latestCall.customerPhone)
       : displayPhone;
   const contextCode = workspaceMode === "calls" ? selectedCallRow?.conversation?.code : activeConversation?.code;
+  const profilePanelToggle = (
+    <button
+      aria-label={isProfilePanelCollapsed ? "Show customer profile" : "Hide customer profile"}
+      className="profile-panel-toggle"
+      onClick={() => setIsProfilePanelCollapsed((current) => !current)}
+      title={isProfilePanelCollapsed ? "Show customer profile" : "Hide customer profile"}
+      type="button"
+    >
+      {isProfilePanelCollapsed ? <PanelRightOpen size={16} /> : <PanelRightClose size={16} />}
+      <span>{isProfilePanelCollapsed ? "Show profile" : "Hide profile"}</span>
+    </button>
+  );
 
   return (
     <div className="app-shell">
@@ -2043,7 +2064,7 @@ export function App() {
         </div>
       </header>
 
-      <main className="workspace">
+      <main className={`workspace ${isProfilePanelCollapsed ? "profile-panel-collapsed" : ""}`}>
         <aside className="inbox-panel">
           <WorkspaceTabs mode={workspaceMode} onModeChange={handleWorkspaceModeChange} />
 
@@ -2241,6 +2262,7 @@ export function App() {
                     {isContextOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
                     <span>{isContextOpen ? "Hide details" : "Details"}</span>
                   </button>
+                  {profilePanelToggle}
                 </div>
               </div>
             </div>
@@ -2281,6 +2303,7 @@ export function App() {
         ) : (
           <CallWorkspace
             calls={calls}
+            headerActions={profilePanelToggle}
             isLoadingDetail={isLoadingDetail}
             onGenerateCallRecap={handleGenerateCallRecap}
             onSaveCallDetails={handleSaveCallDetails}
@@ -2291,7 +2314,7 @@ export function App() {
           />
         )}
 
-        <aside className={`context-panel mobile-drawer ${isContextOpen ? "is-open" : "is-collapsed"}`}>
+        <aside className={`context-panel mobile-drawer ${isContextOpen ? "is-open" : "is-collapsed"} ${isProfilePanelCollapsed ? "is-desktop-collapsed" : ""}`}>
           <div className="context-panel-header">
             <span>Details</span>
             <button aria-label="Close details panel" onClick={() => setIsContextOpen(false)} type="button">
