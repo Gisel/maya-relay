@@ -1113,19 +1113,16 @@ button {
 }
 
 .conversation-call-action {
-  background: var(--brand-blue-soft);
-  border-color: #bfd5f8;
-  color: var(--brand-blue-dark);
+  border-color: #8fc8ff;
+  color: var(--brand-blue);
 }
 
 .conversation-proof-action {
-  background: #effaf3;
-  border-color: #a8dfbc;
-  color: #176a3b;
+  border-color: #f4aac6;
+  color: #b8326d;
 }
 
 .conversation-asset-action {
-  background: #fff7ed;
   border-color: #f4c98a;
   color: #875000;
 }
@@ -1137,8 +1134,10 @@ button {
 
 .conversation-status-action:disabled,
 .conversation-call-action:disabled,
-.conversation-proof-action:disabled {
+.conversation-proof-action:disabled,
+.conversation-asset-action:disabled {
   background: #eef1f5;
+  border-color: #d7dde7;
   color: #98a2b6;
   cursor: not-allowed;
 }
@@ -4276,10 +4275,6 @@ button {
 
   .conversation-call-action {
     color: var(--brand-blue);
-  }
-
-  .conversation-panel.channel-whatsapp .conversation-call-action {
-    color: var(--brand-green-dark);
   }
 
   .conversation-status-action {
