@@ -1628,6 +1628,21 @@ button {
   padding: 0;
 }
 
+.contact-picker-search {
+  background: #ffffff;
+  width: 100%;
+}
+
+.contact-picker-search input {
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.contact-picker-search input:focus {
+  outline: none;
+}
+
 .contact-picker-results {
   border: 1px solid #e3e8f0;
   border-radius: 8px;
@@ -1637,6 +1652,10 @@ button {
   min-width: 0;
   overflow: auto;
   padding: 7px;
+}
+
+.contact-picker-results {
+  background: #ffffff;
 }
 
 .contact-picker-result {
@@ -1673,6 +1692,24 @@ button {
   font-size: 12px;
   font-style: normal;
   font-weight: 560;
+}
+
+.contact-picker-divider {
+  align-items: center;
+  color: #68748a;
+  display: grid;
+  font-size: 12px;
+  font-weight: 650;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  text-transform: uppercase;
+}
+
+.contact-picker-divider::before,
+.contact-picker-divider::after {
+  background: #e3e8f0;
+  content: "";
+  height: 1px;
 }
 
 .contact-picker-manual-fields {

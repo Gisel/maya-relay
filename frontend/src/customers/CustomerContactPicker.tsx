@@ -126,6 +126,10 @@ export function CustomerContactPicker({
         </div>
       )}
 
+      <div className="contact-picker-divider">
+        <span>Or enter a new number</span>
+      </div>
+
       <div className="contact-picker-manual-fields">
         <label>
           <span>Customer phone</span>
