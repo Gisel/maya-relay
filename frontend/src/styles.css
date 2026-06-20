@@ -4233,17 +4233,25 @@ button {
   }
 
   .conversation-header {
-    align-items: center;
+    align-items: stretch;
     background: #f4f7fb;
+    display: block;
     max-width: 100vw;
     min-height: auto;
     overflow: hidden;
-    padding-bottom: 10px;
+    padding-bottom: 8px;
     padding-top: 12px;
   }
 
   .conversation-header h1 {
-    display: none;
+    display: block;
+    font-size: 17px;
+    line-height: 1.12;
+    margin: 0 0 8px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .conversation-header p {
@@ -4255,7 +4263,7 @@ button {
     font-size: 12px;
     font-weight: 560;
     gap: 3px;
-    justify-content: center;
+    justify-content: flex-start;
     max-width: 100%;
     min-height: 28px;
     overflow: hidden;
@@ -4267,19 +4275,29 @@ button {
     align-items: center;
     flex-direction: row;
     gap: 6px;
+    margin-top: 8px;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .conversation-header-actions::-webkit-scrollbar {
+    display: none;
   }
 
   .conversation-meta-row {
     align-items: center;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    display: block;
     flex-wrap: wrap;
-    gap: 8px;
     width: 100%;
   }
 
   .conversation-meta-row p {
-    justify-self: center;
+    max-width: 100%;
+    width: fit-content;
   }
 
   .chat-phone {
@@ -4310,20 +4328,42 @@ button {
     background: #eef1f5;
     justify-content: center;
     min-height: 30px;
+    order: -1;
     padding: 0;
     width: 34px;
   }
 
   .conversation-status-action,
-  .conversation-call-action {
+  .conversation-call-action,
+  .conversation-proof-action,
+  .conversation-asset-action {
     align-items: center;
     background: #eef1f5;
     border: 0;
     border-radius: 8px;
+    flex: 0 0 auto;
     justify-content: center;
     min-height: 34px;
     padding: 0;
     width: 34px;
+  }
+
+  .conversation-proof-action,
+  .conversation-asset-action {
+    background: #ffffff;
+    border: 1px solid #dfe4ec;
+    font-size: 12px;
+    gap: 5px;
+    padding: 0 10px;
+    width: auto;
+  }
+
+  .conversation-proof-action {
+    color: #b8326d;
+  }
+
+  .conversation-asset-action {
+    color: #875000;
   }
 
   .conversation-status-action {

@@ -926,6 +926,22 @@ test("customer profile edits happen from the right-panel pencil without hiding m
   await page.getByRole("button", { name: "Close customer notes" }).click();
 });
 
+test("mobile conversation header keeps customer and action controls usable", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockMayaRelayApi(page);
+
+  await page.goto("/app/");
+
+  const header = page.locator(".conversation-header");
+  await expect(header.locator("h1")).toHaveText("Test Customer");
+  await expect(header.getByRole("button", { name: "Details" })).toBeVisible();
+  await expect(header.getByRole("button", { name: "Send proof approval request" })).toBeVisible();
+  await expect(header.getByRole("button", { name: "Request customer assets" })).toBeVisible();
+
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+});
+
 test("template-aware quick responses appear in the single quick responses list", async ({ page }) => {
   await mockMayaRelayApi(page);
 
