@@ -200,7 +200,7 @@ def api_password_reset(
     settings: Settings = Depends(get_settings),
     operator_auth: OperatorAuthService = Depends(get_operator_auth_service),
 ) -> dict[str, bool]:
-    redirect_to = f"{_public_base_url(request, settings)}/reset-password"
+    redirect_to = f"{_required_public_base_url(request, settings)}/reset-password"
     operator_auth.request_password_reset(email=payload.email, redirect_to=redirect_to)
     return {"sent": True}
 
@@ -212,7 +212,7 @@ def api_password_update(
     settings: Settings = Depends(get_settings),
     operator_auth: OperatorAuthService = Depends(get_operator_auth_service),
 ) -> dict[str, bool]:
-    redirect_to = f"{_public_base_url(request, settings)}/reset-password"
+    redirect_to = f"{_required_public_base_url(request, settings)}/reset-password"
     operator_auth.update_password(
         password=payload.password,
         access_token=payload.access_token,
@@ -2445,6 +2445,17 @@ def _public_base_url(request: Request, settings: Settings) -> str:
         return request_base_url
 
     return configured_base_url or "http://localhost:8000"
+
+
+def _required_public_base_url(request: Request, settings: Settings) -> str:
+    base_url = _public_base_url(request, settings)
+    parsed = urlparse(base_url)
+    if parsed.scheme != "https" or _is_local_base_url(base_url):
+        raise HTTPException(
+            status_code=503,
+            detail="APP_BASE_URL must be set to the public HTTPS Maya Relay URL before sending password reset links.",
+        )
+    return base_url
 
 
 def _is_local_base_url(base_url: str) -> bool:

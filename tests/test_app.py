@@ -425,7 +425,11 @@ def test_api_operator_login_requires_supabase_anon_key_when_using_supabase_auth(
 
 def test_api_password_reset_sends_supabase_recovery_email():
     operator_auth = FakeOperatorAuthService()
-    client, _, _ = make_client(admin_password="legacy-secret", operator_auth=operator_auth)
+    client, _, _ = make_client(
+        admin_password="legacy-secret",
+        app_base_url="https://mayagraphics.co",
+        operator_auth=operator_auth,
+    )
 
     response = client.post(
         "/api/auth/password-reset",
@@ -437,14 +441,38 @@ def test_api_password_reset_sends_supabase_recovery_email():
     assert operator_auth.password_reset_requests == [
         {
             "email": "giselcrystal@gmail.com",
-            "redirect_to": "https://maya-relay.example/reset-password",
+            "redirect_to": "https://mayagraphics.co/reset-password",
         }
     ]
 
 
+def test_api_password_reset_rejects_localhost_redirects():
+    operator_auth = FakeOperatorAuthService()
+    client, _, _ = make_client(
+        admin_password="legacy-secret",
+        app_base_url="http://localhost:8000",
+        operator_auth=operator_auth,
+    )
+
+    response = client.post(
+        "/api/auth/password-reset",
+        json={"email": "giselcrystal@gmail.com"},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == (
+        "APP_BASE_URL must be set to the public HTTPS Maya Relay URL before sending password reset links."
+    )
+    assert operator_auth.password_reset_requests == []
+
+
 def test_api_password_update_uses_recovery_tokens():
     operator_auth = FakeOperatorAuthService()
-    client, _, _ = make_client(admin_password="legacy-secret", operator_auth=operator_auth)
+    client, _, _ = make_client(
+        admin_password="legacy-secret",
+        app_base_url="https://mayagraphics.co",
+        operator_auth=operator_auth,
+    )
 
     response = client.post(
         "/api/auth/password-update",
@@ -463,7 +491,7 @@ def test_api_password_update_uses_recovery_tokens():
             "access_token": "access-token",
             "refresh_token": "refresh-token",
             "code": None,
-            "redirect_to": "https://maya-relay.example/reset-password",
+            "redirect_to": "https://mayagraphics.co/reset-password",
         }
     ]
 

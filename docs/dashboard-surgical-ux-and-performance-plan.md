@@ -369,6 +369,7 @@ This dated snapshot is the current planning source for the first production rele
   - `/reset-password` supports requesting a Supabase Auth reset email.
   - Recovery links can update the Supabase Auth password without storing passwords in Maya Relay.
   - Shared admin password fallback is disabled by default.
+  - Railway `APP_BASE_URL` must be `https://mayagraphics.co` so reset emails never point to localhost.
 
 ### Partially Done / Needs Focused Follow-Up
 
