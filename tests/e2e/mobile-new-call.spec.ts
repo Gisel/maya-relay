@@ -789,6 +789,14 @@ test("operator can start a new SMS conversation from a saved customer", async ({
   await customerResult.click();
 
   await expect(drawer.getByLabel("Customer phone")).toHaveValue("+15550000001");
+  await expect(drawer.getByLabel("Customer name")).toHaveValue("Test Customer");
+  await drawer.getByLabel("Customer phone").fill("+15550000009");
+  await expect(drawer.getByLabel("Customer name")).toHaveValue("");
+  await drawer.getByLabel("Find customer").fill("Test");
+  await expect(customerResult).toBeVisible();
+  await customerResult.click();
+  await expect(drawer.getByLabel("Customer phone")).toHaveValue("+15550000001");
+  await expect(drawer.getByLabel("Customer name")).toHaveValue("Test Customer");
   await drawer.getByRole("textbox", { name: "Message", exact: true }).fill("Hi Test Customer, we can help with your order.");
   await drawer.getByRole("button", { name: /send message/i }).click();
 

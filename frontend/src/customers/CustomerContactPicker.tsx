@@ -83,6 +83,17 @@ export function CustomerContactPicker({
     setError("");
   }
 
+  function updatePhone(phoneNumber: string) {
+    onChange({
+      contact: null,
+      displayName: "",
+      phoneNumber,
+    });
+    setQuery("");
+    setResults([]);
+    setError("");
+  }
+
   return (
     <div className="customer-contact-picker">
       <label>
@@ -136,13 +147,7 @@ export function CustomerContactPicker({
           <input
             disabled={disabled}
             inputMode="tel"
-            onChange={(event) =>
-              onChange({
-                ...selection,
-                contact: null,
-                phoneNumber: event.target.value,
-              })
-            }
+            onChange={(event) => updatePhone(event.target.value)}
             placeholder="+1 555 000 0000"
             required
             type="tel"
