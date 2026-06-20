@@ -3,7 +3,7 @@ import {
   Archive,
   FileText,
   LogOut,
-  MessageSquare,
+  MessageSquarePlus,
   PanelRightClose,
   PanelRightOpen,
   Paperclip,
@@ -2008,20 +2008,25 @@ export function App() {
             <RefreshCw size={18} />
             Refresh
           </button>
-          <button className="new-call-button" onClick={() => setIsNewCallOpen(true)} type="button">
-            <Plus size={18} />
-            New call
+          <button aria-label="New call" className="new-call-button" onClick={() => setIsNewCallOpen(true)} title="New call" type="button">
+            <span aria-hidden="true" className="compound-icon">
+              <Phone size={18} />
+              <Plus className="icon-plus" size={11} />
+            </span>
+            <span className="topbar-action-label">Call</span>
           </button>
           <button
-            className="new-call-button"
+            aria-label="New message"
+            className="new-message-button"
             onClick={() => {
               setNewMessageError("");
               setIsNewMessageOpen(true);
             }}
+            title="New message"
             type="button"
           >
-            <MessageSquare size={18} />
-            New message
+            <MessageSquarePlus size={19} />
+            <span className="topbar-action-label">Message</span>
           </button>
           <button className="settings-button" onClick={() => setIsSettingsOpen(true)} type="button">
             <SettingsIcon size={18} />

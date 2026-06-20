@@ -580,6 +580,7 @@ button {
 .logout-button,
 .send-button,
 .new-call-button,
+.new-message-button,
 .refresh-button,
 .settings-button,
 .ghost-button {
@@ -603,6 +604,7 @@ button {
 
 .topbar-actions .logout-button,
 .topbar-actions .new-call-button,
+.topbar-actions .new-message-button,
 .topbar-actions .refresh-button,
 .topbar-actions .settings-button {
   border-radius: 7px;
@@ -624,6 +626,34 @@ button {
   color: #ffffff;
   min-height: 40px;
   padding: 0 18px;
+}
+
+.new-message-button {
+  background: #25d366;
+  color: #ffffff;
+  min-height: 40px;
+  padding: 0 18px;
+}
+
+.compound-icon {
+  display: inline-grid;
+  height: 20px;
+  place-items: center;
+  position: relative;
+  width: 22px;
+}
+
+.compound-icon .icon-plus {
+  background: currentColor;
+  border-radius: 999px;
+  color: inherit;
+  position: absolute;
+  right: -3px;
+  top: -4px;
+}
+
+.compound-icon .icon-plus path {
+  stroke: #ffffff;
 }
 
 .settings-button {
@@ -3714,6 +3744,7 @@ button {
 
   .logout-button,
   .new-call-button,
+  .new-message-button,
   .refresh-button,
   .settings-button {
     background: #eef1f5;
@@ -3723,15 +3754,25 @@ button {
 
   .logout-button,
   .new-call-button,
+  .new-message-button,
   .refresh-button,
   .settings-button {
     font-size: 0;
   }
 
-  .new-call-button,
   .refresh-button,
   .settings-button {
     color: var(--brand-blue);
+  }
+
+  .new-call-button {
+    background: var(--brand-blue);
+    color: #ffffff;
+  }
+
+  .new-message-button {
+    background: #25d366;
+    color: #ffffff;
   }
 
   .workspace {
