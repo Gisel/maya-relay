@@ -2011,7 +2011,6 @@ export function App() {
       type="button"
     >
       {isProfilePanelCollapsed ? <PanelRightOpen size={16} /> : <PanelRightClose size={16} />}
-      <span>{isProfilePanelCollapsed ? "Show profile" : "Hide profile"}</span>
     </button>
   );
 
@@ -2198,7 +2197,10 @@ export function App() {
         <section className={`conversation-panel channel-${channel}`}>
           <header className="conversation-header">
             <div className="conversation-title-block">
-              <h1>{customerName}</h1>
+              <div className="conversation-title-row">
+                <h1>{customerName}</h1>
+                {profilePanelToggle}
+              </div>
               {activeConversation?.code && <span className="session-id">Session ID: #{activeConversation.code}</span>}
               <div className="conversation-meta-row">
                 <p>
@@ -2262,7 +2264,6 @@ export function App() {
                     {isContextOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
                     <span>{isContextOpen ? "Hide details" : "Details"}</span>
                   </button>
-                  {profilePanelToggle}
                 </div>
               </div>
             </div>

@@ -1039,7 +1039,7 @@ button {
   font-size: 18px;
   font-weight: 620;
   line-height: 1.1;
-  margin: 0 0 6px;
+  margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1077,6 +1077,24 @@ button {
   width: 100%;
 }
 
+.conversation-title-row,
+.call-workspace-title-row {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.conversation-title-row h1,
+.call-workspace-title-row h1 {
+  min-width: 0;
+}
+
+.conversation-title-row {
+  margin-bottom: 6px;
+}
+
 .conversation-meta-row {
   align-items: center;
   display: flex;
@@ -1111,15 +1129,17 @@ button {
   align-items: center;
   background: #ffffff;
   border: 1px solid #d7dde7;
-  border-radius: 999px;
+  border-radius: 50%;
   color: #475366;
   display: none;
   font-size: 12px;
   font-weight: 560;
-  gap: 6px;
+  height: 30px;
+  justify-content: center;
   min-height: 30px;
-  padding: 0 12px;
-  white-space: nowrap;
+  min-width: 30px;
+  padding: 0;
+  width: 30px;
 }
 
 .profile-panel-toggle:hover {
@@ -2416,7 +2436,7 @@ button {
 .call-workspace-header h1 {
   font-size: 20px;
   line-height: 1.15;
-  margin: 0 0 6px;
+  margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2437,6 +2457,10 @@ button {
   display: flex;
   flex: 0 0 auto;
   gap: 10px;
+}
+
+.call-workspace-title-row {
+  margin-bottom: 6px;
 }
 
 .workspace-kicker {
