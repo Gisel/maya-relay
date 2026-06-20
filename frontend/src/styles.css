@@ -1190,8 +1190,8 @@ button {
 }
 
 .message-bubble.outbound {
-  background: var(--brand-blue);
-  border-color: var(--brand-blue);
+  background: var(--whatsapp-green);
+  border-color: var(--whatsapp-green);
   color: #ffffff;
   justify-self: end;
 }
