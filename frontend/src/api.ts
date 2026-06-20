@@ -337,6 +337,15 @@ export type StartNewCallResponse = CallConversationResponse & {
   conversation: ConversationDetail;
 };
 
+export type StartConversationResponse = {
+  status: "sent" | "duplicate";
+  sendMode: "free_form" | "template" | "duplicate";
+  templateKey: string | null;
+  contentSid: string | null;
+  conversation: ConversationDetail;
+  message: Message;
+};
+
 export type UpdateCallDetailsResponse = {
   call: CallRecord;
 };
@@ -586,6 +595,29 @@ export function startNewCall(phoneNumber: string, displayName: string) {
     body: JSON.stringify({
       phone_number: phoneNumber,
       display_name: displayName.trim() || null,
+    }),
+  });
+}
+
+export function startConversation(payload: {
+  phoneNumber: string;
+  displayName?: string;
+  channel: Channel;
+  body?: string;
+  templateKey?: string | null;
+  variables?: Record<string, string>;
+  clientRequestId: string;
+}) {
+  return request<StartConversationResponse>("/api/conversations/start", {
+    method: "POST",
+    body: JSON.stringify({
+      phone_number: payload.phoneNumber,
+      display_name: payload.displayName?.trim() || null,
+      channel: payload.channel,
+      body: payload.body || null,
+      template_key: payload.templateKey || null,
+      variables: payload.variables || {},
+      client_request_id: payload.clientRequestId,
     }),
   });
 }

@@ -492,6 +492,131 @@ def test_api_send_quick_response_requires_template_config_outside_whatsapp_windo
     )
 
 
+def test_api_starts_sms_conversation_and_sends_first_message():
+    client, repository, sender = make_client(admin_password="secret")
+    login = client.post("/api/auth/login", json={"password": "secret"})
+
+    response = client.post(
+        "/api/conversations/start",
+        json={
+            "phone_number": "5550000003",
+            "display_name": "New Client",
+            "channel": "sms",
+            "body": "Hi, this is Maya Graphics following up on your order.",
+            "client_request_id": "start-sms-1",
+        },
+        headers={"cookie": login.headers["set-cookie"]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "sent"
+    assert payload["sendMode"] == "free_form"
+    assert payload["conversation"]["id"] == "conversation-1"
+    assert payload["conversation"]["channel"] == "sms"
+    assert payload["conversation"]["customer"]["displayName"] == "New Client"
+    assert payload["message"]["body"] == "Hi, this is Maya Graphics following up on your order."
+    assert repository.conversations[0].customer_phone == "+15550000003"
+    assert repository.conversations[0].customer_channel == "sms"
+    assert repository.messages[0]["client_request_id"] == "start-sms-1"
+    assert sender.sent_messages == [
+        {
+            "sid": "SMfake1",
+            "to_phone": "+15550000003",
+            "body": "Hi, this is Maya Graphics following up on your order.",
+        }
+    ]
+
+
+def test_api_start_conversation_is_idempotent_by_client_request_id():
+    client, repository, sender = make_client(admin_password="secret")
+    login = client.post("/api/auth/login", json={"password": "secret"})
+    request_payload = {
+        "phone_number": "+15550000003",
+        "channel": "sms",
+        "body": "Hi from Maya.",
+        "client_request_id": "start-sms-1",
+    }
+
+    first = client.post(
+        "/api/conversations/start",
+        json=request_payload,
+        headers={"cookie": login.headers["set-cookie"]},
+    )
+    second = client.post(
+        "/api/conversations/start",
+        json=request_payload,
+        headers={"cookie": login.headers["set-cookie"]},
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert second.json()["status"] == "duplicate"
+    assert len(sender.sent_messages) == 1
+    assert len(repository.messages) == 1
+
+
+def test_api_start_whatsapp_conversation_requires_template():
+    client, _, _ = make_client(admin_password="secret")
+    login = client.post("/api/auth/login", json={"password": "secret"})
+
+    response = client.post(
+        "/api/conversations/start",
+        json={
+            "phone_number": "+15550000003",
+            "channel": "whatsapp",
+            "body": "Hi from Maya.",
+            "client_request_id": "start-wa-1",
+        },
+        headers={"cookie": login.headers["set-cookie"]},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Starting a WhatsApp conversation requires an approved template."
+
+
+def test_api_starts_whatsapp_conversation_with_template():
+    client, repository, sender = make_client(
+        admin_password="secret",
+        whatsapp_template_quote_follow_up_content_sid="HXquote",
+    )
+    login = client.post("/api/auth/login", json={"password": "secret"})
+
+    response = client.post(
+        "/api/conversations/start",
+        json={
+            "phone_number": "+15550000003",
+            "display_name": "Gisel",
+            "channel": "whatsapp",
+            "template_key": "quote_follow_up",
+            "variables": {"customer_name": "Gisel"},
+            "client_request_id": "start-wa-1",
+        },
+        headers={"cookie": login.headers["set-cookie"]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "sent"
+    assert payload["sendMode"] == "template"
+    assert payload["templateKey"] == "quote_follow_up"
+    assert payload["contentSid"] == "HXquote"
+    assert payload["conversation"]["channel"] == "whatsapp"
+    assert repository.conversations[0].customer_channel == "whatsapp"
+    assert repository.messages[0]["body"] == (
+        "Hi Gisel, following up on your quote request. Reply here with any questions or updates."
+    )
+    assert sender.sent_messages == [
+        {
+            "sid": "SMfake1",
+            "to_phone": "+15550000003",
+            "channel": "whatsapp",
+            "content_sid": "HXquote",
+            "content_variables": {"1": "Gisel"},
+        }
+    ]
+
+
 def test_api_operations_status_reports_recent_message_and_call_issues():
     client, repository, _ = make_client(admin_password="secret")
     repository.update_contact_lookup_name("+15550000001", "Test Customer")

@@ -3,6 +3,7 @@ import {
   Archive,
   FileText,
   LogOut,
+  MessageSquare,
   PanelRightClose,
   PanelRightOpen,
   Paperclip,
@@ -53,6 +54,7 @@ import {
   logout,
   sendQuickResponse,
   sendReply,
+  startConversation,
   startNewCall,
   transcribeCall,
   updateContact,
@@ -72,6 +74,7 @@ import { CustomerActionPanelTabs } from "./customerActions/CustomerActionPanelTa
 import { ProofActionButton } from "./customerActions/ProofActionButton";
 import { ProofRequestModal } from "./customerActions/ProofRequestModal";
 import { AiSuggestedReplyPanel } from "./messaging/AiSuggestedReplyPanel";
+import { NewMessageDrawer, NewMessagePayload } from "./messaging/NewMessageDrawer";
 import { QuickResponseSendModal } from "./messaging/QuickResponseSendModal";
 import { UnifiedSearchResults } from "./search/UnifiedSearchResults";
 import { ContactCsvImport } from "./settings/ContactCsvImport";
@@ -739,6 +742,9 @@ export function App() {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isCallingCustomer, setIsCallingCustomer] = useState(false);
   const [isNewCallOpen, setIsNewCallOpen] = useState(false);
+  const [isNewMessageOpen, setIsNewMessageOpen] = useState(false);
+  const [isSendingNewMessage, setIsSendingNewMessage] = useState(false);
+  const [newMessageError, setNewMessageError] = useState("");
   const [isCloseConfirmationOpen, setIsCloseConfirmationOpen] = useState(false);
   const [closedConversationUndo, setClosedConversationUndo] = useState<{ id: string; name: string } | null>(null);
   const [callStatus, setCallStatus] = useState("");
@@ -1833,6 +1839,44 @@ export function App() {
     }
   }
 
+  const handleAuthExpired = useCallback(() => {
+    setIsAuthenticated(false);
+  }, []);
+
+  async function handleStartNewMessage(payload: NewMessagePayload) {
+    setIsSendingNewMessage(true);
+    setNewMessageError("");
+    setAppError("");
+    setCallStatus("");
+    try {
+      const response = await startConversation(payload);
+      setIsNewMessageOpen(false);
+      setWorkspaceMode("text");
+      setStatusFilter("open");
+      setSelectedConversation(response.conversation);
+      setSelectedId(response.conversation.id);
+      setMessages([response.message]);
+      setCalls([]);
+      setCustomerActions([]);
+      setSelectedCallId("");
+      setSuggestedReply("");
+      setDraft("");
+      setFiles([]);
+      setCallStatus(response.status === "duplicate" ? "Conversation already started." : "Message sent.");
+      await loadConversations(response.conversation.id);
+      await refreshDetail(response.conversation.id, { force: true });
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setIsAuthenticated(false);
+      } else {
+        setNewMessageError(error instanceof Error ? error.message : "Could not start the conversation.");
+      }
+      throw error;
+    } finally {
+      setIsSendingNewMessage(false);
+    }
+  }
+
   async function handleSaveCallDetails(
     callId: string,
     payload: {
@@ -1967,6 +2011,17 @@ export function App() {
           <button className="new-call-button" onClick={() => setIsNewCallOpen(true)} type="button">
             <Plus size={18} />
             New call
+          </button>
+          <button
+            className="new-call-button"
+            onClick={() => {
+              setNewMessageError("");
+              setIsNewMessageOpen(true);
+            }}
+            type="button"
+          >
+            <MessageSquare size={18} />
+            New message
           </button>
           <button className="settings-button" onClick={() => setIsSettingsOpen(true)} type="button">
             <SettingsIcon size={18} />
@@ -2277,6 +2332,15 @@ export function App() {
         onClose={() => setIsNewCallOpen(false)}
         onStartCall={handleStartNewCall}
         open={isNewCallOpen}
+      />
+      <NewMessageDrawer
+        error={newMessageError}
+        isSending={isSendingNewMessage}
+        onAuthExpired={handleAuthExpired}
+        onClose={() => setIsNewMessageOpen(false)}
+        onSend={handleStartNewMessage}
+        open={isNewMessageOpen}
+        quickResponses={quickResponses}
       />
       <EditCustomerProfileModal
         contact={activeContact}

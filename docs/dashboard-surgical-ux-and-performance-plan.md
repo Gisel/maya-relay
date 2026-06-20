@@ -264,6 +264,119 @@ Visual direction to preserve:
   - refine monthly fee after real usage
   - include infrastructure, AI, support, improvements, and monitoring
 
+## Current Status Snapshot
+
+- SMS/MMS relay is working and tested.
+- WhatsApp inbound/outbound relay works inside the 24-hour window.
+- React operator inbox is live at `/app`.
+- Customer profile panel, contact edit, and CSV import are implemented.
+- Calls workspace is implemented.
+- Call recording/transcription/recap code path exists with manual fallback buttons.
+- Proof request workflow is implemented:
+  - operator sends proof
+  - customer opens `/proof/{token}`
+  - customer can approve or request changes
+  - result appears in conversation timeline
+- Assets request workflow is implemented:
+  - operator sends upload link
+  - customer opens `/assets/{token}`
+  - customer can upload multiple files
+  - uploaded files appear in conversation timeline
+- Pending Requests tab is implemented:
+  - shows Proof/Assets requests
+  - highlights pending requests
+  - can cancel pending requests
+  - blocks duplicate pending same-type requests
+- Quick Responses have been cleaned up:
+  - Request missing job specs
+  - Shop hours
+  - New customer intro
+  - Quote follow-up
+  - Pickup reminder
+  - Payment reminder
+- Template-aware quick responses are implemented:
+  - SMS uses free-form sends
+  - WhatsApp active-window sends use free-form sends
+  - WhatsApp stale-window sends use Twilio Content templates
+- WhatsApp Proof/Assets template send path is implemented.
+- AI Suggested Reply live refresh is implemented:
+  - auto-refreshes when the latest visible message is from the customer
+  - uses the last 6 visible customer/operator messages
+  - includes a manual Refresh button
+  - clears the suggestion when Maya/operator replied last
+- Mobile Playwright coverage exists for the operator app.
+- Latest verification:
+  - backend tests passed: 154
+  - frontend build passed
+  - mobile e2e passed: 42
+- Docs have been updated; this 360 status refresh is pending commit/push.
+
+## Current Pending Snapshot
+
+- Confirm Twilio/Meta approval for:
+  - `maya_proof_ready`
+  - `maya_assets_needed`
+- Smoke test older-than-24-hour WhatsApp sends:
+  - Proof request
+  - Assets request
+- Smoke test template-aware quick responses:
+  - inside the 24-hour WhatsApp window
+  - outside the 24-hour WhatsApp window
+- Fresh live validation of call recording/transcription/recap:
+  - place one real answered inbound call
+  - confirm recording appears
+  - confirm transcript appears
+  - confirm recap appears
+  - confirm manual buttons still work
+- Add Railway/readiness visibility for AssemblyAI and call automation config.
+- Add persisted provider error visibility for transcription/recap failures.
+- Add public Proof/Assets e2e automation.
+- Add e2e coverage for Transcribe recording and Generate recap buttons.
+- Add asset/proof retention and deletion controls.
+- Add retry UI for failed customer-action sends.
+- Harden auth beyond shared `ADMIN_PASSWORD`.
+- Monitor AI suggestions in production; tune beyond the last 6 messages only if needed.
+
+## Production Release Priority Snapshot - 2026-06-20
+
+This dated snapshot is the current planning source for the first production release. It is additive to the historical `Done`, `Next`, and `Pending` sections above. Do not delete older notes without explicit approval; add newer dated snapshots as the truth changes.
+
+### Done For First Production Release
+
+- Live-call recording automation validation: done.
+- Customer Profile basics: done.
+- Contact/client search foundation: done.
+- CSV import: done.
+- Observability/error explanations: done for first release; remaining improvements are low priority.
+
+### Partially Done / Needs Focused Follow-Up
+
+- WhatsApp templates: partially done, medium priority.
+  - Template-aware quick responses are implemented.
+  - Proof/Assets WhatsApp template send path is implemented.
+  - Remaining work is approval confirmation and older-than-24-hour smoke validation.
+
+### Low Priority
+
+- Call Details UX polish.
+- Manual outbound call contact/details workflow.
+- Observability/error explanation improvements beyond the first-release baseline.
+
+### Pending
+
+- Production auth/users: pending.
+
+### High Priority New Production Slices
+
+1. New outbound text/WhatsApp conversation start.
+   - Operators currently need a way to start a new text or WhatsApp conversation, similar to how they can start a new phone call.
+2. Role/user-routed outbound calls.
+   - New phone calls need to route through the correct line/team context, such as Signs versus General Orders.
+   - The call button should be linked to the logged-in user or role so the call rings/routes to that user's configured phone line.
+3. Authentication foundation for role/user routing.
+   - Auth is required for role-aware call routing and future production user separation.
+   - This should be planned as a production auth slice, not a quick login patch.
+
 ## Current Call Workflow Notes
 
 ### Outgoing Calls

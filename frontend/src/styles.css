@@ -1601,6 +1601,87 @@ button {
   font-weight: 560;
 }
 
+.customer-contact-picker {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.contact-picker-search {
+  align-items: center;
+  border: 1px solid #cdd5e1;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 18px minmax(0, 1fr);
+  min-height: 44px;
+  padding: 0 12px;
+}
+
+.contact-picker-search svg {
+  color: #68748a;
+}
+
+.contact-picker-search input {
+  border: 0;
+  min-height: 40px;
+  padding: 0;
+}
+
+.contact-picker-results {
+  border: 1px solid #e3e8f0;
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  max-height: 220px;
+  min-width: 0;
+  overflow: auto;
+  padding: 7px;
+}
+
+.contact-picker-result {
+  align-items: center;
+  background: #fbfcfe;
+  border: 1px solid #e3e8f0;
+  border-radius: 8px;
+  color: #172033;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  min-height: 54px;
+  min-width: 0;
+  padding: 9px 10px;
+  text-align: left;
+}
+
+.contact-picker-result span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.contact-picker-result strong,
+.contact-picker-result em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contact-picker-result em,
+.contact-picker-result small {
+  color: #68748a;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 560;
+}
+
+.contact-picker-manual-fields {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+}
+
 .settings-surface {
   max-width: 560px;
 }
@@ -3153,6 +3234,48 @@ button {
   font-weight: 560;
   margin-bottom: 7px;
   padding: 0;
+}
+
+.channel-choice {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.channel-choice legend {
+  grid-column: 1 / -1;
+}
+
+.channel-choice label {
+  align-items: center;
+  background: #fbfcfe;
+  border: 1px solid #dfe4ec;
+  border-radius: 8px;
+  color: #475366;
+  display: flex;
+  font-size: 14px;
+  font-weight: 600;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 12px;
+}
+
+.channel-choice label.selected {
+  background: var(--brand-blue-soft);
+  border-color: #9fc1f1;
+  color: #24547e;
+}
+
+.channel-choice input {
+  accent-color: var(--brand-blue);
+  height: 16px;
+  min-height: 16px;
+  padding: 0;
+  width: 16px;
+}
+
+.new-message-template-section {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
 }
 
 .button-grid {

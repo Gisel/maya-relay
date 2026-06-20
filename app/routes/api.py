@@ -102,6 +102,16 @@ class NewCallRequest(BaseModel):
     display_name: str | None = None
 
 
+class NewConversationRequest(BaseModel):
+    phone_number: str
+    display_name: str | None = None
+    channel: Literal["sms", "whatsapp"] = "sms"
+    body: str | None = None
+    template_key: str | None = None
+    variables: dict[str, str] = Field(default_factory=dict)
+    client_request_id: str | None = None
+
+
 class CallDetailsUpdate(BaseModel):
     outcome: Literal["connected", "voicemail", "no_answer", "follow_up_needed", "wrong_number", "cancelled"] | None = None
     follow_up_status: Literal["none", "needed", "scheduled", "done"] = "none"
@@ -217,6 +227,20 @@ def _quick_response_payloads(settings: Settings) -> list[dict[str, Any]]:
 def _quick_response_by_id(settings: Settings, quick_response_id: str) -> dict[str, Any] | None:
     return next(
         (response for response in _quick_response_definitions(settings) if response["id"] == quick_response_id),
+        None,
+    )
+
+
+def _new_conversation_template(settings: Settings, template_key: str | None) -> dict[str, Any] | None:
+    clean_template_key = (template_key or "").strip()
+    if not clean_template_key:
+        return None
+    return next(
+        (
+            response
+            for response in _quick_response_definitions(settings)
+            if response.get("templateKey") == clean_template_key or response["id"] == clean_template_key
+        ),
         None,
     )
 
@@ -548,6 +572,114 @@ def api_conversation_messages(
         raise HTTPException(status_code=404)
     messages = repository.list_messages_for_conversation(conversation_id)
     return {"messages": [_serialize_message(message) for message in messages]}
+
+
+@router.post("/conversations/start")
+def api_start_conversation(
+    payload: NewConversationRequest,
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    repository: RelayRepository = Depends(get_repository),
+    sender: MessageSender = Depends(get_sender),
+) -> dict[str, Any]:
+    require_admin(request, settings)
+    assigned_employee = settings.francisco_phone_e164
+    if not assigned_employee:
+        raise HTTPException(status_code=503, detail="FRANCISCO_PHONE is required to start a conversation.")
+
+    customer_phone = normalize_phone_number(payload.phone_number.replace("whatsapp:", ""))
+    if not customer_phone:
+        raise HTTPException(status_code=400, detail="Customer phone number is required.")
+    if customer_phone == settings.maya_business_number_e164:
+        raise HTTPException(status_code=400, detail="Customer phone number cannot be the Maya business number.")
+
+    display_name = (payload.display_name or "").strip()
+    if display_name:
+        repository.upsert_contact_display_name(customer_phone, display_name)
+
+    conversation = repository.get_or_create_customer_conversation(
+        customer_phone=customer_phone,
+        assigned_employee=assigned_employee,
+        customer_channel=payload.channel,
+    )
+
+    normalized_client_request_id = (payload.client_request_id or "").strip() or None
+    if normalized_client_request_id:
+        existing = repository.get_message_by_client_request_id(
+            conversation_id=conversation.id,
+            client_request_id=normalized_client_request_id,
+        )
+        if existing is not None:
+            return {
+                "status": "duplicate",
+                "sendMode": "duplicate",
+                "templateKey": None,
+                "contentSid": None,
+                "conversation": _serialize_conversation_detail(conversation, _conversation_metadata(repository, conversation)),
+                "message": _serialize_message(existing),
+            }
+
+    quick_response = _new_conversation_template(settings, payload.template_key)
+    if payload.template_key and quick_response is None:
+        raise HTTPException(status_code=404, detail="Conversation starter template not found.")
+
+    if payload.channel == "whatsapp":
+        if quick_response is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Starting a WhatsApp conversation requires an approved template.",
+            )
+        variables = _quick_response_variables(quick_response, payload.variables)
+        body = _render_quick_response_body(quick_response, variables)
+        content_sid = _quick_response_template_content_sid(settings, str(quick_response["templateKey"]))
+        try:
+            outbound_sid = sender.send_template_message(
+                to_phone=customer_phone,
+                channel="whatsapp",
+                content_sid=content_sid,
+                content_variables=_quick_response_content_variables(quick_response, variables),
+            )
+        except Exception as exc:
+            logger.exception("Could not start WhatsApp conversation with %s.", customer_phone)
+            raise HTTPException(status_code=502, detail="Could not send the WhatsApp conversation starter.") from exc
+        send_mode = "template"
+        template_key = str(quick_response["templateKey"])
+    else:
+        if quick_response is not None:
+            variables = _quick_response_variables(quick_response, payload.variables)
+            body = _render_quick_response_body(quick_response, variables)
+            template_key = str(quick_response.get("templateKey") or quick_response["id"])
+        else:
+            body = (payload.body or "").strip()
+            template_key = None
+        if not body:
+            raise HTTPException(status_code=400, detail="Message body is required to start an SMS conversation.")
+        try:
+            outbound_sid = sender.send_message(to_phone=customer_phone, body=body, channel="sms")
+        except Exception as exc:
+            logger.exception("Could not start SMS conversation with %s.", customer_phone)
+            raise HTTPException(status_code=502, detail="Could not send the SMS conversation starter.") from exc
+        send_mode = "free_form"
+        content_sid = None
+
+    created_message = repository.create_message(
+        conversation_id=conversation.id,
+        direction="employee_to_customer",
+        from_phone=settings.maya_business_number,
+        to_phone=customer_phone,
+        body=body,
+        twilio_message_sid=outbound_sid,
+        client_request_id=normalized_client_request_id,
+    )
+    conversation = repository.get_conversation(conversation.id) or conversation
+    return {
+        "status": "sent",
+        "sendMode": send_mode,
+        "templateKey": template_key,
+        "contentSid": content_sid,
+        "conversation": _serialize_conversation_detail(conversation, _conversation_metadata(repository, conversation)),
+        "message": _serialize_message(created_message),
+    }
 
 
 @router.post("/conversations/{conversation_id}/proof-requests")

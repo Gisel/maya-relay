@@ -45,6 +45,22 @@ async function mockMayaRelayApi(
     },
     updatedAt: "2026-06-05T14:00:00Z",
   };
+  let startedConversation: typeof conversation | null = null;
+  let startedMessage: {
+    id: string;
+    conversationId: string;
+    direction: string;
+    body: string;
+    fromPhone: string;
+    toPhone: string;
+    twilioMessageSid: string;
+    deliveryStatus: string;
+    deliveryErrorCode: null;
+    deliveryErrorMessage: null;
+    clientRequestId: string | null;
+    createdAt: string;
+    attachments: never[];
+  } | null = null;
   let contact = {
     id: "contact-1",
     phone: "+15550000001",
@@ -71,7 +87,9 @@ async function mockMayaRelayApi(
     contactImports: 0,
     operationalStatus: 0,
     suggestedReplies: 0,
+    conversationStarts: 0,
   };
+  const startConversationPayloads: unknown[] = [];
   const calls = [
     {
       id: "call-existing",
@@ -114,6 +132,9 @@ async function mockMayaRelayApi(
     const offset = Number(url.searchParams.get("offset") || "0");
     const currentConversation = { ...conversation, status: conversationStatus };
     const candidates = [currentConversation, olderConversation].filter((item) => !status || item.status === status);
+    if (startedConversation && (!status || startedConversation.status === status)) {
+      candidates.unshift(startedConversation);
+    }
     const pageConversations = query
       ? candidates.filter((item) =>
         [item.customer.name, item.customer.phone, item.lastMessage.body].join(" ").toLowerCase().includes(query),
@@ -290,6 +311,84 @@ async function mockMayaRelayApi(
         ],
         calls: [],
         suggestedReply: "",
+      },
+    });
+  });
+
+  await page.route("**/api/conversations/conversation-started", async (route) => {
+    requestCounts.detail += 1;
+    await route.fulfill({
+      contentType: "application/json",
+      json: {
+        conversation: {
+          ...(startedConversation || conversation),
+          assignedEmployee: "+15551234567",
+          createdAt: "2026-06-06T14:07:00Z",
+        },
+        messages: startedMessage ? [startedMessage] : [],
+        calls: [],
+        suggestedReply: "",
+      },
+    });
+  });
+
+  await page.route("**/api/conversations/start", async (route) => {
+    requestCounts.conversationStarts += 1;
+    const payload = JSON.parse(route.request().postData() || "{}") as {
+      body?: string;
+      channel?: "sms" | "whatsapp";
+      display_name?: string;
+      phone_number?: string;
+      client_request_id?: string;
+    };
+    startConversationPayloads.push(payload);
+    startedConversation = {
+      ...conversation,
+      id: "conversation-started",
+      code: "C0003",
+      channel: payload.channel || "sms",
+      customer: {
+        phone: payload.phone_number || "+15550000001",
+        displayName: payload.display_name || null,
+        lookupName: null,
+        name: payload.display_name || "Test Customer",
+      },
+      lastMessage: {
+        ...conversation.lastMessage,
+        body: payload.body || "Started conversation",
+        direction: "employee_to_customer",
+        createdAt: "2026-06-06T14:07:00Z",
+      },
+      updatedAt: "2026-06-06T14:07:00Z",
+    };
+    startedMessage = {
+      id: "message-started",
+      conversationId: "conversation-started",
+      direction: "employee_to_customer",
+      body: payload.body || "Started conversation",
+      fromPhone: "+13852208404",
+      toPhone: payload.phone_number || "+15550000001",
+      twilioMessageSid: "SMstarted",
+      deliveryStatus: "queued",
+      deliveryErrorCode: null,
+      deliveryErrorMessage: null,
+      clientRequestId: payload.client_request_id || null,
+      createdAt: "2026-06-06T14:07:00Z",
+      attachments: [],
+    };
+    await route.fulfill({
+      contentType: "application/json",
+      json: {
+        status: "sent",
+        sendMode: "freeform",
+        templateKey: null,
+        contentSid: null,
+        conversation: {
+          ...startedConversation,
+          assignedEmployee: "+15551234567",
+          createdAt: "2026-06-06T14:07:00Z",
+        },
+        message: startedMessage,
       },
     });
   });
@@ -616,6 +715,12 @@ async function mockMayaRelayApi(
     get operationalStatus() {
       return requestCounts.operationalStatus;
     },
+    get conversationStarts() {
+      return requestCounts.conversationStarts;
+    },
+    get startConversationPayloads() {
+      return startConversationPayloads;
+    },
     releaseHeldDetailRequest() {
       releaseHeldDetailRequest?.();
     },
@@ -666,6 +771,36 @@ test("New Call drawer stays inside the mobile viewport", async ({ page }) => {
   ]) {
     await expectInsideViewport(control);
   }
+});
+
+test("operator can start a new SMS conversation from a saved customer", async ({ page }) => {
+  const requestCounts = await mockMayaRelayApi(page);
+
+  await page.goto("/app/");
+  await expect(page.getByRole("article").getByText("Hello")).toBeVisible();
+
+  await page.getByRole("button", { name: /new message/i }).click();
+  const drawer = page.getByRole("dialog", { name: "New message" });
+  await expect(drawer).toBeVisible();
+
+  await drawer.getByLabel("Find customer").fill("Test");
+  const customerResult = drawer.locator(".contact-picker-result", { hasText: "Test Customer" });
+  await expect(customerResult).toBeVisible();
+  await customerResult.click();
+
+  await expect(drawer.getByLabel("Customer phone")).toHaveValue("+15550000001");
+  await drawer.getByRole("textbox", { name: "Message", exact: true }).fill("Hi Test Customer, we can help with your order.");
+  await drawer.getByRole("button", { name: /send message/i }).click();
+
+  await expect.poll(() => requestCounts.conversationStarts).toBe(1);
+  expect(requestCounts.startConversationPayloads[0]).toMatchObject({
+    body: "Hi Test Customer, we can help with your order.",
+    channel: "sms",
+    display_name: "Test Customer",
+    phone_number: "+15550000001",
+  });
+  await expect(drawer).toBeHidden();
+  await expect(page.getByRole("article").getByText("Hi Test Customer, we can help with your order.")).toBeVisible();
 });
 
 test("authenticated boot loads each initial resource once", async ({ page }) => {
