@@ -380,6 +380,12 @@ This dated snapshot is the current planning source for the first production rele
 
 ### High Priority New Production Slices
 
+Planning note, June 20, 2026:
+
+- Execution order is auth foundation first, then user-routed outbound calls.
+- Both operators can share one app role for the first production release.
+- The key production need is trusted user identity so the Call action can route to the logged-in operator's configured phone line.
+
 1. Role/user-routed outbound calls.
    - New phone calls need to route through the correct line/team context, such as Signs versus General Orders.
    - The call button should be linked to the logged-in user or role so the call rings/routes to that user's configured phone line.

@@ -859,3 +859,198 @@ Other AI should be used for copy, prompt, or content drafting only, not code own
 - Domain final check.
 - Update 360 list truthfully.
 - Commit/push final stable version.
+
+## Auth And User-Routed Calls Addendum - June 20, 2026
+
+This addendum defines the next production direction after the New Message and New Call saved-customer selector slices. It is additive. Do not remove the current shared-password path until the replacement is implemented, tested, deployed, and validated.
+
+### Slice A1: Production Auth Foundation
+
+Feature goal:
+
+Give Maya Relay a real operator identity model so future actions can safely depend on who is logged in.
+
+Current status:
+
+- The app uses a shared `ADMIN_PASSWORD` cookie.
+- All operator APIs are protected by the same shared admin session.
+- There is no trusted per-user identity yet.
+- Two operators need access to the whole app for the first production release.
+- Both operators can share one role for now.
+
+In scope:
+
+- Add two real operator users.
+- Use one role: `operator`.
+- Store operator routing config with the user identity:
+  - display name
+  - login identifier
+  - role
+  - active flag
+  - call routing line, such as `signs` or `general_orders`
+  - click-to-call phone number
+- Replace the shared login behavior with user login while preserving the current secure cookie pattern.
+- Passwords must be hashed; no plaintext password storage.
+- `/api/me` returns authenticated user identity, role, and call-routing readiness.
+- Existing operator API access remains all-or-nothing: authenticated operators can access the full app.
+- Keep the current shared-password behavior available only as a transition fallback if needed during rollout.
+
+Out of scope:
+
+- Fine-grained permissions.
+- Admin user-management UI.
+- Multi-company tenancy.
+- Customer login/auth.
+- Role-based feature hiding.
+- Call routing changes; those belong to Slice A2.
+
+Data contract:
+
+- Add an operator identity record with stable ID, login identifier, display name, role, active flag, password hash, and timestamps.
+- Add or associate call-routing settings for each operator.
+- Keep existing conversations, messages, contacts, calls, proof requests, and asset requests compatible.
+- Do not rewrite historical call records.
+
+API contract:
+
+- `POST /api/auth/login`
+  - Request includes login identifier and password.
+  - Response confirms authentication and returns safe user summary.
+- `POST /api/auth/logout`
+  - Clears the auth cookie/session.
+- `GET /api/me`
+  - Returns authenticated user, role, app metadata, features, and call-routing readiness.
+- Existing protected endpoints continue returning `401` when unauthenticated.
+
+UI contract:
+
+- Login screen adds a user identifier field and password field.
+- Logout remains in the top bar.
+- The app should display only small, useful identity context if needed; do not crowd the operator workspace.
+- Show clear login errors without leaking which account exists.
+- Mobile login must remain clean and usable.
+
+Tests:
+
+- Backend tests for valid login, invalid login, logout, `/api/me`, inactive user rejection, and protected endpoint rejection.
+- Password hash verification tests.
+- Session/cookie tests.
+- Frontend/e2e login smoke for one operator.
+- Regression tests that SMS, WhatsApp, calls, proof/assets, contacts, and CSV endpoints still require auth.
+
+Risks:
+
+- Locking both operators out if credentials or env/seeding are wrong.
+- Accidentally exposing password hashes or service-role data.
+- Session migration confusion while Railway deploys.
+- Tests relying on old shared-password-only login.
+
+Acceptance criteria:
+
+- Two configured operators can log in.
+- Both can access the full app.
+- `/api/me` identifies the logged-in operator.
+- Invalid and inactive users cannot log in.
+- Existing app workflows remain protected and functional.
+- No call routing behavior changes yet.
+
+Deploy/validation plan:
+
+- Commit the auth foundation as its own slice.
+- Deploy through Railway.
+- Confirm both operators can log in and out.
+- Confirm old unauthenticated access is rejected.
+- Confirm existing SMS/WhatsApp/call screens load after login.
+
+### Slice A2: User-Routed Outbound Calls
+
+Feature goal:
+
+Route outbound click-to-call actions to the phone configured for the logged-in operator, so Signs and General Orders can receive their own calls.
+
+Current status:
+
+- `POST /api/calls` starts a new manual outbound call.
+- `POST /api/conversations/{conversation_id}/call` starts a call from an existing conversation.
+- Both paths currently resolve the employee phone from `FRANCISCO_PHONE`.
+- Calls already store `employee_phone`, so the historical call log can remain compatible.
+
+In scope:
+
+- Resolve outbound call employee phone from the authenticated operator.
+- Support two configured operator destinations for the first release.
+- Preserve the existing New Call and conversation Call buttons.
+- Preserve manual phone/name fallback in New Call.
+- Store the selected employee phone on the call record.
+- Add operator attribution to outbound call records if a new nullable field is approved.
+- Show a clear error if the logged-in operator has no call phone configured.
+
+Out of scope:
+
+- Complex queue routing.
+- Call transfer.
+- Inbound Studio Flow replacement.
+- Department-switching UI unless explicitly approved.
+- Recording behavior changes.
+
+Data contract:
+
+- Existing `calls.employee_phone` remains authoritative for the phone Twilio called first.
+- Add nullable operator attribution only if needed:
+  - `operator_user_id`
+  - `operator_display_name`
+  - `operator_routing_line`
+- Existing call rows remain valid with null operator attribution.
+
+API contract:
+
+- `POST /api/calls`
+  - Uses authenticated operator routing phone instead of global `FRANCISCO_PHONE`.
+- `POST /api/conversations/{conversation_id}/call`
+  - Uses the same routing resolver.
+- Error states:
+  - `401` unauthenticated.
+  - `503` authenticated operator has no call phone configured.
+  - Existing customer-phone validation errors remain unchanged.
+
+UI contract:
+
+- The Call buttons stay simple and elegant.
+- No new routing dropdown for the first implementation.
+- Optional small confirmation/error copy may mention which operator phone will ring only if it helps prevent confusion.
+- Mobile layout must not gain extra crowded controls.
+
+Tests:
+
+- Backend tests that each operator routes calls to the correct configured phone.
+- Backend tests for missing operator call phone.
+- Backend tests for both New Call and conversation Call paths.
+- Repository tests for optional call attribution if added.
+- E2E smoke that the New Call drawer still works after auth.
+
+Risks:
+
+- Misconfigured operator phone routes calls to the wrong person.
+- Existing `FRANCISCO_PHONE` assumptions in tests need careful update.
+- Twilio click-to-call behavior must remain unchanged except the first leg destination.
+
+Acceptance criteria:
+
+- Operator A clicks Call and Operator A's configured phone rings first.
+- Operator B clicks Call and Operator B's configured phone rings first.
+- The customer is still bridged only after the operator answers.
+- Call records show the correct `employee_phone`.
+- Existing calls, conversations, messages, proof/assets, contacts, and CSV import continue working.
+
+Deploy/validation plan:
+
+- Commit as a separate slice after auth foundation is live.
+- Deploy through Railway.
+- Smoke test with both operators:
+  - log in as Operator A
+  - start a call
+  - confirm Operator A phone rings
+  - log in as Operator B
+  - start a call
+  - confirm Operator B phone rings
+- Confirm no inbound Studio behavior changed.
