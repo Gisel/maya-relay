@@ -492,7 +492,7 @@ def test_operator_password_reset_reports_supabase_rate_limit():
     except HTTPException as error:
         assert error.status_code == 429
         assert error.detail == (
-            "Password reset email was requested too recently. Please wait a few minutes before trying again."
+            "Supabase email limit reached. Wait before trying again, or configure custom SMTP for production password resets."
         )
     else:
         raise AssertionError("expected Supabase email rate limit to be surfaced")
