@@ -66,6 +66,8 @@ class MayaOperatorAuthService:
 
         profile = self._get_profile(supabase_user_id=user_id, email=email)
         if profile is not None:
+            if profile.supabase_user_id is None:
+                profile = self._link_profile_to_supabase_user(profile_id=profile.id, supabase_user_id=user_id)
             if not profile.active:
                 raise HTTPException(status_code=403, detail="Operator is inactive.")
             return profile
@@ -134,6 +136,18 @@ class MayaOperatorAuthService:
             if profile is None:
                 raise HTTPException(status_code=503, detail="Operator profile could not be synced.")
             return profile
+        return _profile_from_row(rows[0])
+
+    def _link_profile_to_supabase_user(self, *, profile_id: str, supabase_user_id: str) -> OperatorProfile:
+        response = (
+            self.service_client.table("operator_profiles")
+            .update({"supabase_user_id": supabase_user_id})
+            .eq("id", profile_id)
+            .execute()
+        )
+        rows = response.data or []
+        if not rows:
+            raise HTTPException(status_code=503, detail="Operator profile could not be linked to Supabase Auth.")
         return _profile_from_row(rows[0])
 
 

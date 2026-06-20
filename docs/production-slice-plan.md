@@ -966,12 +966,14 @@ Implementation note, June 20, 2026:
 
 - Auth uses Supabase Auth for email/password verification when Supabase Auth keys are configured.
 - Maya Relay keeps a local `operator_profiles` table synced to the Supabase Auth user by email and `supabase_user_id`.
+- Production operator routing values live in `operator_profiles`; Railway operator variables are optional bootstrap/local fallback, not the long-term routing source.
 - The first implementation keeps the old `ADMIN_PASSWORD` path as a controlled fallback through `ENABLE_ADMIN_PASSWORD_FALLBACK`.
 - Required Railway/local variables for the auth foundation:
   - `AUTH_SESSION_SECRET`
   - `SUPABASE_URL`
   - `SUPABASE_SERVICE_ROLE_KEY`
   - `SUPABASE_ANON_KEY` if available; server falls back to service role for auth calls when absent
+- Optional bootstrap/local fallback variables:
   - `OPERATOR_1_EMAIL`
   - `OPERATOR_1_PASSWORD`
   - `OPERATOR_1_NAME`
