@@ -5,6 +5,7 @@ import logging
 from typing import Any, Protocol
 
 from fastapi import HTTPException
+from gotrue.errors import AuthApiError
 from supabase import Client, create_client
 
 from app.auth import OperatorProfile
@@ -33,11 +34,14 @@ class MayaOperatorAuthService:
         if self._supabase_configured:
             return self._authenticate_with_supabase(normalized_email, password)
 
+        if self.settings.supabase_url and self.settings.supabase_service_role_key and not self.settings.supabase_anon_key:
+            raise HTTPException(status_code=503, detail="SUPABASE_ANON_KEY is required for operator login.")
+
         return self._authenticate_with_seed(normalized_email, password)
 
     @property
     def _supabase_configured(self) -> bool:
-        return bool(self.settings.supabase_url and self.settings.supabase_auth_key and self.settings.supabase_service_role_key)
+        return bool(self.settings.supabase_url and self.settings.supabase_anon_key and self.settings.supabase_service_role_key)
 
     @property
     def auth_client(self) -> Client:
@@ -54,9 +58,15 @@ class MayaOperatorAuthService:
     def _authenticate_with_supabase(self, email: str, password: str) -> OperatorProfile:
         try:
             auth_response = self.auth_client.auth.sign_in_with_password({"email": email, "password": password})
-        except Exception as error:
+        except AuthApiError as error:
+            if "invalid api key" in str(error).lower():
+                logger.error("Supabase anon key is missing or invalid for operator auth.")
+                raise HTTPException(status_code=503, detail="Supabase Auth is not configured correctly.") from error
             logger.warning("Supabase operator auth failed for %s: %s", email, error)
             raise HTTPException(status_code=401) from error
+        except Exception as error:
+            logger.warning("Supabase operator auth failed for %s: %s", email, error)
+            raise HTTPException(status_code=503, detail="Supabase Auth is unavailable.") from error
 
         user = getattr(auth_response, "user", None)
         user_id = str(getattr(user, "id", "") or "")

@@ -93,7 +93,7 @@ class Settings(BaseSettings):
 
     @property
     def supabase_auth_key(self) -> str:
-        return self.supabase_anon_key or self.supabase_service_role_key
+        return self.supabase_anon_key
 
     @property
     def operator_seed_configs(self) -> tuple[dict[str, str], ...]:
@@ -116,7 +116,7 @@ class Settings(BaseSettings):
 
     @property
     def operator_auth_configured(self) -> bool:
-        return bool(self.operator_seed_configs or (self.supabase_url and self.supabase_auth_key and self.supabase_service_role_key))
+        return bool(self.operator_seed_configs or (self.supabase_url and self.supabase_anon_key and self.supabase_service_role_key))
 
 
 def normalize_phone_number(phone_number: str) -> str:

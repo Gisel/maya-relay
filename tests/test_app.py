@@ -1,6 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
 from fastapi.testclient import TestClient
+from fastapi import HTTPException
 from twilio.request_validator import RequestValidator
 
 from app.config import Settings, get_settings
@@ -14,6 +15,7 @@ from app.dependencies import (
     get_voice_caller,
 )
 from app.main import create_app
+from app.operator_auth import MayaOperatorAuthService
 from app.services.relay import RelayService
 from tests.fakes import FakeAttachmentStore, FakeOperatorAuthService, FakeRepository, FakeSender, FakeTriage, FakeVoiceCaller
 
@@ -400,6 +402,24 @@ def test_api_operator_login_rejects_inactive_user():
     )
 
     assert response.status_code == 403
+
+
+def test_api_operator_login_requires_supabase_anon_key_when_using_supabase_auth():
+    settings = Settings(
+        ADMIN_PASSWORD="legacy-secret",
+        SUPABASE_URL="https://example.supabase.co",
+        SUPABASE_SERVICE_ROLE_KEY="service-role",
+        SUPABASE_ANON_KEY="",
+    )
+    service = MayaOperatorAuthService(settings)
+
+    try:
+        service.authenticate(email="giselcrystal@gmail.com", password="M4y42026!@")
+    except HTTPException as error:
+        assert error.status_code == 503
+        assert error.detail == "SUPABASE_ANON_KEY is required for operator login."
+    else:
+        raise AssertionError("expected missing anon key to fail")
 
 
 def test_api_quick_responses_include_template_mapped_actions():
