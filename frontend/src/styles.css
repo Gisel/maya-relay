@@ -3854,19 +3854,26 @@ button {
     width: 18px;
   }
 
-  .refresh-button,
-  .settings-button {
+  .topbar-actions .refresh-button,
+  .topbar-actions .settings-button {
+    background: #eef6ff;
+    border: 1px solid #c7ddf4;
     color: var(--brand-blue);
   }
 
-  .new-call-button {
+  .topbar-actions .new-call-button {
     background: var(--brand-blue);
     color: #ffffff;
   }
 
-  .new-message-button {
+  .topbar-actions .new-message-button {
     background: var(--whatsapp-green);
     color: #ffffff;
+  }
+
+  .topbar-actions .logout-button {
+    background: #eef1f5;
+    color: #475366;
   }
 
   .workspace {
