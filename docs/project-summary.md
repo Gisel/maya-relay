@@ -228,7 +228,8 @@ Current auth and outbound call routing status:
 - Sales, Francisco, and Gisel/admin users exist in Supabase Auth and are synced to `operator_profiles`.
 - New outbound calls route to the logged-in operator's configured phone before bridging to the customer.
 - Conversation header Call uses the same logged-in-operator routing.
-- Legacy shared-admin fallback remains available during transition.
+- Password reset flow is implemented through Supabase Auth email recovery.
+- Shared-admin fallback is disabled by default.
 
 UI action color language:
 
@@ -246,7 +247,7 @@ Pending:
 - Retry UI for failed customer-action sends remains pending.
 - Asset/proof retention and deletion remains pending.
 - Temporary Supabase Auth passwords should be changed after production smoke validation.
-- Decide when to disable shared `ADMIN_PASSWORD` fallback.
+- Supabase Auth redirect allowlist must include `https://mayagraphics.co/reset-password`.
 - AI behavior should be monitored in production after the live-refresh fix; broader AI auto-response remains out of scope.
 - Formal frontend/e2e automation for public proof and assets flows remains pending.
 

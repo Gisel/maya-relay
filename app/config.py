@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     assemblyai_poll_interval_seconds: int = Field(default=3, alias="ASSEMBLYAI_POLL_INTERVAL_SECONDS")
     admin_password: str = Field(default="", alias="ADMIN_PASSWORD")
     auth_session_secret: str = Field(default="", alias="AUTH_SESSION_SECRET")
-    enable_admin_password_fallback: bool = Field(default=True, alias="ENABLE_ADMIN_PASSWORD_FALLBACK")
+    enable_admin_password_fallback: bool = Field(default=False, alias="ENABLE_ADMIN_PASSWORD_FALLBACK")
     app_base_url: str = Field(default="", alias="APP_BASE_URL")
     customer_action_token_secret: str = Field(default="", alias="CUSTOMER_ACTION_TOKEN_SECRET")
 

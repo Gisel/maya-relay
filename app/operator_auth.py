@@ -19,6 +19,20 @@ class OperatorAuthService(Protocol):
     def authenticate(self, *, email: str, password: str) -> OperatorProfile:
         ...
 
+    def request_password_reset(self, *, email: str, redirect_to: str) -> None:
+        ...
+
+    def update_password(
+        self,
+        *,
+        password: str,
+        access_token: str | None = None,
+        refresh_token: str | None = None,
+        code: str | None = None,
+        redirect_to: str | None = None,
+    ) -> None:
+        ...
+
 
 class MayaOperatorAuthService:
     def __init__(self, settings: Settings):
@@ -38,6 +52,56 @@ class MayaOperatorAuthService:
             raise HTTPException(status_code=503, detail="SUPABASE_ANON_KEY is required for operator login.")
 
         return self._authenticate_with_seed(normalized_email, password)
+
+    def request_password_reset(self, *, email: str, redirect_to: str) -> None:
+        normalized_email = email.strip().lower()
+        if not normalized_email:
+            return
+        if not self._supabase_configured:
+            raise HTTPException(status_code=503, detail="Supabase Auth is not configured correctly.")
+        try:
+            self.auth_client.auth.reset_password_for_email(normalized_email, {"redirect_to": redirect_to})
+        except AuthApiError as error:
+            if "invalid api key" in str(error).lower():
+                raise HTTPException(status_code=503, detail="Supabase Auth is not configured correctly.") from error
+            logger.warning("Supabase password reset request failed for %s: %s", normalized_email, error)
+            raise HTTPException(status_code=503, detail="Password reset email could not be sent.") from error
+        except Exception as error:
+            logger.warning("Supabase password reset request failed for %s: %s", normalized_email, error)
+            raise HTTPException(status_code=503, detail="Password reset email could not be sent.") from error
+
+    def update_password(
+        self,
+        *,
+        password: str,
+        access_token: str | None = None,
+        refresh_token: str | None = None,
+        code: str | None = None,
+        redirect_to: str | None = None,
+    ) -> None:
+        clean_password = password.strip()
+        if len(clean_password) < 8:
+            raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
+        if not self._supabase_configured:
+            raise HTTPException(status_code=503, detail="Supabase Auth is not configured correctly.")
+        try:
+            if access_token and refresh_token:
+                self.auth_client.auth.set_session(access_token, refresh_token)
+            elif code:
+                self.auth_client.auth.exchange_code_for_session(
+                    {"auth_code": code, "redirect_to": redirect_to or ""}
+                )
+            else:
+                raise HTTPException(status_code=400, detail="Password reset link is missing recovery tokens.")
+            self.auth_client.auth.update_user({"password": clean_password})
+        except HTTPException:
+            raise
+        except AuthApiError as error:
+            logger.warning("Supabase password update failed: %s", error)
+            raise HTTPException(status_code=400, detail="Password reset link is invalid or expired.") from error
+        except Exception as error:
+            logger.warning("Supabase password update failed: %s", error)
+            raise HTTPException(status_code=400, detail="Password reset link is invalid or expired.") from error
 
     @property
     def _supabase_configured(self) -> bool:

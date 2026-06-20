@@ -140,6 +140,17 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class PasswordResetRequest(BaseModel):
+    email: str
+
+
+class PasswordUpdateRequest(BaseModel):
+    password: str
+    access_token: str | None = None
+    refresh_token: str | None = None
+    code: str | None = None
+
+
 @router.post("/auth/login")
 def api_login(
     payload: LoginRequest,
@@ -179,6 +190,37 @@ def api_logout(settings: Settings = Depends(get_settings)) -> JSONResponse:
     admin_enabled(settings)
     response = JSONResponse({"authenticated": False})
     response.delete_cookie(SESSION_COOKIE)
+    return response
+
+
+@router.post("/auth/password-reset")
+def api_password_reset(
+    payload: PasswordResetRequest,
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    operator_auth: OperatorAuthService = Depends(get_operator_auth_service),
+) -> dict[str, bool]:
+    redirect_to = f"{_public_base_url(request, settings)}/reset-password"
+    operator_auth.request_password_reset(email=payload.email, redirect_to=redirect_to)
+    return {"sent": True}
+
+
+@router.post("/auth/password-update")
+def api_password_update(
+    payload: PasswordUpdateRequest,
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    operator_auth: OperatorAuthService = Depends(get_operator_auth_service),
+) -> dict[str, bool]:
+    redirect_to = f"{_public_base_url(request, settings)}/reset-password"
+    operator_auth.update_password(
+        password=payload.password,
+        access_token=payload.access_token,
+        refresh_token=payload.refresh_token,
+        code=payload.code,
+        redirect_to=redirect_to,
+    )
+    response = {"updated": True}
     return response
 
 

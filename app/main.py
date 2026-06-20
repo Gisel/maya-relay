@@ -39,6 +39,10 @@ def create_app() -> FastAPI:
         def frontend_public_assets(path: str) -> FileResponse:
             return FileResponse(FRONTEND_DIST / "index.html")
 
+        @app.get("/reset-password", include_in_schema=False)
+        def frontend_reset_password() -> FileResponse:
+            return FileResponse(FRONTEND_DIST / "index.html")
+
     return app
 
 

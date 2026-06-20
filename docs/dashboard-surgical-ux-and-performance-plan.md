@@ -364,6 +364,11 @@ This dated snapshot is the current planning source for the first production rele
   - New Call and conversation Call route to the logged-in operator's configured phone.
   - Legacy shared-admin sessions still fall back to `FRANCISCO_PHONE` during transition.
   - No inbound Twilio Studio routing changes were made.
+- Password reset foundation: done.
+  - Login includes a Forgot password link.
+  - `/reset-password` supports requesting a Supabase Auth reset email.
+  - Recovery links can update the Supabase Auth password without storing passwords in Maya Relay.
+  - Shared admin password fallback is disabled by default.
 
 ### Partially Done / Needs Focused Follow-Up
 
@@ -385,7 +390,7 @@ This dated snapshot is the current planning source for the first production rele
   - Desired behavior is a mobile-friendly number picker/keypad experience when entering a phone number.
   - Deferred intentionally; current manual phone entry remains available.
 - Change temporary Supabase Auth passwords after production smoke validation.
-- Decide when to disable `ENABLE_ADMIN_PASSWORD_FALLBACK`.
+- Confirm Supabase Auth redirect allowlist includes `https://mayagraphics.co/reset-password`.
 
 ### High Priority New Production Slices
 

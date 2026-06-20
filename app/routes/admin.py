@@ -72,6 +72,8 @@ def admin_login(
     settings: Settings = Depends(get_settings),
 ) -> RedirectResponse:
     admin_enabled(settings)
+    if not settings.enable_admin_password_fallback or not settings.admin_password:
+        return RedirectResponse("/app", status_code=303)
     if not hmac.compare_digest(password, settings.admin_password):
         return RedirectResponse("/admin", status_code=303)
     response = RedirectResponse("/admin", status_code=303)

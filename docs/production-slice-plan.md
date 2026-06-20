@@ -981,6 +981,8 @@ Implementation note, June 20, 2026:
   - `OPERATOR_1_ROUTING_LINE`
   - matching `OPERATOR_2_*` values
 - Production Supabase migration `add_operator_profiles` has been applied.
+- Password reset is implemented through Supabase Auth recovery email and `/reset-password`; Supabase Auth redirect URLs must allow `https://mayagraphics.co/reset-password`.
+- `ENABLE_ADMIN_PASSWORD_FALLBACK` now defaults to false.
 
 ### Slice A2: User-Routed Outbound Calls
 

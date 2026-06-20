@@ -1295,4 +1295,19 @@ test("login input focus does not create mobile zoom risk", async ({ page }) => {
   await expectInsideViewport(page.locator(".login-panel"));
   await expectInsideViewport(passwordInput);
   await expectInsideViewport(page.getByRole("button", { name: "Sign in" }));
+  await expect(page.getByRole("link", { name: "Forgot password?" })).toBeVisible();
+});
+
+test("reset password page stays inside the mobile viewport", async ({ page }) => {
+  await page.goto("/app/reset-password");
+  const emailInput = page.getByLabel("Email");
+
+  await expect(page.getByRole("button", { name: "Send reset link" })).toBeVisible();
+  await emailInput.focus();
+  await expectNoIosInputZoomRisk(emailInput);
+  await expectNoHorizontalOverflow(page);
+
+  await expectInsideViewport(page.locator(".login-panel"));
+  await expectInsideViewport(emailInput);
+  await expectInsideViewport(page.getByRole("button", { name: "Send reset link" }));
 });

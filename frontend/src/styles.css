@@ -494,6 +494,17 @@ button {
   width: 100%;
 }
 
+.login-reset-link {
+  color: var(--brand-blue);
+  font-weight: 600;
+  justify-self: center;
+  text-decoration: none;
+}
+
+.login-reset-link:hover {
+  text-decoration: underline;
+}
+
 .form-error,
 .app-error,
 .app-success {

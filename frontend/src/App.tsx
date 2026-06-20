@@ -363,6 +363,9 @@ function LoginScreen({
         <button className="send-button" disabled={!email.trim() || !password || isSubmitting} type="submit">
           {isSubmitting ? "Signing in..." : "Sign in"}
         </button>
+        <a className="login-reset-link" href="/app/reset-password">
+          Forgot password?
+        </a>
       </form>
     </main>
   );

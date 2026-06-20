@@ -408,6 +408,30 @@ export function logout() {
   return request<{ authenticated: false }>("/api/auth/logout", { method: "POST" });
 }
 
+export function requestPasswordReset(email: string) {
+  return request<{ sent: true }>("/api/auth/password-reset", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function updatePassword(payload: {
+  password: string;
+  accessToken?: string | null;
+  refreshToken?: string | null;
+  code?: string | null;
+}) {
+  return request<{ updated: true }>("/api/auth/password-update", {
+    method: "POST",
+    body: JSON.stringify({
+      password: payload.password,
+      access_token: payload.accessToken || null,
+      refresh_token: payload.refreshToken || null,
+      code: payload.code || null,
+    }),
+  });
+}
+
 export function getConversations(query = "", offset = 0, limit = 50, status: ConversationStatusFilter = "all") {
   const params = new URLSearchParams();
   if (query.trim()) params.set("q", query.trim());

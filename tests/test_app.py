@@ -47,6 +47,7 @@ def make_client(
         MAYA_BUSINESS_NUMBER="+13852208404",
         VERIFY_TWILIO_SIGNATURE=verify_twilio_signature,
         ENABLE_AI_TRIAGE=False,
+        ENABLE_ADMIN_PASSWORD_FALLBACK=True,
         OPENAI_API_KEY=openai_api_key,
         OPENAI_MODEL="gpt-5-mini",
         ASSEMBLYAI_API_KEY=assemblyai_api_key,
@@ -420,6 +421,51 @@ def test_api_operator_login_requires_supabase_anon_key_when_using_supabase_auth(
         assert error.detail == "SUPABASE_ANON_KEY is required for operator login."
     else:
         raise AssertionError("expected missing anon key to fail")
+
+
+def test_api_password_reset_sends_supabase_recovery_email():
+    operator_auth = FakeOperatorAuthService()
+    client, _, _ = make_client(admin_password="legacy-secret", operator_auth=operator_auth)
+
+    response = client.post(
+        "/api/auth/password-reset",
+        json={"email": "giselcrystal@gmail.com"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"sent": True}
+    assert operator_auth.password_reset_requests == [
+        {
+            "email": "giselcrystal@gmail.com",
+            "redirect_to": "https://maya-relay.example/reset-password",
+        }
+    ]
+
+
+def test_api_password_update_uses_recovery_tokens():
+    operator_auth = FakeOperatorAuthService()
+    client, _, _ = make_client(admin_password="legacy-secret", operator_auth=operator_auth)
+
+    response = client.post(
+        "/api/auth/password-update",
+        json={
+            "password": "N3w-password!",
+            "access_token": "access-token",
+            "refresh_token": "refresh-token",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"updated": True}
+    assert operator_auth.password_updates == [
+        {
+            "password": "N3w-password!",
+            "access_token": "access-token",
+            "refresh_token": "refresh-token",
+            "code": None,
+            "redirect_to": "https://maya-relay.example/reset-password",
+        }
+    ]
 
 
 def test_api_quick_responses_include_template_mapped_actions():

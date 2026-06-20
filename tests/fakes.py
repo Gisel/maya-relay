@@ -898,6 +898,8 @@ def _message_search_text(messages: list[dict[str, Any]]) -> str:
 class FakeOperatorAuthService:
     def __init__(self):
         self.operators: dict[str, tuple[str, OperatorProfile]] = {}
+        self.password_reset_requests: list[dict[str, str]] = []
+        self.password_updates: list[dict[str, str | None]] = []
 
     def add_operator(
         self,
@@ -932,3 +934,25 @@ class FakeOperatorAuthService:
         if not profile.active:
             raise HTTPException(status_code=403, detail="Operator is inactive.")
         return profile
+
+    def request_password_reset(self, *, email: str, redirect_to: str) -> None:
+        self.password_reset_requests.append({"email": email, "redirect_to": redirect_to})
+
+    def update_password(
+        self,
+        *,
+        password: str,
+        access_token: str | None = None,
+        refresh_token: str | None = None,
+        code: str | None = None,
+        redirect_to: str | None = None,
+    ) -> None:
+        self.password_updates.append(
+            {
+                "password": password,
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "code": code,
+                "redirect_to": redirect_to,
+            }
+        )
