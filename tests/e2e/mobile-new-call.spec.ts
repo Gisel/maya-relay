@@ -932,6 +932,13 @@ test("mobile conversation header keeps customer and action controls usable", asy
 
   await page.goto("/app/");
 
+  for (const buttonName of ["Refresh inbox", "New call", "New message", "Settings", "Logout"]) {
+    const box = await page.getByRole("button", { name: buttonName }).boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.width).toBeLessThanOrEqual(40);
+    expect(box!.height).toBeLessThanOrEqual(40);
+  }
+
   const header = page.locator(".conversation-header");
   await expect(header.locator("h1")).toHaveText("Test Customer");
   await expect(header.locator(".mobile-conversation-title-row").getByRole("button", { name: "Details" })).toBeVisible();

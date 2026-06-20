@@ -3770,7 +3770,7 @@ button {
   .topbar {
     max-width: 100vw;
     overflow: hidden;
-    padding: 10px 14px;
+    padding: 8px 10px;
   }
 
   .app-shell {
@@ -3783,10 +3783,11 @@ button {
   }
 
   .topbar-actions {
-    gap: 10px;
+    flex: 0 0 auto;
+    gap: 6px;
     overflow-x: auto;
     overflow-y: hidden;
-    padding-left: 6px;
+    padding-left: 4px;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
   }
@@ -3809,36 +3810,48 @@ button {
 
   .brand strong,
   .brand span {
-    font-size: 19px;
+    font-size: 16px;
   }
 
   .brand img {
-    height: 44px;
-    width: 44px;
+    height: 34px;
+    width: 34px;
   }
 
-  .logout-button,
-  .new-call-button,
-  .new-message-button,
-  .refresh-button,
-  .settings-button {
+  .brand {
+    gap: 7px;
+    flex: 1 1 auto;
+  }
+
+  .brand div {
+    gap: 5px;
+  }
+
+  .topbar-actions .logout-button,
+  .topbar-actions .new-call-button,
+  .topbar-actions .new-message-button,
+  .topbar-actions .refresh-button,
+  .topbar-actions .settings-button {
     background: #eef1f5;
     border-radius: 50%;
     flex: 0 0 auto;
-    height: 48px;
+    font-size: 0;
+    gap: 0;
+    height: 36px;
     justify-content: center;
-    min-height: 48px;
-    min-width: 48px;
+    min-height: 36px;
+    min-width: 36px;
     padding: 0;
-    width: 48px;
+    width: 36px;
   }
 
-  .logout-button,
-  .new-call-button,
-  .new-message-button,
-  .refresh-button,
-  .settings-button {
-    font-size: 0;
+  .topbar-actions .logout-button svg,
+  .topbar-actions .new-call-button svg,
+  .topbar-actions .new-message-button svg,
+  .topbar-actions .refresh-button svg,
+  .topbar-actions .settings-button svg {
+    height: 18px;
+    width: 18px;
   }
 
   .refresh-button,
