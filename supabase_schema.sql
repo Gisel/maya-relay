@@ -95,7 +95,7 @@ create table if not exists public.operator_profiles (
   supabase_user_id uuid unique,
   email text not null unique,
   display_name text not null,
-  role text not null default 'operator' check (role in ('operator')),
+  role text not null default 'operator' check (role in ('operator', 'admin')),
   routing_line text not null default 'operator',
   click_to_call_phone text,
   active boolean not null default true,
