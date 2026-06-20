@@ -2220,15 +2220,20 @@ export function App() {
           <header className="conversation-header">
             <div className="conversation-title-block">
               <div className="mobile-conversation-title-row">
-                <h1>{customerName}</h1>
+                <div className="mobile-conversation-identity">
+                  <h1>{customerName}</h1>
+                  <p className="mobile-conversation-channel-pill">
+                    <span className="chat-phone">{displayPhone}</span>
+                    <span className="mobile-channel-label">via {channelLabel(channel)}</span>
+                  </p>
+                </div>
                 {mobileDetailsToggle}
               </div>
               {activeConversation?.code && <span className="session-id">Session ID: #{activeConversation.code}</span>}
               <div className="conversation-meta-row">
-                <p>
+                <p className="desktop-conversation-channel-pill">
                   <span className="desktop-channel-label">via {channelLabel(channel)} </span>
                   <span className="chat-phone">{displayPhone}</span>
-                  <span className="mobile-channel-label">via {channelLabel(channel)}</span>
                 </p>
                 <div className="conversation-header-actions">
                   <StatusPill status={status} />

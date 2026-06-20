@@ -1082,6 +1082,10 @@ button {
   display: contents;
 }
 
+.mobile-conversation-channel-pill {
+  display: none;
+}
+
 .conversation-meta-row {
   align-items: center;
   display: flex;
@@ -4327,9 +4331,7 @@ button {
   }
 
   .conversation-meta-row {
-    align-items: center;
     display: block;
-    flex-wrap: wrap;
     width: 100%;
   }
 
@@ -4347,7 +4349,30 @@ button {
     min-width: 0;
   }
 
-  .conversation-meta-row p {
+  .mobile-conversation-identity {
+    align-items: center;
+    display: flex;
+    flex: 1 1 auto;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .conversation-header .mobile-conversation-channel-pill {
+    display: inline-flex;
+    flex: 0 1 auto;
+    max-width: 48vw;
+  }
+
+  .mobile-conversation-channel-pill .chat-phone {
+    min-width: 0;
+  }
+
+  .conversation-header .desktop-conversation-channel-pill {
+    display: none;
+  }
+
+  .conversation-meta-row p,
+  .mobile-conversation-channel-pill {
     max-width: 100%;
     width: fit-content;
   }
@@ -4436,7 +4461,8 @@ button {
   }
 
   .conversation-call-action {
-    color: var(--brand-blue);
+    background: var(--brand-blue);
+    color: #ffffff;
   }
 
   .conversation-status-action {

@@ -942,8 +942,13 @@ test("mobile conversation header keeps customer and action controls usable", asy
   const header = page.locator(".conversation-header");
   await expect(header.locator("h1")).toHaveText("Test Customer");
   await expect(header.locator(".mobile-conversation-title-row").getByRole("button", { name: "Details" })).toBeVisible();
+  await expect(header.locator(".mobile-conversation-title-row").getByText("+15550000001")).toBeVisible();
+  await expect(header.locator(".desktop-conversation-channel-pill")).toBeHidden();
   await expect(header.getByRole("button", { name: "Send proof approval request" })).toBeVisible();
   await expect(header.getByRole("button", { name: "Request customer assets" })).toBeVisible();
+  const callAction = header.getByRole("button", { name: "Call" });
+  await expect(callAction).toHaveCSS("background-color", "rgb(10, 132, 255)");
+  await expect(callAction).toHaveCSS("color", "rgb(255, 255, 255)");
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
