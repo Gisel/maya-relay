@@ -92,7 +92,12 @@ export function CallsPanel({
                 <span className={`workflow-pill workflow-${row.workflowStatus || "pending_follow_up"}`}>
                   {compactWorkflowLabel(row.workflowStatus)}
                 </span>
-                {row.callCount > 1 && <span>{row.callCount} calls</span>}
+                {row.callCount > 1 && (
+                  <span className="call-row-count">
+                    <Clock size={12} />
+                    {row.callCount} calls
+                  </span>
+                )}
                 <span className="call-row-code">
                   <Clock size={12} />
                   {row.conversation?.code ? `#${row.conversation.code}` : "No conversation"}

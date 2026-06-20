@@ -2351,6 +2351,16 @@ button {
   min-width: 0;
 }
 
+.call-activity-row .conversation-row-heading em {
+  color: #98a2b6;
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 520;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
 .call-row-content strong {
   font-size: 13px;
   font-weight: 620;
@@ -4464,7 +4474,8 @@ button {
   }
 
   .conversation-proof-action,
-  .conversation-asset-action {
+  .conversation-asset-action,
+  .conversation-call-action {
     background: #ffffff;
     border: 1px solid #dfe4ec;
     font-size: 12px;
@@ -4491,8 +4502,8 @@ button {
   }
 
   .conversation-call-action {
-    background: var(--brand-blue);
-    color: #ffffff;
+    border-color: #7dbdff;
+    color: var(--brand-blue);
   }
 
   .conversation-status-action {
