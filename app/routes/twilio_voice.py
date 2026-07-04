@@ -1,6 +1,7 @@
 import logging
 import time
 from typing import Any
+from urllib.parse import urlencode
 
 import requests
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request
@@ -40,7 +41,15 @@ async def bridge_click_to_call(
         return PlainTextResponse(str(response), media_type="text/xml")
 
     response.say("Connecting you to the customer.")
-    dial = response.dial(caller_id=settings.maya_business_number_e164, answer_on_bridge=True)
+    recording_callback_url = await _outbound_recording_callback_url(request, settings)
+    dial = response.dial(
+        caller_id=settings.maya_business_number_e164,
+        answer_on_bridge=True,
+        record="record-from-answer-dual",
+        recording_status_callback=recording_callback_url,
+        recording_status_callback_method="POST",
+        recording_status_callback_event="completed",
+    )
     dial.number(customer_phone)
     return PlainTextResponse(str(response), media_type="text/xml")
 
@@ -187,6 +196,7 @@ async def voice_recording_status(
         return PlainTextResponse("Forbidden", status_code=403)
 
     call_sid = _payload_value(payload, "CallSid", "call_sid", "callSid")
+    fallback_call_sid = request.query_params.get("outbound_call_sid", "").strip()
     recording_status = _payload_value(payload, "RecordingStatus", "recording_status", "recordingStatus")
     recording_sid = _payload_value(payload, "RecordingSid", "recording_sid", "recordingSid")
     recording_url = _payload_value(payload, "RecordingUrl", "recording_url", "recordingUrl")
@@ -207,6 +217,15 @@ async def voice_recording_status(
             recording_duration_seconds=recording_duration_seconds,
             recording_channels=recording_channels,
         )
+        if call is None and fallback_call_sid and fallback_call_sid != call_sid:
+            call = repository.update_call_recording_by_sid(
+                twilio_call_sid=fallback_call_sid,
+                recording_sid=recording_sid or None,
+                recording_url=recording_url or None,
+                recording_status=recording_status or None,
+                recording_duration_seconds=recording_duration_seconds,
+                recording_channels=recording_channels,
+            )
         repository.create_call_event(
             call_id=call.get("id") if call else None,
             twilio_call_sid=call_sid or None,
@@ -231,6 +250,28 @@ async def voice_recording_status(
         logger.exception("Failed to persist Twilio recording status for CallSid %s", call_sid)
 
     return Response(status_code=204)
+
+
+async def _outbound_recording_callback_url(request: Request, settings: Settings) -> str:
+    form_payload = await request.form()
+    parent_call_sid = _payload_value({key: str(value) for key, value in form_payload.multi_items()}, "CallSid")
+    callback_url = f"{_voice_public_base_url(request, settings)}/webhooks/twilio/voice/recording"
+    if not parent_call_sid:
+        return callback_url
+    return f"{callback_url}?{urlencode({'outbound_call_sid': parent_call_sid})}"
+
+
+def _voice_public_base_url(request: Request, settings: Settings) -> str:
+    configured_base_url = settings.app_base_url.strip().rstrip("/")
+    if configured_base_url:
+        return configured_base_url
+
+    forwarded_proto = request.headers.get("x-forwarded-proto")
+    forwarded_host = request.headers.get("x-forwarded-host") or request.headers.get("host")
+    if forwarded_proto and forwarded_host:
+        return f"{forwarded_proto}://{forwarded_host}"
+
+    return str(request.base_url).rstrip("/")
 
 
 def _automate_completed_recording(settings: Settings, repository: RelayRepository, call_id: str) -> None:

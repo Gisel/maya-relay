@@ -2131,12 +2131,16 @@ def test_twilio_voice_bridge_dials_customer():
         customer_channel="whatsapp",
     )
 
-    response = client.post("/webhooks/twilio/voice/bridge/conversation-1")
+    response = client.post("/webhooks/twilio/voice/bridge/conversation-1", data={"CallSid": "CAoperatorleg"})
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/xml")
     assert "Connecting you to the customer." in response.text
     assert "<Dial" in response.text
+    assert 'record="record-from-answer-dual"' in response.text
+    assert 'recordingStatusCallback="https://maya-relay.example/webhooks/twilio/voice/recording?outbound_call_sid=CAoperatorleg"' in response.text
+    assert 'recordingStatusCallbackMethod="POST"' in response.text
+    assert 'recordingStatusCallbackEvent="completed"' in response.text
     assert "+15550000001" in response.text
     assert "+13852208404" in response.text
 
@@ -2416,6 +2420,96 @@ def test_twilio_voice_recording_status_updates_call_log_and_records_event():
             },
         }
     ]
+
+
+def test_twilio_voice_recording_status_uses_outbound_call_sid_fallback():
+    client, repository, _ = make_client()
+    repository.create_call(
+        conversation_id="conversation-1",
+        direction="outbound",
+        call_type="conversation_call",
+        customer_phone="+15550000009",
+        employee_phone="+15551234567",
+        twilio_call_sid="CAoperatorleg",
+        status="completed",
+    )
+
+    response = client.post(
+        "/webhooks/twilio/voice/recording?outbound_call_sid=CAoperatorleg",
+        data={
+            "CallSid": "CAcustomerleg",
+            "RecordingSid": "REoutbound1",
+            "RecordingUrl": "https://api.twilio.com/2010-04-01/Accounts/ACfake/Recordings/REoutbound1",
+            "RecordingStatus": "completed",
+            "RecordingDuration": "62",
+            "RecordingChannels": "2",
+        },
+    )
+
+    assert response.status_code == 204
+    assert repository.calls[0]["recording_sid"] == "REoutbound1"
+    assert repository.calls[0]["recording_url"] == "https://api.twilio.com/2010-04-01/Accounts/ACfake/Recordings/REoutbound1"
+    assert repository.calls[0]["recording_status"] == "completed"
+    assert repository.calls[0]["recording_duration_seconds"] == 62
+    assert repository.calls[0]["recording_channels"] == 2
+    assert repository.calls[0]["outcome"] is None
+    assert repository.calls[0]["follow_up_status"] == "none"
+    assert repository.call_events == [
+        {
+            "id": "call-event-1",
+            "call_id": "call-1",
+            "twilio_call_sid": "CAcustomerleg",
+            "event_type": "recording-status",
+            "call_status": "completed",
+            "payload": {
+                "CallSid": "CAcustomerleg",
+                "RecordingSid": "REoutbound1",
+                "RecordingUrl": "https://api.twilio.com/2010-04-01/Accounts/ACfake/Recordings/REoutbound1",
+                "RecordingStatus": "completed",
+                "RecordingDuration": "62",
+                "RecordingChannels": "2",
+            },
+        }
+    ]
+
+
+def test_twilio_voice_outbound_recording_fallback_triggers_automation(monkeypatch):
+    client, repository, _ = make_client(
+        twilio_account_sid="ACfake",
+        twilio_auth_token="token",
+        assemblyai_api_key="assembly-key",
+        openai_api_key="openai-key",
+    )
+    repository.create_call(
+        conversation_id="conversation-1",
+        direction="outbound",
+        call_type="conversation_call",
+        customer_phone="+15550000009",
+        employee_phone="+15551234567",
+        twilio_call_sid="CAoperatorleg",
+        status="completed",
+    )
+    automated_call_ids: list[str] = []
+
+    def fake_automate_completed_recording(settings, repository, call_id):
+        automated_call_ids.append(call_id)
+
+    monkeypatch.setattr("app.routes.twilio_voice._automate_completed_recording", fake_automate_completed_recording)
+
+    response = client.post(
+        "/webhooks/twilio/voice/recording?outbound_call_sid=CAoperatorleg",
+        data={
+            "CallSid": "CAcustomerleg",
+            "RecordingSid": "REoutbound1",
+            "RecordingUrl": "https://api.twilio.com/2010-04-01/Accounts/ACfake/Recordings/REoutbound1",
+            "RecordingStatus": "completed",
+            "RecordingDuration": "62",
+            "RecordingChannels": "2",
+        },
+    )
+
+    assert response.status_code == 204
+    assert automated_call_ids == ["call-1"]
 
 
 def test_twilio_voice_completed_recording_auto_transcribes_and_recaps(monkeypatch):
