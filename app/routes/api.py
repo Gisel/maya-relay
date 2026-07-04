@@ -1451,7 +1451,7 @@ def api_call_recording(
     )
 
 
-@router.get("/messages/{message_id}/attachments/{attachment_index}")
+@router.api_route("/messages/{message_id}/attachments/{attachment_index}", methods=["GET", "HEAD"])
 def api_message_attachment(
     message_id: str,
     attachment_index: int,
@@ -1475,8 +1475,11 @@ def api_message_attachment(
     if not settings.twilio_account_sid or not settings.twilio_auth_token:
         raise HTTPException(status_code=503, detail="Twilio credentials are required to preview this attachment.")
 
-    media_response = _download_twilio_message_media(settings, media_url)
     fallback_content_type = media_content_types[attachment_index] if attachment_index < len(media_content_types) else "application/octet-stream"
+    if request.method == "HEAD":
+        return Response(media_type=fallback_content_type)
+
+    media_response = _download_twilio_message_media(settings, media_url)
     return Response(
         content=media_response.content,
         media_type=media_response.headers.get("content-type") or fallback_content_type,

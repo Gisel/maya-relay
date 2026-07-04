@@ -1080,6 +1080,35 @@ def test_api_message_attachment_proxies_twilio_media(monkeypatch):
     ]
 
 
+def test_api_message_attachment_supports_head_for_twilio_media():
+    client, repository, _ = make_client(
+        admin_password="secret",
+        twilio_account_sid="ACfake",
+        twilio_auth_token="token",
+    )
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    repository.create_message(
+        conversation_id="conversation-1",
+        direction="customer_to_employee",
+        from_phone="+15550000001",
+        to_phone="+13852208404",
+        body="See attached",
+        num_media=1,
+        media_urls=("https://api.twilio.com/2010-04-01/Accounts/ACfake/Messages/MM123/Media/ME123",),
+        media_content_types=("image/jpeg",),
+    )
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+
+    response = client.head("/api/messages/message-1/attachments/0", headers={"cookie": login.headers["set-cookie"]})
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/jpeg"
+    assert response.content == b""
+
+
 def test_api_generates_fresh_suggested_reply_for_latest_customer_message():
     triage = FakeTriage(
         "Intent: proof timing question\n"

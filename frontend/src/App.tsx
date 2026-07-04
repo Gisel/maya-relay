@@ -260,6 +260,48 @@ function proofDecisionClass(message: Message) {
   return "";
 }
 
+function AttachmentImage({
+  alt,
+  onLoad,
+  url,
+}: {
+  alt: string;
+  onLoad: () => void;
+  url: string;
+}) {
+  const [previewUrl, setPreviewUrl] = useState(url);
+
+  useEffect(() => {
+    if (!url.startsWith("/api/messages/")) {
+      setPreviewUrl(url);
+      return;
+    }
+
+    let objectUrl = "";
+    let isMounted = true;
+    fetch(url, { credentials: "include" })
+      .then((response) => {
+        if (!response.ok) throw new Error("Attachment preview failed.");
+        return response.blob();
+      })
+      .then((blob) => {
+        if (!isMounted) return;
+        objectUrl = URL.createObjectURL(blob);
+        setPreviewUrl(objectUrl);
+      })
+      .catch(() => {
+        if (isMounted) setPreviewUrl(url);
+      });
+
+    return () => {
+      isMounted = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [url]);
+
+  return <img alt={alt} onLoad={onLoad} src={previewUrl} />;
+}
+
 function MessageBubble({ message, onMediaLoad }: { message: Message; onMediaLoad: () => void }) {
   if (message.direction === "system") {
     return (
@@ -267,7 +309,7 @@ function MessageBubble({ message, onMediaLoad }: { message: Message; onMediaLoad
         {message.attachments.map((attachment) => (
           <a className="attachment-preview" href={attachment.url} key={attachment.url} rel="noreferrer" target="_blank">
             {attachment.kind === "image" ? (
-              <img alt="Message attachment" onLoad={onMediaLoad} src={attachment.url} />
+              <AttachmentImage alt="Message attachment" onLoad={onMediaLoad} url={attachment.url} />
             ) : (
               <span>
                 <FileText size={18} />
@@ -291,7 +333,7 @@ function MessageBubble({ message, onMediaLoad }: { message: Message; onMediaLoad
       {message.attachments.map((attachment) => (
         <a className="attachment-preview" href={attachment.url} key={attachment.url} rel="noreferrer" target="_blank">
           {attachment.kind === "image" ? (
-            <img alt="Message attachment" onLoad={onMediaLoad} src={attachment.url} />
+            <AttachmentImage alt="Message attachment" onLoad={onMediaLoad} url={attachment.url} />
           ) : (
             <span>
               <FileText size={18} />
