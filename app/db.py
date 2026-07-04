@@ -146,6 +146,9 @@ class RelayRepository(Protocol):
     ) -> dict[str, Any] | None:
         ...
 
+    def get_message(self, message_id: str) -> dict[str, Any] | None:
+        ...
+
     def create_message_attachment(
         self,
         *,
@@ -156,6 +159,15 @@ class RelayRepository(Protocol):
         source_url: str,
         content_type: str,
         size_bytes: int | None = None,
+    ) -> dict[str, Any]:
+        ...
+
+    def update_message_media(
+        self,
+        *,
+        message_id: str,
+        media_urls: tuple[str, ...],
+        media_content_types: tuple[str, ...],
     ) -> dict[str, Any]:
         ...
 
@@ -693,6 +705,22 @@ class SupabaseRelayRepository:
             return None
         return result.data[0]
 
+    def get_message(self, message_id: str) -> dict[str, Any] | None:
+        result = (
+            self.client.table("messages")
+            .select(
+                "id, conversation_id, direction, from_phone, to_phone, body, twilio_message_sid, "
+                "num_media, media_urls, media_content_types, delivery_status, delivery_error_code, "
+                "delivery_error_message, client_request_id, created_at"
+            )
+            .eq("id", message_id)
+            .limit(1)
+            .execute()
+        )
+        if not result.data:
+            return None
+        return result.data[0]
+
     def create_message_attachment(
         self,
         *,
@@ -717,6 +745,27 @@ class SupabaseRelayRepository:
                     "size_bytes": size_bytes,
                 }
             )
+            .execute()
+        )
+        return result.data[0]
+
+    def update_message_media(
+        self,
+        *,
+        message_id: str,
+        media_urls: tuple[str, ...],
+        media_content_types: tuple[str, ...],
+    ) -> dict[str, Any]:
+        result = (
+            self.client.table("messages")
+            .update(
+                {
+                    "num_media": len(media_urls),
+                    "media_urls": list(media_urls),
+                    "media_content_types": list(media_content_types),
+                }
+            )
+            .eq("id", message_id)
             .execute()
         )
         return result.data[0]

@@ -76,7 +76,7 @@ def make_client(
     app = create_app()
 
     def relay_override() -> RelayService:
-        return RelayService(settings=settings, repository=repository, sender=sender)
+        return RelayService(settings=settings, repository=repository, sender=sender, attachment_store=attachment_store)
 
     app.dependency_overrides[get_relay_service] = relay_override
     app.dependency_overrides[get_repository] = lambda: repository
@@ -998,6 +998,86 @@ def test_api_conversation_contract_and_idempotent_reply():
     assert duplicate.status_code == 200
     assert duplicate.json()["status"] == "duplicate"
     assert len(sender.sent_messages) == 1
+
+
+def test_api_conversation_proxies_protected_twilio_media_urls():
+    client, repository, _ = make_client(admin_password="secret")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    repository.create_message(
+        conversation_id="conversation-1",
+        direction="customer_to_employee",
+        from_phone="+15550000001",
+        to_phone="+13852208404",
+        body="See attached",
+        num_media=1,
+        media_urls=("https://api.twilio.com/2010-04-01/Accounts/AC123/Messages/MM123/Media/ME123",),
+        media_content_types=("image/jpeg",),
+    )
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+
+    detail = client.get("/api/conversations/conversation-1", headers={"cookie": login.headers["set-cookie"]})
+
+    assert detail.status_code == 200
+    assert detail.json()["messages"][0]["attachments"] == [
+        {
+            "url": "/api/messages/message-1/attachments/0",
+            "contentType": "image/jpeg",
+            "kind": "image",
+        }
+    ]
+
+
+def test_api_message_attachment_proxies_twilio_media(monkeypatch):
+    client, repository, _ = make_client(
+        admin_password="secret",
+        twilio_account_sid="ACfake",
+        twilio_auth_token="token",
+    )
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    repository.create_message(
+        conversation_id="conversation-1",
+        direction="customer_to_employee",
+        from_phone="+15550000001",
+        to_phone="+13852208404",
+        body="See attached",
+        num_media=1,
+        media_urls=("https://api.twilio.com/2010-04-01/Accounts/ACfake/Messages/MM123/Media/ME123",),
+        media_content_types=("image/jpeg",),
+    )
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    calls = []
+
+    class FakeResponse:
+        content = b"fake image"
+        headers = {"content-type": "image/jpeg"}
+
+        def raise_for_status(self) -> None:
+            return None
+
+    def fake_get(url, **kwargs):
+        calls.append({"url": url, **kwargs})
+        return FakeResponse()
+
+    monkeypatch.setattr("app.routes.api.requests.get", fake_get)
+
+    response = client.get("/api/messages/message-1/attachments/0", headers={"cookie": login.headers["set-cookie"]})
+
+    assert response.status_code == 200
+    assert response.content == b"fake image"
+    assert response.headers["content-type"] == "image/jpeg"
+    assert calls == [
+        {
+            "url": "https://api.twilio.com/2010-04-01/Accounts/ACfake/Messages/MM123/Media/ME123",
+            "auth": ("ACfake", "token"),
+            "timeout": 30,
+        }
+    ]
 
 
 def test_api_generates_fresh_suggested_reply_for_latest_customer_message():
@@ -2365,10 +2445,10 @@ def test_twilio_sms_webhook_parses_media_fields():
 
     assert response.status_code == 200
     assert repository.messages[0]["num_media"] == 1
-    assert repository.messages[0]["media_urls"] == ("https://api.twilio.com/media/image.jpg",)
+    assert repository.messages[0]["media_urls"] == ("https://files.example/messages/message-1/image.jpg",)
     assert repository.messages[0]["media_content_types"] == ("image/jpeg",)
     assert "Attachment 1 (image/jpeg)" not in sender.sent_messages[0]["body"]
-    assert sender.sent_messages[0]["media_urls"] == ("https://api.twilio.com/media/image.jpg",)
+    assert sender.sent_messages[0]["media_urls"] == ("https://files.example/messages/message-1/image.jpg",)
 
 
 def test_twilio_whatsapp_webhook_normalizes_channel_addresses():
@@ -2568,6 +2648,15 @@ def test_api_creates_sends_public_proof_request_and_exposes_conversation_action_
         ),
     }
     assert repository.messages[-1]["body"] == sender.sent_messages[-1]["body"]
+    assert repository.messages[-1]["media_urls"] == ("https://files.example/proof-requests/conversation-1/proof.pdf",)
+    assert repository.messages[-1]["media_content_types"] == ("application/pdf",)
+    assert payload["message"]["attachments"] == [
+        {
+            "url": "https://files.example/proof-requests/conversation-1/proof.pdf",
+            "contentType": "application/pdf",
+            "kind": "file",
+        }
+    ]
     assert repository.customer_action_events[-1]["event_type"] == "sent"
     assert repository.customer_action_events[-1]["metadata"] == {
         "message_id": "message-1",

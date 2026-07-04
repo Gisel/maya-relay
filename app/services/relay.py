@@ -57,6 +57,11 @@ class RelayService:
             media_urls=message.media_urls,
             media_content_types=message.media_content_types,
         )
+        self._update_message_media_urls(
+            message_id=inbound_message["id"],
+            media_urls=media_urls,
+            media_content_types=message.media_content_types,
+        )
 
         from_label = self._contact_label(message.from_phone, default_prefix="customer")
         triage_note = self._triage_note(message, conversation_code=conversation.conversation_code)
@@ -138,6 +143,11 @@ class RelayService:
         media_urls = self._store_attachment_urls(
             message_id=inbound_message["id"],
             media_urls=message.media_urls,
+            media_content_types=message.media_content_types,
+        )
+        self._update_message_media_urls(
+            message_id=inbound_message["id"],
+            media_urls=media_urls,
             media_content_types=message.media_content_types,
         )
         forwarded_body = self._format_customer_reply_body(
@@ -268,6 +278,24 @@ class RelayService:
         except Exception:
             return media_urls
         return tuple(attachment.public_url for attachment in stored)
+
+    def _update_message_media_urls(
+        self,
+        *,
+        message_id: str,
+        media_urls: tuple[str, ...],
+        media_content_types: tuple[str, ...],
+    ) -> None:
+        if not media_urls:
+            return
+        try:
+            self.repository.update_message_media(
+                message_id=message_id,
+                media_urls=media_urls,
+                media_content_types=media_content_types,
+            )
+        except Exception:
+            return
 
 
 def _extract_suggested_reply(triage_note: str | None, conversation_code: str) -> str | None:

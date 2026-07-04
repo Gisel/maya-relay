@@ -255,6 +255,12 @@ class FakeRepository:
                 return message
         return None
 
+    def get_message(self, message_id: str) -> dict[str, Any] | None:
+        for message in self.messages:
+            if message["id"] == message_id:
+                return message
+        return None
+
     def create_message_attachment(
         self,
         *,
@@ -278,6 +284,21 @@ class FakeRepository:
         }
         self.attachments.append(attachment)
         return attachment
+
+    def update_message_media(
+        self,
+        *,
+        message_id: str,
+        media_urls: tuple[str, ...],
+        media_content_types: tuple[str, ...],
+    ) -> dict[str, Any]:
+        for message in self.messages:
+            if message["id"] == message_id:
+                message["num_media"] = len(media_urls)
+                message["media_urls"] = media_urls
+                message["media_content_types"] = media_content_types
+                return message
+        raise AssertionError(f"message not found: {message_id}")
 
     def update_message_status(
         self,
@@ -830,7 +851,32 @@ class FakeVoiceCaller:
 class FakeAttachmentStore:
     def __init__(self):
         self.uploads: list[dict[str, object]] = []
+        self.message_uploads: list[dict[str, object]] = []
         self.deleted_uploads: list[StoredAttachment] = []
+
+    def store_message_attachments(
+        self,
+        *,
+        message_id: str,
+        source_urls: tuple[str, ...],
+        content_types: tuple[str, ...],
+    ) -> tuple[StoredAttachment, ...]:
+        self.message_uploads.append({"message_id": message_id, "source_urls": source_urls, "content_types": content_types})
+        stored: list[StoredAttachment] = []
+        for index, source_url in enumerate(source_urls):
+            filename = source_url.rstrip("/").rsplit("/", 1)[-1] or f"attachment-{index + 1}"
+            content_type = content_types[index] if index < len(content_types) else "application/octet-stream"
+            object_path = f"messages/{message_id}/{filename}"
+            stored.append(
+                StoredAttachment(
+                    source_url=source_url,
+                    public_url=f"https://files.example/{object_path}",
+                    content_type=content_type,
+                    bucket="attachments",
+                    object_path=object_path,
+                )
+            )
+        return tuple(stored)
 
     def store_uploaded_attachments(
         self,

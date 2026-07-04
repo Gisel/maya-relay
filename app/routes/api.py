@@ -877,6 +877,18 @@ def api_create_proof_request(
         to_phone=conversation.customer_phone,
         body=send_result["body"],
         twilio_message_sid=send_result["sid"],
+        num_media=1,
+        media_urls=(stored_proof.public_url,),
+        media_content_types=(stored_proof.content_type,),
+    )
+    repository.create_message_attachment(
+        message_id=created_message["id"],
+        bucket=stored_proof.bucket,
+        object_path=stored_proof.object_path,
+        public_url=stored_proof.public_url,
+        source_url=stored_proof.source_url,
+        content_type=stored_proof.content_type,
+        size_bytes=len(proof_upload.content),
     )
     repository.create_customer_action_event(
         request_id=result["request"]["id"],
@@ -1439,6 +1451,38 @@ def api_call_recording(
     )
 
 
+@router.get("/messages/{message_id}/attachments/{attachment_index}")
+def api_message_attachment(
+    message_id: str,
+    attachment_index: int,
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    repository: RelayRepository = Depends(get_repository),
+) -> Response:
+    require_admin(request, settings)
+    if attachment_index < 0:
+        raise HTTPException(status_code=404)
+    message = repository.get_message(message_id)
+    if message is None:
+        raise HTTPException(status_code=404)
+    media_urls = tuple(message.get("media_urls") or ())
+    media_content_types = tuple(message.get("media_content_types") or ())
+    if attachment_index >= len(media_urls):
+        raise HTTPException(status_code=404)
+    media_url = str(media_urls[attachment_index])
+    if not _is_protected_twilio_media_url(media_url):
+        raise HTTPException(status_code=404)
+    if not settings.twilio_account_sid or not settings.twilio_auth_token:
+        raise HTTPException(status_code=503, detail="Twilio credentials are required to preview this attachment.")
+
+    media_response = _download_twilio_message_media(settings, media_url)
+    fallback_content_type = media_content_types[attachment_index] if attachment_index < len(media_content_types) else "application/octet-stream"
+    return Response(
+        content=media_response.content,
+        media_type=media_response.headers.get("content-type") or fallback_content_type,
+    )
+
+
 @router.post("/calls/{call_id}/transcribe")
 def api_transcribe_call(
     call_id: str,
@@ -1563,6 +1607,20 @@ def _download_twilio_recording(settings: Settings, recording_url: str) -> reques
     except requests.RequestException as exc:
         logger.exception("Could not download Twilio recording.")
         raise HTTPException(status_code=502, detail="Could not download the Twilio recording.") from exc
+    return response
+
+
+def _download_twilio_message_media(settings: Settings, media_url: str) -> requests.Response:
+    try:
+        response = requests.get(
+            media_url,
+            auth=(settings.twilio_account_sid, settings.twilio_auth_token),
+            timeout=30,
+        )
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        logger.exception("Could not download Twilio message media.")
+        raise HTTPException(status_code=502, detail="Could not download the Twilio message attachment.") from exc
     return response
 
 
@@ -2105,6 +2163,7 @@ def _serialize_message(message: dict[str, Any]) -> dict[str, Any]:
         "clientRequestId": message.get("client_request_id"),
         "createdAt": message.get("created_at"),
         "attachments": _serialize_attachments(
+            str(message.get("id") or ""),
             message.get("media_urls") or (),
             message.get("media_content_types") or (),
         ),
@@ -2301,18 +2360,33 @@ def _filename_extension(filename: str) -> str:
     return f".{name.rsplit('.', 1)[-1]}"
 
 
-def _serialize_attachments(media_urls: tuple[str, ...] | list[str], content_types: tuple[str, ...] | list[str]) -> list[dict[str, str]]:
+def _serialize_attachments(
+    message_id: str,
+    media_urls: tuple[str, ...] | list[str],
+    content_types: tuple[str, ...] | list[str],
+) -> list[dict[str, str]]:
     attachments = []
     for index, url in enumerate(media_urls):
         content_type = content_types[index] if index < len(content_types) else "application/octet-stream"
+        preview_url = _message_attachment_url(message_id, index, str(url))
         attachments.append(
             {
-                "url": url,
+                "url": preview_url,
                 "contentType": content_type,
                 "kind": "image" if content_type.lower().startswith("image/") else "file",
             }
         )
     return attachments
+
+
+def _message_attachment_url(message_id: str, index: int, url: str) -> str:
+    if _is_protected_twilio_media_url(url) and message_id:
+        return f"/api/messages/{message_id}/attachments/{index}"
+    return url
+
+
+def _is_protected_twilio_media_url(url: str) -> bool:
+    return "api.twilio.com/" in url.lower()
 
 
 def _conversation_metadata(repository: RelayRepository, conversation: Conversation) -> dict[str, Any]:

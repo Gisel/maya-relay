@@ -2,7 +2,7 @@ from app.config import Settings
 from app.models import Contact
 from app.models import IncomingMessage
 from app.services.relay import RelayService, _extract_suggested_reply, _triage_context_note
-from tests.fakes import FakeLookup, FakeRepository, FakeSender, FakeTriage
+from tests.fakes import FakeAttachmentStore, FakeLookup, FakeRepository, FakeSender, FakeTriage
 
 
 def build_service(
@@ -20,11 +20,13 @@ def build_service(
     )
     repository = FakeRepository()
     sender = FakeSender()
+    attachment_store = FakeAttachmentStore()
     return (
         RelayService(
             settings=settings,
             repository=repository,
             sender=sender,
+            attachment_store=attachment_store,
             contact_name_lookup=lookup,
             message_triage=triage,
         ),
@@ -87,13 +89,13 @@ def test_customer_image_media_is_stored_and_forwarded_as_mms_media():
     )
 
     assert repository.messages[0]["num_media"] == 1
-    assert repository.messages[0]["media_urls"] == ("https://api.twilio.com/media/image.jpg",)
+    assert repository.messages[0]["media_urls"] == ("https://files.example/messages/message-1/image.jpg",)
     assert sender.sent_messages[0]["body"] == (
         "From customer +15550000001 [#C0001]:\n"
         "Here is the design\n"
         "Reply with #C0001 your message"
     )
-    assert sender.sent_messages[0]["media_urls"] == ("https://api.twilio.com/media/image.jpg",)
+    assert sender.sent_messages[0]["media_urls"] == ("https://files.example/messages/message-1/image.jpg",)
 
 
 def test_customer_non_image_media_keeps_attachment_link():
@@ -114,7 +116,7 @@ def test_customer_non_image_media_keeps_attachment_link():
     assert sender.sent_messages[0]["body"] == (
         "From customer +15550000001 [#C0001]:\n"
         "Here is the proof\n"
-        "Attachment 1 (application/pdf): https://api.twilio.com/media/proof.pdf\n"
+        "Attachment 1 (application/pdf): https://files.example/messages/message-1/proof.pdf\n"
         "Reply with #C0001 your message"
     )
     assert "media_urls" not in sender.sent_messages[0]
@@ -330,7 +332,7 @@ def test_employee_reply_to_customer_sends_image_as_media():
         "sid": "SMfake2",
         "to_phone": "+15550000001",
         "body": "Here is the proof.",
-        "media_urls": ("https://api.twilio.com/media/proof.jpg",),
+        "media_urls": ("https://files.example/messages/message-3/proof.jpg",),
     }
 
 
