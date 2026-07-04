@@ -509,7 +509,13 @@ def api_conversations(
     safe_limit = min(max(limit, 1), 100)
     safe_offset = max(offset, 0)
     if q.strip():
-        search_pool = repository.list_conversations(limit=500, offset=0, status=status, channel=channel)
+        search_pool, _ = _list_text_inbox_conversations(
+            repository,
+            limit=500,
+            offset=0,
+            status=status,
+            channel=channel,
+        )
         filtered = [
             conversation
             for conversation in search_pool
@@ -518,14 +524,13 @@ def api_conversations(
         page_conversations = filtered[safe_offset: safe_offset + safe_limit]
         has_more = len(filtered) > safe_offset + safe_limit
     else:
-        conversations = repository.list_conversations(
-            limit=safe_limit + 1,
+        page_conversations, has_more = _list_text_inbox_conversations(
+            repository,
+            limit=safe_limit,
             offset=safe_offset,
             status=status,
             channel=channel,
         )
-        has_more = len(conversations) > safe_limit
-        page_conversations = conversations[:safe_limit]
     return {
         "metrics": _conversation_metrics(page_conversations),
         "conversations": [_serialize_conversation_list_item(conversation) for conversation in page_conversations],
@@ -2426,6 +2431,50 @@ def _conversation_metrics(conversations: list[dict[str, Any]]) -> dict[str, int]
             1 for conversation in conversations if ((conversation.get("last_message") or {}).get("num_media") or 0) > 0
         ),
     }
+
+
+def _list_text_inbox_conversations(
+    repository: RelayRepository,
+    *,
+    limit: int,
+    offset: int,
+    status: str,
+    channel: str,
+) -> tuple[list[dict[str, Any]], bool]:
+    page: list[dict[str, Any]] = []
+    skipped_text_rows = 0
+    raw_offset = 0
+    batch_size = min(max(limit * 3, 50), 200)
+
+    while len(page) <= limit:
+        batch = repository.list_conversations(
+            limit=batch_size,
+            offset=raw_offset,
+            status=status,
+            channel=channel,
+        )
+        if not batch:
+            break
+
+        for conversation in batch:
+            if not _has_text_inbox_activity(conversation):
+                continue
+            if skipped_text_rows < offset:
+                skipped_text_rows += 1
+                continue
+            page.append(conversation)
+            if len(page) > limit:
+                break
+
+        if len(batch) < batch_size:
+            break
+        raw_offset += batch_size
+
+    return page[:limit], len(page) > limit
+
+
+def _has_text_inbox_activity(conversation: dict[str, Any]) -> bool:
+    return bool(conversation.get("last_message"))
 
 
 def _matches_filters(conversation: dict[str, Any], *, q: str, status: str, channel: str) -> bool:

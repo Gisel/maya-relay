@@ -1238,6 +1238,13 @@ def test_api_status_filter_checks_before_conversation_pagination():
         customer_phone="+15550000001",
         assigned_employee="+15551234567",
     )
+    repository.create_message(
+        conversation_id=closed.id,
+        direction="customer_to_employee",
+        from_phone="+15550000001",
+        to_phone="+15551234567",
+        body="Closed conversation message",
+    )
     repository.update_conversation_status(closed.id, "closed")
     for index in range(55):
         repository.get_or_create_customer_conversation(
@@ -1286,7 +1293,7 @@ def test_api_reply_uploads_image_as_media():
     ]
 
 
-def test_api_conversation_list_marks_call_only_activity():
+def test_api_conversation_list_hides_call_only_activity_from_text_inbox():
     client, repository, _ = make_client(admin_password="secret")
     repository.get_or_create_customer_conversation(
         customer_phone="+15550000001",
@@ -1306,16 +1313,17 @@ def test_api_conversation_list_marks_call_only_activity():
 
     conversations = client.get("/api/conversations", headers={"cookie": cookie})
     detail = client.get("/api/conversations/conversation-1", headers={"cookie": cookie})
+    calls = client.get("/api/calls?direction=incoming", headers={"cookie": cookie})
 
     assert conversations.status_code == 200
-    row = conversations.json()["conversations"][0]
-    assert row["lastMessage"] is None
-    assert row["latestCall"]["direction"] == "inbound"
-    assert row["latestCall"]["status"] == "ringing"
-    assert row["callCount"] == 1
+    assert conversations.json()["conversations"] == []
+    assert conversations.json()["pagination"]["hasMore"] is False
     assert detail.status_code == 200
     assert detail.json()["messages"] == []
     assert len(detail.json()["calls"]) == 1
+    assert calls.status_code == 200
+    assert calls.json()["calls"][0]["latestCall"]["direction"] == "inbound"
+    assert calls.json()["calls"][0]["latestCall"]["status"] == "ringing"
 
 
 def test_api_reply_rejects_oversized_attachment_before_storage(monkeypatch):
