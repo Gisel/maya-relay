@@ -5,6 +5,7 @@ from fastapi import HTTPException
 from gotrue.errors import AuthApiError
 from twilio.request_validator import RequestValidator
 
+import app.routes.api as api_routes
 from app.config import Settings, get_settings
 from app.dependencies import (
     get_attachment_store,
@@ -960,6 +961,8 @@ def test_api_conversation_contract_and_idempotent_reply():
             "createdAt": None,
             "hasAttachments": True,
         },
+        "latestCall": None,
+        "callCount": 0,
         "updatedAt": "",
     }
 
@@ -1281,6 +1284,61 @@ def test_api_reply_uploads_image_as_media():
             "kind": "image",
         }
     ]
+
+
+def test_api_conversation_list_marks_call_only_activity():
+    client, repository, _ = make_client(admin_password="secret")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    repository.create_call(
+        conversation_id="conversation-1",
+        direction="inbound",
+        call_type="inbound",
+        customer_phone="+15550000001",
+        employee_phone="+15551234567",
+        twilio_call_sid="CAinbound",
+        status="ringing",
+    )
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    conversations = client.get("/api/conversations", headers={"cookie": cookie})
+    detail = client.get("/api/conversations/conversation-1", headers={"cookie": cookie})
+
+    assert conversations.status_code == 200
+    row = conversations.json()["conversations"][0]
+    assert row["lastMessage"] is None
+    assert row["latestCall"]["direction"] == "inbound"
+    assert row["latestCall"]["status"] == "ringing"
+    assert row["callCount"] == 1
+    assert detail.status_code == 200
+    assert detail.json()["messages"] == []
+    assert len(detail.json()["calls"]) == 1
+
+
+def test_api_reply_rejects_oversized_attachment_before_storage(monkeypatch):
+    monkeypatch.setattr(api_routes, "MESSAGE_ATTACHMENT_MAX_FILE_SIZE_BYTES", 4)
+    client, repository, sender = make_client(admin_password="secret")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    response = client.post(
+        "/api/conversations/conversation-1/reply",
+        data={"body": "Please review.", "client_request_id": "large-file-request-1"},
+        files=[("reply_files", ("large.pdf", b"x" * 5, "application/pdf"))],
+        headers={"cookie": cookie},
+    )
+
+    assert response.status_code == 413
+    assert response.json()["detail"] == "Each message attachment must be 50 MB or smaller."
+    assert sender.sent_messages == []
+    assert repository.attachments == []
 
 
 def test_api_updates_conversation_status():
@@ -2720,23 +2778,22 @@ def test_api_proof_request_rejects_unsupported_file_type_before_storage():
     assert repository.customer_action_files == []
 
 
-def test_api_proof_request_rejects_oversized_file_before_storage():
+def test_api_proof_request_rejects_oversized_file_before_storage(monkeypatch):
+    monkeypatch.setattr(api_routes, "PROOF_MAX_FILE_SIZE_BYTES", len(PROOF_PDF_BYTES) - 1)
     client, repository, _ = make_client(admin_password="secret")
     repository.get_or_create_customer_conversation(
         customer_phone="+15550000001",
         assigned_employee="+15551234567",
     )
     login = client.post("/api/auth/login", json={"password": "secret"})
-    oversized_pdf = b"%PDF-1.4\n" + (b"x" * (32 * 1024 * 1024))
-
     response = client.post(
         "/api/conversations/conversation-1/proof-requests",
-        files={"proof_file": ("proof.pdf", oversized_pdf, "application/pdf")},
+        files={"proof_file": ("proof.pdf", PROOF_PDF_BYTES, "application/pdf")},
         headers={"cookie": login.headers["set-cookie"]},
     )
 
     assert response.status_code == 413
-    assert response.json()["detail"] == "Proof file must be 32 MB or smaller."
+    assert response.json()["detail"] == "Proof file must be 50 MB or smaller."
     assert repository.customer_action_requests == []
     assert repository.customer_action_files == []
 
@@ -3159,7 +3216,8 @@ def test_api_asset_request_rejects_local_public_link_before_sending():
     assert repository.messages == []
 
 
-def test_api_public_asset_submit_validates_file_count_type_and_size():
+def test_api_public_asset_submit_validates_file_count_type_and_size(monkeypatch):
+    monkeypatch.setattr(api_routes, "ASSET_MAX_FILE_SIZE_BYTES", 4)
     client, repository, _ = make_client(admin_password="secret")
     repository.get_or_create_customer_conversation(
         customer_phone="+15550000001",
@@ -3182,7 +3240,7 @@ def test_api_public_asset_submit_validates_file_count_type_and_size():
     )
     oversized = client.post(
         f"/api/assets/{token}/submit",
-        files=[("asset_files", ("large.pdf", b"x" * (32 * 1024 * 1024 + 1), "application/pdf"))],
+        files=[("asset_files", ("large.pdf", b"x" * 5, "application/pdf"))],
     )
 
     assert missing_files.status_code == 400
@@ -3192,6 +3250,6 @@ def test_api_public_asset_submit_validates_file_count_type_and_size():
     assert unsupported.status_code == 400
     assert unsupported.json()["detail"] == "Asset files must be PDF, image, design, document, or ZIP files."
     assert oversized.status_code == 413
-    assert oversized.json()["detail"] == "Each asset file must be 32 MB or smaller."
+    assert oversized.json()["detail"] == "Each asset file must be 50 MB or smaller."
     assert repository.customer_action_requests[0]["status"] == "pending"
     assert repository.customer_action_files == []

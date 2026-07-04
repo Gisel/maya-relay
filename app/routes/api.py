@@ -42,7 +42,7 @@ from app.twilio_client import MessageSender, VoiceCaller
 router = APIRouter(prefix="/api", tags=["api"])
 logger = logging.getLogger(__name__)
 
-PROOF_MAX_FILE_SIZE_BYTES = 32 * 1024 * 1024
+PROOF_MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024
 PROOF_ALLOWED_CONTENT_TYPES = {
     "application/pdf",
     "image/gif",
@@ -52,7 +52,7 @@ PROOF_ALLOWED_CONTENT_TYPES = {
     "image/webp",
 }
 ASSET_MAX_FILES = 8
-ASSET_MAX_FILE_SIZE_BYTES = 32 * 1024 * 1024
+ASSET_MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024
 ASSET_MAX_TOTAL_SIZE_BYTES = 100 * 1024 * 1024
 ASSET_ALLOWED_CONTENT_TYPES = {
     "application/illustrator",
@@ -88,6 +88,7 @@ ASSET_ALLOWED_EXTENSIONS = {
     ".webp",
     ".zip",
 }
+MESSAGE_ATTACHMENT_MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024
 
 
 class ConversationUpdate(BaseModel):
@@ -1194,7 +1195,7 @@ def api_send_conversation_reply(
             return {"status": "duplicate", "message": _serialize_message(existing)}
 
     reply_body = body.strip()
-    uploads = read_uploads(reply_files)
+    uploads = _validated_message_uploads(read_uploads(reply_files))
     if not reply_body and not uploads:
         raise HTTPException(status_code=400, detail="Reply body or file is required.")
 
@@ -1734,6 +1735,7 @@ def _generate_call_recap_with_openai(settings: Settings, *, call: dict[str, Any]
 
 def _serialize_conversation_list_item(conversation: dict[str, Any]) -> dict[str, Any]:
     last_message = conversation.get("last_message") or {}
+    latest_call = conversation.get("latest_call") or {}
     return {
         "id": conversation["id"],
         "code": conversation.get("conversation_code"),
@@ -1741,6 +1743,8 @@ def _serialize_conversation_list_item(conversation: dict[str, Any]) -> dict[str,
         "channel": _effective_customer_channel(conversation.get("customer_channel"), conversation.get("customer_phone")),
         "customer": _serialize_customer(conversation),
         "lastMessage": _serialize_last_message(last_message),
+        "latestCall": _serialize_call(latest_call) if latest_call else None,
+        "callCount": conversation.get("call_count") or 0,
         "updatedAt": conversation.get("updated_at"),
     }
 
@@ -2288,7 +2292,7 @@ def _clean_optional_text(value: str | None) -> str | None:
 
 def _validated_proof_upload(upload: UploadedAttachment) -> UploadedAttachment:
     if len(upload.content) > PROOF_MAX_FILE_SIZE_BYTES:
-        raise HTTPException(status_code=413, detail="Proof file must be 32 MB or smaller.")
+        raise HTTPException(status_code=413, detail="Proof file must be 50 MB or smaller.")
     content_type = _proof_content_type(upload)
     if content_type not in PROOF_ALLOWED_CONTENT_TYPES:
         raise HTTPException(
@@ -2336,7 +2340,7 @@ def _validated_asset_uploads(uploads: tuple[UploadedAttachment, ...]) -> tuple[U
     validated: list[UploadedAttachment] = []
     for upload in uploads:
         if len(upload.content) > ASSET_MAX_FILE_SIZE_BYTES:
-            raise HTTPException(status_code=413, detail="Each asset file must be 32 MB or smaller.")
+            raise HTTPException(status_code=413, detail="Each asset file must be 50 MB or smaller.")
         content_type = _asset_content_type(upload)
         extension = _filename_extension(upload.filename)
         if content_type not in ASSET_ALLOWED_CONTENT_TYPES and extension not in ASSET_ALLOWED_EXTENSIONS:
@@ -2346,6 +2350,13 @@ def _validated_asset_uploads(uploads: tuple[UploadedAttachment, ...]) -> tuple[U
             )
         validated.append(UploadedAttachment(filename=upload.filename, content=upload.content, content_type=content_type))
     return tuple(validated)
+
+
+def _validated_message_uploads(uploads: tuple[UploadedAttachment, ...]) -> tuple[UploadedAttachment, ...]:
+    for upload in uploads:
+        if len(upload.content) > MESSAGE_ATTACHMENT_MAX_FILE_SIZE_BYTES:
+            raise HTTPException(status_code=413, detail="Each message attachment must be 50 MB or smaller.")
+    return uploads
 
 
 def _asset_content_type(upload: UploadedAttachment) -> str:

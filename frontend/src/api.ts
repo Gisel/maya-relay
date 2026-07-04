@@ -59,6 +59,8 @@ export type ConversationListItem = {
     createdAt: string | null;
     hasAttachments: boolean;
   } | null;
+  latestCall: CallRecord | null;
+  callCount: number;
   updatedAt: string | null;
 };
 

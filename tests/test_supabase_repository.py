@@ -864,11 +864,13 @@ def test_list_conversations_batches_contacts_and_messages():
 
     conversations = repository.list_conversations()
 
-    assert client.query_count == 3
+    assert client.query_count == 4
     assert [conversation["id"] for conversation in conversations] == ["conversation-1", "conversation-2"]
     assert conversations[0]["customer_display_name"] == "Maria Lopez"
     assert conversations[0]["customer_name"] == "Maria Lopez"
     assert conversations[0]["last_message"]["body"] == "Latest message"
+    assert conversations[0]["latest_call"] is None
+    assert conversations[0]["call_count"] == 0
     assert "Internal AI suggestion" in conversations[0]["message_search_text"]
     assert "Older message" in conversations[0]["message_search_text"]
     assert conversations[1]["customer_lookup_name"] == "Lookup Client"

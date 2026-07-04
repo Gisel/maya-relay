@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from app.attachments import AttachmentStore
+from app.attachments import AttachmentStore, UploadedAttachment
 from app.auth import SESSION_COOKIE, admin_enabled, is_authenticated, require_admin, session_value
 from app.config import Settings, get_settings
 from app.db import RelayRepository
@@ -15,6 +15,7 @@ from app.twilio_client import MessageSender
 
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+MESSAGE_ATTACHMENT_MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024
 
 
 @router.get("", response_class=HTMLResponse)
@@ -146,7 +147,7 @@ def send_conversation_reply(
         raise HTTPException(status_code=404)
 
     body = reply_body.strip()
-    uploads = read_uploads(reply_files)
+    uploads = _validated_message_uploads(read_uploads(reply_files))
     if not body and not uploads:
         raise HTTPException(status_code=400, detail="Reply body or file is required.")
 
@@ -186,6 +187,13 @@ def send_conversation_reply(
             size_bytes=None,
         )
     return RedirectResponse(f"/admin/conversations/{conversation_id}", status_code=303)
+
+
+def _validated_message_uploads(uploads: tuple[UploadedAttachment, ...]) -> tuple[UploadedAttachment, ...]:
+    for upload in uploads:
+        if len(upload.content) > MESSAGE_ATTACHMENT_MAX_FILE_SIZE_BYTES:
+            raise HTTPException(status_code=413, detail="Each message attachment must be 50 MB or smaller.")
+    return uploads
 
 
 def _login_form() -> str:

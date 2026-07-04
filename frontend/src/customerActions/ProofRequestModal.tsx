@@ -4,7 +4,7 @@ import { FileCheck2, Send, Upload, X } from "lucide-react";
 
 import { Channel } from "../api";
 
-const PROOF_MAX_FILE_SIZE_BYTES = 32 * 1024 * 1024;
+const PROOF_MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 const PROOF_ALLOWED_CONTENT_TYPES = new Set([
   "application/pdf",
   "image/gif",
@@ -211,7 +211,7 @@ export function ProofRequestModal({
 
 function proofFileValidationError(file: File) {
   if (file.size > PROOF_MAX_FILE_SIZE_BYTES) {
-    return "Proof file must be 32 MB or smaller.";
+    return "Proof file must be 50 MB or smaller.";
   }
   const contentType = file.type.toLowerCase();
   const filename = file.name.toLowerCase();

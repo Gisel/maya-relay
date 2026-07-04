@@ -5,7 +5,7 @@ import { ApiError, PublicAssetRequest, getPublicAssetRequest, submitPublicAssets
 import logoMaya from "../assets/logo-maya.jpg";
 
 const ASSET_MAX_FILES = 8;
-const ASSET_MAX_FILE_SIZE_BYTES = 32 * 1024 * 1024;
+const ASSET_MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 const ASSET_MAX_TOTAL_SIZE_BYTES = 100 * 1024 * 1024;
 const ASSET_ALLOWED_EXTENSIONS = [
   ".ai",
@@ -179,7 +179,7 @@ export function PublicAssetsPage({ token }: PublicAssetsPageProps) {
                 <strong>Choose files</strong>
                 <span>or drag and drop them here</span>
               </span>
-              <span className="public-asset-dropzone-hint">Up to 8 files, 32 MB each, 100 MB total.</span>
+              <span className="public-asset-dropzone-hint">Up to 8 files, 50 MB each, 100 MB total.</span>
               <input
                 accept={ASSET_ALLOWED_EXTENSIONS.join(",")}
                 disabled={isSubmitting}
@@ -254,7 +254,7 @@ function assetValidationError(files: File[]) {
   }
   for (const file of files) {
     if (file.size > ASSET_MAX_FILE_SIZE_BYTES) {
-      return "Each asset file must be 32 MB or smaller.";
+      return "Each asset file must be 50 MB or smaller.";
     }
     const filename = file.name.toLowerCase();
     if (!ASSET_ALLOWED_EXTENSIONS.some((extension) => filename.endsWith(extension))) {

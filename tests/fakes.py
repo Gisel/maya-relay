@@ -346,6 +346,11 @@ class FakeRepository:
                 (message for message in reversed(messages) if message.get("direction") != "system"),
                 None,
             )
+            calls = [
+                call
+                for call in reversed(self.calls)
+                if call["conversation_id"] == conversation.id
+            ]
             contact = self.get_contact(conversation.customer_phone)
             rows.append(
                 {
@@ -361,6 +366,8 @@ class FakeRepository:
                     "customer_display_name": contact.display_name if contact else None,
                     "customer_lookup_name": contact.lookup_name if contact else None,
                     "last_message": last_message,
+                    "latest_call": calls[0] if calls else None,
+                    "call_count": len(calls),
                     "message_search_text": _message_search_text(messages),
                 }
             )

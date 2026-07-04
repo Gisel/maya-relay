@@ -829,6 +829,19 @@ class SupabaseRelayRepository:
             .in_("phone_number", customer_phones)
             .execute()
         )
+        calls = (
+            self.client.table("calls")
+            .select(
+                "id, conversation_id, direction, call_type, customer_phone, employee_phone, twilio_call_sid, "
+                "status, outcome, notes, follow_up_status, recap, transcription, "
+                "recording_sid, recording_url, recording_status, recording_duration_seconds, recording_channels, "
+                "started_at, answered_at, completed_at, created_at, updated_at"
+            )
+            .in_("conversation_id", conversation_ids)
+            .order("created_at", desc=True)
+            .limit(limit * 20)
+            .execute()
+        )
 
         messages_by_conversation: dict[str, list[dict[str, Any]]] = {conversation_id: [] for conversation_id in conversation_ids}
         for message in messages.data:
@@ -836,10 +849,17 @@ class SupabaseRelayRepository:
             if conversation_messages is not None and len(conversation_messages) < 50:
                 conversation_messages.append(message)
 
+        calls_by_conversation: dict[str, list[dict[str, Any]]] = {conversation_id: [] for conversation_id in conversation_ids}
+        for call in calls.data:
+            conversation_calls = calls_by_conversation.get(call["conversation_id"])
+            if conversation_calls is not None and len(conversation_calls) < 20:
+                conversation_calls.append(call)
+
         contacts_by_phone = {contact["phone_number"]: contact for contact in contacts.data}
         conversations: list[dict[str, Any]] = []
         for conversation in result.data:
             conversation_messages = messages_by_conversation[conversation["id"]]
+            conversation_calls = calls_by_conversation[conversation["id"]]
             last_message = _latest_customer_visible_message(conversation_messages)
             contact = contacts_by_phone.get(conversation["customer_phone"], {})
             conversations.append(
@@ -850,6 +870,8 @@ class SupabaseRelayRepository:
                     "customer_lookup_name": contact.get("lookup_name"),
                     "customer_name": contact.get("display_name") or contact.get("lookup_name"),
                     "last_message": last_message,
+                    "latest_call": conversation_calls[0] if conversation_calls else None,
+                    "call_count": len(conversation_calls),
                     "message_search_text": _message_search_text(conversation_messages),
                 }
             )

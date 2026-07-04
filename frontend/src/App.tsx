@@ -84,6 +84,7 @@ import { SettingsModal } from "./settings/SettingsModal";
 const INBOX_REFRESH_INTERVAL_MS = 15000;
 const CLOSE_AUDIT_LOG_PREFIX = "[Maya Relay Close Audit]";
 const PROFILE_PANEL_COLLAPSED_STORAGE_KEY = "maya-relay-profile-panel-collapsed";
+const MESSAGE_ATTACHMENT_MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 
 function closeAuditLog(event: string, details: Record<string, unknown> = {}) {
   console.info(CLOSE_AUDIT_LOG_PREFIX, event, {
@@ -141,7 +142,13 @@ function displayMessageBody(message: Message) {
 function previewBody(conversation: ConversationListItem) {
   if (conversation.lastMessage?.body) return cleanRelayBody(conversation.lastMessage.body);
   if (conversation.lastMessage?.hasAttachments) return "Attachment received";
+  if (conversation.latestCall) return callPreviewBody(conversation.latestCall);
   return "No messages yet";
+}
+
+function callPreviewBody(call: CallRecord) {
+  const direction = call.direction === "inbound" ? "Incoming call" : "Outgoing call";
+  return call.status ? `${direction} - ${call.status}` : direction;
 }
 
 function conversationSearchText(conversation: ConversationListItem) {
@@ -634,6 +641,7 @@ function Composer({
 }) {
   const [isSending, setIsSending] = useState(false);
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
+  const [fileError, setFileError] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const canSend = draft.trim().length > 0 || files.length > 0;
 
@@ -647,7 +655,13 @@ function Composer({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSend || isSending || disabled) return;
+    const validationError = messageFileValidationError(files);
+    if (validationError) {
+      setFileError(validationError);
+      return;
+    }
     setIsSending(true);
+    setFileError("");
     try {
       await onSend(draft.trim(), files);
       onDraftChange("");
@@ -659,7 +673,14 @@ function Composer({
 
   function appendFiles(nextFiles: File[]) {
     if (disabled || isSending || nextFiles.length === 0) return;
-    onFilesChange([...files, ...nextFiles]);
+    const mergedFiles = [...files, ...nextFiles];
+    const validationError = messageFileValidationError(mergedFiles);
+    if (validationError) {
+      setFileError(validationError);
+      return;
+    }
+    setFileError("");
+    onFilesChange(mergedFiles);
   }
 
   function handleDragOver(event: DragEvent<HTMLFormElement>) {
@@ -731,8 +752,17 @@ function Composer({
           ))}
         </div>
       )}
+      {fileError && <p className="form-error">{fileError}</p>}
     </form>
   );
+}
+
+function messageFileValidationError(files: File[]) {
+  const oversizedFile = files.find((file) => file.size > MESSAGE_ATTACHMENT_MAX_FILE_SIZE_BYTES);
+  if (oversizedFile) {
+    return "Each message attachment must be 50 MB or smaller.";
+  }
+  return "";
 }
 
 export function App() {
@@ -2347,7 +2377,11 @@ export function App() {
             )}
             {detailError && <p className="app-error">Could not load this conversation. Try selecting it again.</p>}
             {isLoadingDetail && <p className="panel-note">Loading messages...</p>}
-            {!isLoadingDetail && !detailError && visibleMessages.length === 0 && <p className="panel-note">No messages yet.</p>}
+            {!isLoadingDetail && !detailError && visibleMessages.length === 0 && (
+              <p className="panel-note">
+                {calls.length > 0 ? "No text messages yet. This conversation has call activity." : "No messages yet."}
+              </p>
+            )}
             {visibleMessages.map((message) => (
               <MessageBubble key={message.id} message={message} onMediaLoad={scrollMessagesToLatest} />
             ))}

@@ -22,7 +22,7 @@ export function SettingsModal({ open, onClose, children }: SettingsModalProps) {
             <X size={18} />
           </button>
         </div>
-        {children}
+        <div className="settings-modal-body">{children}</div>
       </section>
     </div>
   );

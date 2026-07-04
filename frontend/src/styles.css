@@ -1800,7 +1800,17 @@ button {
 }
 
 .settings-surface {
+  max-height: calc(100vh - 36px);
   max-width: 560px;
+  overflow: hidden;
+}
+
+.settings-modal-body {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-gutter: stable;
 }
 
 .proof-request-surface {
