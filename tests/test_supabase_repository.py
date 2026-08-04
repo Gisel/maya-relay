@@ -16,6 +16,26 @@ class MissingContactNotesClient(InMemorySupabaseClient):
         return MissingContactNotesQuery(self, self.tables[name])
 
 
+class InsertRaceQuery(InMemoryQuery):
+    def execute(self):
+        if self.operation == "insert" and self.table.name == "conversations" and self.client.race_pending:
+            self.client.race_pending = False
+            # A concurrent request wins the partial unique index: its row lands first...
+            self.client._insert(self.table, self.payload)
+            # ...and our insert then violates the constraint.
+            raise Exception("duplicate key value violates unique constraint")
+        return super().execute()
+
+
+class InsertRaceClient(InMemorySupabaseClient):
+    race_pending = True
+
+    def table(self, name: str) -> InMemoryQuery:
+        if name not in self.tables:
+            self.tables[name] = self.tables["contacts"].__class__(name)
+        return InsertRaceQuery(self, self.tables[name])
+
+
 def build_repository() -> tuple[SupabaseRelayRepository, InMemorySupabaseClient]:
     client = InMemorySupabaseClient()
     return SupabaseRelayRepository(client), client
@@ -351,6 +371,23 @@ def test_get_or_create_reuses_open_conversation_when_operator_routing_changes():
 
     assert first.id == second.id
     assert second.assigned_employee == "+15552222222"
+    assert len(client.rows("conversations")) == 1
+
+
+def test_get_or_create_customer_conversation_recovers_from_insert_race():
+    client = InsertRaceClient()
+    repository = SupabaseRelayRepository(client)
+
+    conversation = repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+        customer_channel="whatsapp",
+    )
+
+    # The insert lost the race and raised, but we recovered the winner by re-selecting.
+    assert client.race_pending is False
+    assert conversation.customer_phone == "+15550000001"
+    assert conversation.customer_channel == "whatsapp"
     assert len(client.rows("conversations")) == 1
 
 

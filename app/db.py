@@ -400,20 +400,38 @@ class SupabaseRelayRepository:
                 row["assigned_employee"] = assigned_employee
             return _conversation_from_row(row)
 
-        created = (
-            self.client.table("conversations")
-            .insert(
-                {
-                    "customer_phone": customer_phone,
-                    "assigned_employee": assigned_employee,
-                    "customer_channel": customer_channel,
-                    "status": "open",
-                    "conversation_code": _new_conversation_code(),
-                }
+        try:
+            created = (
+                self.client.table("conversations")
+                .insert(
+                    {
+                        "customer_phone": customer_phone,
+                        "assigned_employee": assigned_employee,
+                        "customer_channel": customer_channel,
+                        "status": "open",
+                        "conversation_code": _new_conversation_code(),
+                    }
+                )
+                .execute()
             )
-            .execute()
-        )
-        return _conversation_from_row(created.data[0])
+            return _conversation_from_row(created.data[0])
+        except Exception:
+            # A concurrent request may have created the open conversation first and
+            # won the partial unique index on (customer_phone, customer_channel)
+            # where status='open'. Re-select the winner instead of failing.
+            retry = (
+                self.client.table("conversations")
+                .select("id, customer_phone, assigned_employee, status, conversation_code, customer_channel")
+                .eq("customer_phone", customer_phone)
+                .eq("customer_channel", customer_channel)
+                .eq("status", "open")
+                .order("updated_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+            if retry.data:
+                return _conversation_from_row(retry.data[0])
+            raise
 
     def get_contact(self, phone_number: str) -> Contact | None:
         result = _execute_contact_query_with_optional_notes(
