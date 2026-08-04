@@ -253,6 +253,20 @@ function DeliveryPill({ status }: { status: DeliveryStatus }) {
   );
 }
 
+function isFailedDelivery(message: Message) {
+  return message.deliveryStatus === "failed" || message.deliveryStatus === "undelivered";
+}
+
+function deliveryFailureHint(message: Message) {
+  if (message.deliveryErrorCode === "63016") {
+    return "WhatsApp 24-hour window closed — an approved template is required to reach this customer.";
+  }
+  if (message.deliveryErrorCode) {
+    return `Not delivered (Twilio error ${message.deliveryErrorCode}).`;
+  }
+  return "This message was not delivered.";
+}
+
 function proofDecisionClass(message: Message) {
   const normalizedBody = message.body.toLowerCase();
   if (normalizedBody.startsWith("proof approved by customer")) {
@@ -352,7 +366,14 @@ function MessageBubble({ message, onMediaLoad }: { message: Message; onMediaLoad
       {body && <p>{body}</p>}
       <footer>
         <span>{formatDate(message.createdAt)}</span>
-        <span>{message.deliveryStatus}</span>
+        {isOutbound && isFailedDelivery(message) ? (
+          <span className={`delivery-pill ${message.deliveryStatus}`} title={deliveryFailureHint(message)}>
+            <AlertTriangle size={13} />
+            Not delivered
+          </span>
+        ) : (
+          <span>{message.deliveryStatus}</span>
+        )}
       </footer>
     </article>
   );
@@ -642,6 +663,7 @@ function Composer({
   const [isSending, setIsSending] = useState(false);
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const [fileError, setFileError] = useState("");
+  const [sendError, setSendError] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const canSend = draft.trim().length > 0 || files.length > 0;
 
@@ -662,10 +684,13 @@ function Composer({
     }
     setIsSending(true);
     setFileError("");
+    setSendError("");
     try {
       await onSend(draft.trim(), files);
       onDraftChange("");
       onFilesChange([]);
+    } catch (error) {
+      setSendError(error instanceof Error ? error.message : "Could not send the message. Please try again.");
     } finally {
       setIsSending(false);
     }
@@ -753,6 +778,7 @@ function Composer({
         </div>
       )}
       {fileError && <p className="form-error">{fileError}</p>}
+      {sendError && <p className="form-error">{sendError}</p>}
     </form>
   );
 }
@@ -1584,9 +1610,8 @@ export function App() {
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         setIsAuthenticated(false);
-      } else {
-        setAppError(error instanceof Error ? error.message : "Could not send the message. Please try again.");
       }
+      // The composer surfaces this inline (e.g. closed-window guidance), so avoid a duplicate banner.
       throw error;
     }
   }

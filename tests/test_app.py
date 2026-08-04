@@ -924,6 +924,10 @@ def test_api_conversation_contract_and_idempotent_reply():
         media_urls=("https://files.example/card.jpg",),
         media_content_types=("image/jpeg",),
     )
+    # Recent inbound keeps the WhatsApp 24-hour window open, so the composer reply
+    # below sends free-form (not via the owner-message template).
+    inbound_created_at = datetime.now(UTC).isoformat()
+    repository.messages[-1]["created_at"] = inbound_created_at
     repository.create_message(
         conversation_id="conversation-1",
         direction="system",
@@ -958,7 +962,7 @@ def test_api_conversation_contract_and_idempotent_reply():
             "direction": "customer_to_employee",
             "deliveryStatus": "pending",
             "deliveryErrorCode": None,
-            "createdAt": None,
+            "createdAt": inbound_created_at,
             "hasAttachments": True,
         },
         "latestCall": None,
@@ -1001,6 +1005,163 @@ def test_api_conversation_contract_and_idempotent_reply():
     assert duplicate.status_code == 200
     assert duplicate.json()["status"] == "duplicate"
     assert len(sender.sent_messages) == 1
+
+
+def _setup_whatsapp_reply_conversation(repository, *, hours_since_inbound: float):
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+        customer_channel="whatsapp",
+    )
+    repository.create_message(
+        conversation_id="conversation-1",
+        direction="customer_to_employee",
+        from_phone="+15550000001",
+        to_phone="+13852208404",
+        body="Hola",
+    )
+    repository.messages[-1]["created_at"] = (
+        datetime.now(UTC) - timedelta(hours=hours_since_inbound)
+    ).isoformat()
+
+
+def test_api_reply_free_form_inside_whatsapp_window():
+    client, repository, sender = make_client(
+        admin_password="secret",
+        whatsapp_template_owner_message_content_sid="HXowner",
+    )
+    _setup_whatsapp_reply_conversation(repository, hours_since_inbound=1)
+    login = client.post("/api/auth/login", json={"password": "secret"})
+
+    response = client.post(
+        "/api/conversations/conversation-1/reply",
+        data={"body": "Ya está listo, puede pasar."},
+        headers={"cookie": login.headers["set-cookie"]},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["sendMode"] == "free_form"
+    assert sender.sent_messages[-1] == {
+        "sid": "SMfake1",
+        "to_phone": "+15550000001",
+        "body": "Ya está listo, puede pasar.",
+        "channel": "whatsapp",
+    }
+
+
+def test_api_reply_outside_window_uses_owner_message_template():
+    client, repository, sender = make_client(
+        admin_password="secret",
+        whatsapp_template_owner_message_content_sid="HXowner",
+    )
+    _setup_whatsapp_reply_conversation(repository, hours_since_inbound=30)
+    login = client.post("/api/auth/login", json={"password": "secret"})
+
+    response = client.post(
+        "/api/conversations/conversation-1/reply",
+        data={"body": "Ya está listo,\n  puede pasar a recogerlo."},
+        headers={"cookie": login.headers["set-cookie"]},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["sendMode"] == "owner_message_template"
+    # Free-form was NOT used; delivered via the approved template with whitespace collapsed.
+    assert sender.sent_messages[-1] == {
+        "sid": "SMfake1",
+        "to_phone": "+15550000001",
+        "channel": "whatsapp",
+        "content_sid": "HXowner",
+        "content_variables": {"1": "Ya está listo, puede pasar a recogerlo."},
+    }
+
+
+def test_api_reply_outside_window_blocks_when_owner_template_unconfigured():
+    client, repository, sender = make_client(admin_password="secret")
+    _setup_whatsapp_reply_conversation(repository, hours_since_inbound=30)
+    login = client.post("/api/auth/login", json={"password": "secret"})
+
+    response = client.post(
+        "/api/conversations/conversation-1/reply",
+        data={"body": "Ya está listo."},
+        headers={"cookie": login.headers["set-cookie"]},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "whatsapp_window_closed"
+    assert sender.sent_messages == []
+
+
+def test_api_reply_outside_window_blocks_media():
+    client, repository, sender = make_client(
+        admin_password="secret",
+        whatsapp_template_owner_message_content_sid="HXowner",
+    )
+    _setup_whatsapp_reply_conversation(repository, hours_since_inbound=30)
+    login = client.post("/api/auth/login", json={"password": "secret"})
+
+    response = client.post(
+        "/api/conversations/conversation-1/reply",
+        data={"body": "Aquí está la foto"},
+        files={"reply_files": ("proof.jpg", b"binary", "image/jpeg")},
+        headers={"cookie": login.headers["set-cookie"]},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "whatsapp_window_closed_media"
+    assert sender.sent_messages == []
+
+
+def test_api_reply_outside_window_infers_whatsapp_from_legacy_prefixed_phone():
+    # A not-yet-cleaned corrupted thread (channel=sms, phone has whatsapp: prefix)
+    # is still treated as WhatsApp, so it gets the template path, not a broken send.
+    client, repository, sender = make_client(
+        admin_password="secret",
+        whatsapp_template_owner_message_content_sid="HXowner",
+    )
+    repository.get_or_create_customer_conversation(
+        customer_phone="whatsapp:+15550000001",
+        assigned_employee="+15551234567",
+        customer_channel="sms",
+    )
+    repository.create_message(
+        conversation_id="conversation-1",
+        direction="customer_to_employee",
+        from_phone="whatsapp:+15550000001",
+        to_phone="+13852208404",
+        body="Hola",
+    )
+    repository.messages[-1]["created_at"] = (datetime.now(UTC) - timedelta(hours=30)).isoformat()
+    login = client.post("/api/auth/login", json={"password": "secret"})
+
+    response = client.post(
+        "/api/conversations/conversation-1/reply",
+        data={"body": "Ya está listo."},
+        headers={"cookie": login.headers["set-cookie"]},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["sendMode"] == "owner_message_template"
+    assert sender.sent_messages[-1]["content_sid"] == "HXowner"
+
+
+def test_api_reply_sms_always_free_form_regardless_of_age():
+    client, repository, sender = make_client(admin_password="secret")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+        customer_channel="sms",
+    )
+    login = client.post("/api/auth/login", json={"password": "secret"})
+
+    response = client.post(
+        "/api/conversations/conversation-1/reply",
+        data={"body": "Your order is ready."},
+        headers={"cookie": login.headers["set-cookie"]},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["sendMode"] == "free_form"
+    assert "content_sid" not in sender.sent_messages[-1]
 
 
 def test_api_conversation_proxies_protected_twilio_media_urls():
@@ -2661,6 +2822,50 @@ def test_twilio_whatsapp_webhook_normalizes_channel_addresses():
     assert repository.messages[0]["to_phone"] == "+13852208404"
     assert sender.sent_messages[0]["to_phone"] == "+15551234567"
     assert "Hola por WhatsApp" in sender.sent_messages[0]["body"]
+
+
+def test_twilio_sms_webhook_reclassifies_whatsapp_prefixed_sender():
+    # Reproduces the production defect: a WhatsApp message arriving on the SMS
+    # webhook with the whatsapp: prefix must be self-corrected, not stored as a
+    # channel="sms" conversation with a whatsapp:-prefixed phone.
+    client, repository, sender = make_client()
+
+    response = client.post(
+        "/webhooks/twilio/sms",
+        data={
+            "MessageSid": "SMinbound",
+            "From": "whatsapp:+15550000001",
+            "To": "whatsapp:+13852208404",
+            "Body": "Hola, llego al webhook equivocado",
+            "NumMedia": "0",
+        },
+    )
+
+    assert response.status_code == 200
+    assert repository.conversations[0].customer_channel == "whatsapp"
+    assert repository.conversations[0].customer_phone == "+15550000001"
+    assert repository.messages[0]["from_phone"] == "+15550000001"
+    assert repository.messages[0]["to_phone"] == "+13852208404"
+
+
+def test_twilio_sms_webhook_keeps_plain_sms_as_sms():
+    # Regression guard: a normal SMS must stay SMS after the reclassification guard.
+    client, repository, _ = make_client()
+
+    response = client.post(
+        "/webhooks/twilio/sms",
+        data={
+            "MessageSid": "SMinbound",
+            "From": "+15550000001",
+            "To": "+13852208404",
+            "Body": "Regular SMS",
+            "NumMedia": "0",
+        },
+    )
+
+    assert response.status_code == 200
+    assert repository.conversations[0].customer_channel == "sms"
+    assert repository.conversations[0].customer_phone == "+15550000001"
 
 
 def test_status_callback_updates_message_status():
