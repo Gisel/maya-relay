@@ -364,10 +364,12 @@ export type UpdateCallDetailsResponse = {
 
 export class ApiError extends Error {
   status: number;
+  code: string | null;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code: string | null = null) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -383,13 +385,21 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   if (!response.ok) {
     let message = response.statusText;
+    let code: string | null = null;
     try {
-      const payload = (await response.json()) as { detail?: string };
-      message = payload.detail || message;
+      const payload = (await response.json()) as {
+        detail?: string | { message?: string; code?: string };
+      };
+      if (typeof payload.detail === "string") {
+        message = payload.detail || message;
+      } else if (payload.detail) {
+        message = payload.detail.message || message;
+        code = payload.detail.code ?? null;
+      }
     } catch {
       // Keep the status text when the response is not JSON.
     }
-    throw new ApiError(response.status, message);
+    throw new ApiError(response.status, message, code);
   }
 
   return (await response.json()) as T;

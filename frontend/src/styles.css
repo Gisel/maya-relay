@@ -998,7 +998,8 @@ button {
   color: #475366;
 }
 
-.delivery-pill.failed {
+.delivery-pill.failed,
+.delivery-pill.undelivered {
   background: #ffe2e4;
   color: #dc1f46;
 }

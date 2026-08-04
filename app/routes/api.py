@@ -1213,12 +1213,28 @@ def api_send_conversation_reply(
 
     outbound_body = reply_body_with_attachments(reply_body, stored_attachments)
     outbound_media_urls = image_attachment_urls(stored_attachments)
-    outbound_sid = sender.send_message(
-        to_phone=conversation.customer_phone,
-        body=outbound_body,
-        channel=conversation.customer_channel,
-        media_urls=outbound_media_urls,
-    )
+
+    channel = _effective_customer_channel(conversation.customer_channel, conversation.customer_phone)
+    whatsapp_window_open = channel != "whatsapp" or _has_active_whatsapp_window(repository, conversation.id)
+
+    if whatsapp_window_open:
+        outbound_sid = sender.send_message(
+            to_phone=conversation.customer_phone,
+            body=outbound_body,
+            channel=channel,
+            media_urls=outbound_media_urls,
+        )
+        send_mode = "free_form"
+    else:
+        outbound_sid = _send_closed_window_whatsapp_reply(
+            settings=settings,
+            sender=sender,
+            conversation=conversation,
+            reply_text=reply_body,
+            has_attachments=bool(stored_attachments),
+        )
+        send_mode = "owner_message_template"
+
     created_message = repository.create_message(
         conversation_id=conversation.id,
         direction="employee_to_customer",
@@ -1242,7 +1258,7 @@ def api_send_conversation_reply(
             size_bytes=None,
         )
 
-    return {"status": "sent", "message": _serialize_message(created_message)}
+    return {"status": "sent", "sendMode": send_mode, "message": _serialize_message(created_message)}
 
 
 @router.post("/conversations/{conversation_id}/quick-responses/{quick_response_id}/send")
@@ -2050,6 +2066,70 @@ def _effective_customer_channel(channel: str | None, customer_phone: str | None)
     if str(customer_phone or "").lower().startswith("whatsapp:"):
         return "whatsapp"
     return "whatsapp" if channel == "whatsapp" else "sms"
+
+
+def _whatsapp_template_safe_text(text: str) -> str:
+    """WhatsApp Content template variables cannot contain newlines, tabs, or long
+    runs of whitespace, so collapse all whitespace to single spaces."""
+    return " ".join(text.split())
+
+
+def _send_closed_window_whatsapp_reply(
+    *,
+    settings: Settings,
+    sender: MessageSender,
+    conversation: Conversation,
+    reply_text: str,
+    has_attachments: bool,
+) -> str:
+    """Composer send when the WhatsApp 24-hour window is closed.
+
+    Meta forbids free-form messages outside the window. We deliver the operator's
+    typed text through the approved ``maya_owner_message`` template (B4). When the
+    message cannot be carried by that template, we block with plain-language
+    guidance instead of letting Twilio silently fail with error 63016 (B1).
+    """
+    if has_attachments:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "whatsapp_window_closed_media",
+                "message": (
+                    "This WhatsApp chat is older than 24 hours, so files can't be sent. "
+                    "Ask the customer to reply first, or send a text-only update."
+                ),
+            },
+        )
+    template_text = _whatsapp_template_safe_text(reply_text)
+    if not template_text:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "whatsapp_window_closed_empty",
+                "message": (
+                    "This WhatsApp chat is older than 24 hours. Type a short text message so it "
+                    "can be sent as an approved WhatsApp template."
+                ),
+            },
+        )
+    owner_message_sid = settings.whatsapp_template_owner_message_content_sid.strip()
+    if not owner_message_sid:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "whatsapp_window_closed",
+                "message": (
+                    "This WhatsApp chat is older than 24 hours. Use an approved template "
+                    "(for example Pickup Reminder or Custom WhatsApp message) to reach this customer."
+                ),
+            },
+        )
+    return sender.send_template_message(
+        to_phone=conversation.customer_phone,
+        channel="whatsapp",
+        content_sid=owner_message_sid,
+        content_variables={"1": template_text},
+    )
 
 
 def _record_customer_action_message(

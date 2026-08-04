@@ -3,7 +3,7 @@ from fastapi.responses import PlainTextResponse, Response
 from twilio.request_validator import RequestValidator
 from twilio.twiml.messaging_response import MessagingResponse
 
-from app.config import Settings, get_settings
+from app.config import Settings, get_settings, normalize_phone_number
 from app.db import RelayRepository
 from app.dependencies import get_relay_service, get_repository
 from app.models import IncomingMessage
@@ -111,6 +111,8 @@ async def _handle_inbound_message(
     if not await _validate_twilio_request(request, settings):
         return PlainTextResponse("Forbidden", status_code=403)
 
+    from_phone, to_phone, channel = _sanitize_inbound_identity(from_phone, to_phone, channel)
+
     relay_service.handle_inbound_sms(
         await _incoming_message_from_request(
             request,
@@ -199,3 +201,29 @@ def _strip_whatsapp_prefix(phone_number: str) -> str:
     if phone_number.lower().startswith(prefix):
         return phone_number[len(prefix):]
     return phone_number
+
+
+def _sanitize_inbound_identity(
+    from_phone: str,
+    to_phone: str,
+    channel: str,
+) -> tuple[str, str, str]:
+    """Self-correct inbound identity regardless of which webhook received it.
+
+    A ``whatsapp:`` address prefix on either party means the message is WhatsApp,
+    even if it arrived on the SMS webhook. We force the channel accordingly, strip
+    the prefix, and normalize both numbers to E.164 so a conversation/contact can
+    never be stored with a ``whatsapp:``-prefixed or unnormalized phone.
+    """
+    prefix = "whatsapp:"
+    is_whatsapp = (
+        channel == "whatsapp"
+        or from_phone.lower().startswith(prefix)
+        or to_phone.lower().startswith(prefix)
+    )
+    effective_channel = "whatsapp" if is_whatsapp else channel
+    return (
+        normalize_phone_number(_strip_whatsapp_prefix(from_phone)),
+        normalize_phone_number(_strip_whatsapp_prefix(to_phone)),
+        effective_channel,
+    )
