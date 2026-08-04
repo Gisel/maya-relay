@@ -1,8 +1,22 @@
 # WhatsApp Window & Conversation Integrity — Assessment and Solution Paths
 
-Date: 2026-08-01 (Saturday)
-Status: **Assessment only. No code changes made.** Implementation targeted for Sunday 2026-08-02 while the shop is closed.
+Date: 2026-08-01 (Saturday). Implemented 2026-08-03.
+Status: **✅ COMPLETE — all five phases implemented, deployed, and verified in production.**
 Author context: Investigation triggered by client report that customer **Martin Alcocer** was not receiving WhatsApp messages.
+
+## Completion summary (2026-08-03)
+
+All five phases are live:
+
+- **Phase 1 — Ingestion fix:** inbound WhatsApp is self-corrected at the shared webhook funnel (prefix stripped, channel forced to `whatsapp`, phone normalized) regardless of which webhook receives it. Deployed.
+- **Phase 2 — Composer window-guard:** replies resolve the effective channel; free-form inside the 24h window, auto-send via the approved `maya_owner_message` template outside it, and block-with-guidance when a template can't carry the message. Failed sends surface as a red "Not delivered" state. Deployed and live-verified (Iris/Gisel).
+- **Phase 3 — Identity dedup:** `assigned_employee` dropped from the conversation match key; routing refreshed on inbound. Deployed.
+- **Phase 4 — DB guardrails:** CHECK constraints `conversations_customer_phone_e164` / `contacts_phone_number_e164` and partial unique index `conversations_one_open_per_phone_channel` (recorded in `supabase_schema.sql`). Applied in production.
+- **Phase 5 — Data cleanup:** the 9 affected customers' 27 open threads consolidated to clean per-channel threads; all 1014 messages preserved; duplicate `whatsapp:`-prefixed contact rows removed. Executed via transactional SQL with a full `backup_*` snapshot first. Zero `whatsapp:`-prefixed rows remain in `conversations` or `contacts`.
+
+Follow-up housekeeping: drop the `backup_*` snapshot tables after a confidence window (~1–2 weeks). Original assessment and solution paths retained below for the record.
+
+---
 
 > This document captures the full diagnosis, root causes, evidence, impact, and the candidate fix paths (with trade-offs) for each problem. It is a planning artifact. Nothing here has been implemented. All investigation was **read-only** (code reading + SELECT-only SQL).
 

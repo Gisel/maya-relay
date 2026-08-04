@@ -166,6 +166,25 @@ create index if not exists conversations_channel_customer_open_idx
 create index if not exists conversations_employee_open_idx
   on public.conversations (assigned_employee, status, updated_at desc);
 
+-- At most one open conversation per (customer_phone, channel). Prevents duplicate
+-- open threads for the same customer, even under a concurrent-insert race.
+create unique index if not exists conversations_one_open_per_phone_channel
+  on public.conversations (customer_phone, customer_channel)
+  where status = 'open';
+
+-- Phone numbers must be normalized E.164 (e.g. +18012009467). Rejects a leaked
+-- "whatsapp:" address prefix or any other malformed value at write time.
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'conversations_customer_phone_e164') then
+    alter table public.conversations
+      add constraint conversations_customer_phone_e164 check (customer_phone ~ '^\+[0-9]+$');
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'contacts_phone_number_e164') then
+    alter table public.contacts
+      add constraint contacts_phone_number_e164 check (phone_number ~ '^\+[0-9]+$');
+  end if;
+end $$;
+
 create index if not exists messages_conversation_created_idx
   on public.messages (conversation_id, created_at);
 
