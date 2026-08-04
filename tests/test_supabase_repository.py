@@ -333,6 +333,27 @@ def test_get_or_create_customer_conversation_creates_contact_and_open_conversati
     assert len(client.rows("conversations")) == 1
 
 
+def test_get_or_create_reuses_open_conversation_when_operator_routing_changes():
+    # A returning customer must reuse their single open thread even if the assigned
+    # operator changed, and the thread's routing is refreshed to the current operator.
+    repository, client = build_repository()
+
+    first = repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551111111",
+        customer_channel="whatsapp",
+    )
+    second = repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15552222222",
+        customer_channel="whatsapp",
+    )
+
+    assert first.id == second.id
+    assert second.assigned_employee == "+15552222222"
+    assert len(client.rows("conversations")) == 1
+
+
 def test_get_or_create_customer_conversation_separates_channels():
     repository, client = build_repository()
 

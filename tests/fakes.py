@@ -155,13 +155,22 @@ class FakeRepository:
         assigned_employee: str,
         customer_channel: Channel = "sms",
     ) -> Conversation:
-        for conversation in self.conversations:
+        for index, conversation in enumerate(self.conversations):
             if (
                 conversation.customer_phone == customer_phone
-                and conversation.assigned_employee == assigned_employee
                 and conversation.customer_channel == customer_channel
                 and conversation.status == "open"
             ):
+                if assigned_employee and conversation.assigned_employee != assigned_employee:
+                    conversation = Conversation(
+                        id=conversation.id,
+                        customer_phone=conversation.customer_phone,
+                        assigned_employee=assigned_employee,
+                        status=conversation.status,
+                        conversation_code=conversation.conversation_code,
+                        customer_channel=conversation.customer_channel,
+                    )
+                    self.conversations[index] = conversation
                 return conversation
 
         conversation = Conversation(
