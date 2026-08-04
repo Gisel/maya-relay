@@ -381,7 +381,6 @@ class SupabaseRelayRepository:
             self.client.table("conversations")
             .select("id, customer_phone, assigned_employee, status, conversation_code, customer_channel")
             .eq("customer_phone", customer_phone)
-            .eq("assigned_employee", assigned_employee)
             .eq("customer_channel", customer_channel)
             .eq("status", "open")
             .order("updated_at", desc=True)
@@ -390,6 +389,15 @@ class SupabaseRelayRepository:
         )
         if existing.data:
             row = existing.data[0]
+            # Reuse the one open thread per (phone, channel). Matching intentionally
+            # ignores assigned_employee, so an operator-routing change does not split a
+            # customer into a second open conversation. Instead, refresh the routing so
+            # forwarded inbound reaches the current operator rather than a stale phone.
+            if assigned_employee and row.get("assigned_employee") != assigned_employee:
+                self.client.table("conversations").update(
+                    {"assigned_employee": assigned_employee}
+                ).eq("id", row["id"]).execute()
+                row["assigned_employee"] = assigned_employee
             return _conversation_from_row(row)
 
         created = (
