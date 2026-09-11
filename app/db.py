@@ -2,10 +2,41 @@ from datetime import UTC, datetime, timedelta
 from secrets import token_hex
 from typing import Any, Protocol
 
+import httpx
 from supabase import Client, create_client
 
 from app.config import Settings
 from app.models import Channel, Contact, Conversation
+
+
+def _harden_supabase_transport(client: Client) -> Client:
+    """Rebuild the PostgREST httpx session without HTTP/2.
+
+    postgrest hardcodes ``http2=True``. Supabase periodically closes idle HTTP/2
+    connections with a graceful GOAWAY; httpx then reuses the terminated
+    connection and raises ``httpx.RemoteProtocolError: ConnectionTerminated``,
+    surfacing as an intermittent 500 on reads (e.g. the inbox). Forcing HTTP/1.1
+    plus a short keepalive expiry drops idle connections before Supabase does,
+    eliminating that failure mode.
+    """
+    postgrest = getattr(client, "postgrest", None)
+    old_session = getattr(postgrest, "session", None)
+    if old_session is None:
+        return client
+    new_session = httpx.Client(
+        base_url=old_session.base_url,
+        headers=old_session.headers,
+        timeout=old_session.timeout,
+        follow_redirects=True,
+        http2=False,
+        limits=httpx.Limits(max_keepalive_connections=10, keepalive_expiry=5.0),
+    )
+    postgrest.session = new_session
+    try:
+        old_session.close()
+    except Exception:
+        pass
+    return client
 
 CONTACT_COLUMNS = "id, phone_number, display_name, lookup_name, notes"
 CONTACT_COLUMNS_WITH_CREATED_AT = f"{CONTACT_COLUMNS}, created_at"
@@ -367,7 +398,8 @@ class SupabaseRelayRepository:
     def from_settings(cls, settings: Settings) -> "SupabaseRelayRepository":
         if not settings.supabase_url or not settings.supabase_service_role_key:
             raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required.")
-        return cls(create_client(settings.supabase_url, settings.supabase_service_role_key))
+        client = create_client(settings.supabase_url, settings.supabase_service_role_key)
+        return cls(_harden_supabase_transport(client))
 
     def get_or_create_customer_conversation(
         self,
