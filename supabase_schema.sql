@@ -51,6 +51,12 @@ create table if not exists public.message_attachments (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.short_links (
+  token text primary key,
+  target_url text not null,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.calls (
   id uuid primary key default gen_random_uuid(),
   conversation_id uuid references public.conversations(id) on delete set null,

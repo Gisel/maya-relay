@@ -12,6 +12,7 @@ class FakeRepository:
         self.contacts: list[Contact] = []
         self.messages: list[dict[str, Any]] = []
         self.attachments: list[dict[str, Any]] = []
+        self.short_links: dict[str, str] = {}
         self.status_updates: list[dict[str, Any]] = []
         self.calls: list[dict[str, Any]] = []
         self.call_events: list[dict[str, Any]] = []
@@ -293,6 +294,12 @@ class FakeRepository:
         }
         self.attachments.append(attachment)
         return attachment
+
+    def create_short_link(self, *, token: str, target_url: str) -> None:
+        self.short_links[token] = target_url
+
+    def get_short_link(self, token: str) -> str | None:
+        return self.short_links.get(token)
 
     def update_message_media(
         self,

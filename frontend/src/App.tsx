@@ -74,6 +74,7 @@ import { CustomerActionPanelTabs } from "./customerActions/CustomerActionPanelTa
 import { ProofActionButton } from "./customerActions/ProofActionButton";
 import { ProofRequestModal } from "./customerActions/ProofRequestModal";
 import { AiSuggestedReplyPanel } from "./messaging/AiSuggestedReplyPanel";
+import { MESSAGE_ATTACHMENT_MAX_FILE_SIZE_BYTES, messageFileValidationError } from "./messaging/attachmentValidation";
 import { NewMessageDrawer, NewMessagePayload } from "./messaging/NewMessageDrawer";
 import { QuickResponseSendModal } from "./messaging/QuickResponseSendModal";
 import { UnifiedSearchResults } from "./search/UnifiedSearchResults";
@@ -84,7 +85,6 @@ import { SettingsModal } from "./settings/SettingsModal";
 const INBOX_REFRESH_INTERVAL_MS = 15000;
 const CLOSE_AUDIT_LOG_PREFIX = "[Maya Relay Close Audit]";
 const PROFILE_PANEL_COLLAPSED_STORAGE_KEY = "maya-relay-profile-panel-collapsed";
-const MESSAGE_ATTACHMENT_MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 
 function closeAuditLog(event: string, details: Record<string, unknown> = {}) {
   console.info(CLOSE_AUDIT_LOG_PREFIX, event, {
@@ -781,14 +781,6 @@ function Composer({
       {sendError && <p className="form-error">{sendError}</p>}
     </form>
   );
-}
-
-function messageFileValidationError(files: File[]) {
-  const oversizedFile = files.find((file) => file.size > MESSAGE_ATTACHMENT_MAX_FILE_SIZE_BYTES);
-  if (oversizedFile) {
-    return "Each message attachment must be 50 MB or smaller.";
-  }
-  return "";
 }
 
 export function App() {
@@ -1975,7 +1967,17 @@ export function App() {
       setSuggestedReply("");
       setDraft("");
       setFiles([]);
-      setCallStatus(response.status === "duplicate" ? "Conversation already started." : "Message sent.");
+      let statusMessage = response.status === "duplicate" ? "Conversation already started." : "Message sent.";
+      if (payload.files.length > 0) {
+        try {
+          await sendReply(response.conversation.id, "", payload.files, newClientRequestId());
+        } catch (attachmentError) {
+          statusMessage = attachmentError instanceof Error
+            ? `Message sent, but the photo failed to send: ${attachmentError.message}`
+            : "Message sent, but the photo failed to send.";
+        }
+      }
+      setCallStatus(statusMessage);
       await loadConversations(response.conversation.id);
       await refreshDetail(response.conversation.id, { force: true });
     } catch (error) {
