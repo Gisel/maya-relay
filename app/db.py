@@ -193,6 +193,12 @@ class RelayRepository(Protocol):
     ) -> dict[str, Any]:
         ...
 
+    def create_short_link(self, *, token: str, target_url: str) -> None:
+        ...
+
+    def get_short_link(self, token: str) -> str | None:
+        ...
+
     def update_message_media(
         self,
         *,
@@ -806,6 +812,15 @@ class SupabaseRelayRepository:
             .execute()
         )
         return result.data[0]
+
+    def create_short_link(self, *, token: str, target_url: str) -> None:
+        self.client.table("short_links").insert({"token": token, "target_url": target_url}).execute()
+
+    def get_short_link(self, token: str) -> str | None:
+        result = self.client.table("short_links").select("target_url").eq("token", token).limit(1).execute()
+        if not result.data:
+            return None
+        return result.data[0]["target_url"]
 
     def update_message_media(
         self,

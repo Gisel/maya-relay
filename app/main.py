@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.routes import admin, api, health, twilio_sms, twilio_voice
+from app.routes import admin, api, health, short_links, twilio_sms, twilio_voice
 
 FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 
@@ -16,6 +16,7 @@ def create_app() -> FastAPI:
     app.include_router(twilio_voice.router)
     app.include_router(api.router)
     app.include_router(admin.router)
+    app.include_router(short_links.router)
 
     @app.get("/", include_in_schema=False)
     def root_redirect() -> RedirectResponse:

@@ -1,13 +1,15 @@
-import { MessageSquare, Send, X } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { MessageSquare, Paperclip, Send, X } from "lucide-react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { Channel, QuickResponse } from "../api";
 import { CustomerContactPicker, CustomerContactSelection } from "../customers/CustomerContactPicker";
+import { messageFileValidationError } from "./attachmentValidation";
 
 export type NewMessagePayload = {
   body: string;
   channel: Channel;
   clientRequestId: string;
   displayName: string;
+  files: File[];
   phoneNumber: string;
   templateKey: string | null;
   variables: Record<string, string>;
@@ -81,6 +83,8 @@ export function NewMessageDrawer({
   const [selection, setSelection] = useState<CustomerContactSelection>(EMPTY_SELECTION);
   const [channel, setChannel] = useState<Channel>("sms");
   const [body, setBody] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
+  const [fileError, setFileError] = useState("");
   const [templateId, setTemplateId] = useState("");
   const [variables, setVariables] = useState<Record<string, string>>({});
   const [clientRequestId, setClientRequestId] = useState(defaultClientRequestId);
@@ -120,20 +124,40 @@ export function NewMessageDrawer({
     onClose();
   }
 
+  function appendFiles(nextFiles: File[]) {
+    if (isSending || nextFiles.length === 0) return;
+    const mergedFiles = [...files, ...nextFiles];
+    const validationError = messageFileValidationError(mergedFiles);
+    if (validationError) {
+      setFileError(validationError);
+      return;
+    }
+    setFileError("");
+    setFiles(mergedFiles);
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const validationError = messageFileValidationError(files);
+    if (validationError) {
+      setFileError(validationError);
+      return;
+    }
     try {
       await onSend({
         body: channel === "sms" ? body.trim() : "",
         channel,
         clientRequestId,
         displayName: selection.displayName,
+        files: channel === "sms" ? files : [],
         phoneNumber: selection.phoneNumber,
         templateKey: channel === "whatsapp" ? selectedTemplate?.templateKey || null : null,
         variables: channel === "whatsapp" ? variables : {},
       });
       setSelection(EMPTY_SELECTION);
       setBody("");
+      setFiles([]);
+      setFileError("");
       setChannel("sms");
       setClientRequestId(defaultClientRequestId());
     } catch {
@@ -195,17 +219,45 @@ export function NewMessageDrawer({
           </fieldset>
 
           {channel === "sms" ? (
-            <label>
-              <span>Message</span>
-              <textarea
-                disabled={isSending}
-                onChange={(event) => setBody(event.target.value)}
-                placeholder="Type the first message"
-                required
-                rows={4}
-                value={body}
-              />
-            </label>
+            <>
+              <label>
+                <span>Message</span>
+                <textarea
+                  disabled={isSending}
+                  onChange={(event) => setBody(event.target.value)}
+                  placeholder="Type the first message"
+                  required
+                  rows={4}
+                  value={body}
+                />
+              </label>
+              <div className="new-message-attach">
+                <label
+                  aria-label="Attach files or imagery"
+                  className={`attach-control ${isSending ? "is-disabled" : ""}`}
+                  title="Attach files or imagery"
+                >
+                  <Paperclip size={18} />
+                  <input
+                    disabled={isSending}
+                    multiple
+                    onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                      appendFiles(Array.from(event.target.files ?? []));
+                      event.currentTarget.value = "";
+                    }}
+                    type="file"
+                  />
+                </label>
+                {files.length > 0 && (
+                  <div className="file-list">
+                    {files.map((file) => (
+                      <span key={`${file.name}-${file.size}`}>{file.name}</span>
+                    ))}
+                  </div>
+                )}
+                {fileError && <p className="form-error">{fileError}</p>}
+              </div>
+            </>
           ) : (
             <div className="new-message-template-section">
               <label>

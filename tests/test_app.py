@@ -1,5 +1,6 @@
 import io
 import os
+import re
 from datetime import UTC, datetime, timedelta
 
 import pillow_heif
@@ -348,7 +349,12 @@ def test_admin_reply_compresses_oversized_image_for_mms():
     compressed_url = "https://files.example/admin-replies/conversation-1/mms/mms-shirt.jpg"
     sent = sender.sent_messages[-1]
     assert sent["media_urls"] == (compressed_url,)
-    assert f"Full quality: {original_url}" in sent["body"]
+    match = re.search(r"See original photo: (https://maya-relay\.example/i/\S+)", sent["body"])
+    assert match is not None
+    short_url = match.group(1)
+    redirect = client.get(short_url.removeprefix("https://maya-relay.example"), headers={"cookie": cookie}, follow_redirects=False)
+    assert redirect.status_code == 302
+    assert redirect.headers["location"] == original_url
     assert repository.messages[-1]["media_urls"] == (original_url,)
     stored_object_paths = {a["object_path"] for a in repository.attachments}
     assert "admin-replies/conversation-1/shirt.jpg" in stored_object_paths
@@ -1554,7 +1560,14 @@ def test_api_reply_compresses_oversized_image_and_links_full_quality():
 
     # Twilio gets the compressed copy, not the original oversized file.
     assert sent["media_urls"] == (compressed_url,)
-    assert f"Full quality: {original_url}" in sent["body"]
+    match = re.search(r"See original photo: (https://maya-relay\.example/i/\S+)", sent["body"])
+    assert match is not None
+    short_url = match.group(1)
+
+    # The short link resolves (redirects) to the full-res original, not the compressed copy.
+    redirect = client.get(short_url.removeprefix("https://maya-relay.example"), headers={"cookie": cookie}, follow_redirects=False)
+    assert redirect.status_code == 302
+    assert redirect.headers["location"] == original_url
 
     # The message's canonical attachment record still points at the full-res original.
     attachment = response.json()["message"]["attachments"][0]
@@ -1597,6 +1610,14 @@ def test_api_conversation_list_hides_call_only_activity_from_text_inbox():
     assert calls.status_code == 200
     assert calls.json()["calls"][0]["latestCall"]["direction"] == "inbound"
     assert calls.json()["calls"][0]["latestCall"]["status"] == "ringing"
+
+
+def test_short_link_unknown_token_returns_404():
+    client, _, _ = make_client()
+
+    response = client.get("/i/does-not-exist", follow_redirects=False)
+
+    assert response.status_code == 404
 
 
 def test_api_reply_rejects_oversized_attachment_before_storage(monkeypatch):

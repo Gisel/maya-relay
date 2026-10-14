@@ -169,6 +169,8 @@ def send_conversation_reply(
         )
         outbound_media_urls, compressed_attachments, full_quality_links = prepare_mms_media(
             attachment_store=attachment_store,
+            repository=repository,
+            app_base_url=settings.app_base_url,
             object_prefix=object_prefix,
             uploads=uploads,
             stored_attachments=stored_attachments,
