@@ -18,6 +18,9 @@ For the current MVP, there is no employee dashboard and no CRM requirement. The 
 - Railway deployment is live.
 - Supabase stores contacts, conversations, messages, delivery status, and attachments.
 - Incoming media is copied from Twilio to the Supabase `attachments` bucket.
+- Outbound image attachments are auto-normalized before sending: HEIC/HEIF is converted to JPEG, and oversized images are compressed to a carrier-safe size (target ~500KB, 1600px max dimension) since real-world MMS limits (e.g. AT&T ~0.6-1.0MB) are far stricter than the app's own 50MB upload cap. See `docs/mms-delivery-and-mobile-composer-fixes.md`.
+- A reply that includes both typed text and a photo sends as two separate messages (text, then a bare image) instead of one combined MMS, to avoid SMS/MMS clients padding the photo with white space to match a wider caption bubble.
+- The "full quality" / original-resolution image link uses a short `mayagraphics.co/i/<token>` redirect (`short_links` table) instead of the raw Supabase storage URL.
 
 ### Routing
 
@@ -138,7 +141,17 @@ Features:
 - `size_bytes`
 - `created_at`
 
+`short_links`
+
+- `token` (primary key)
+- `target_url`
+- `created_at`
+
 ## Pending Work
+
+### MMS Delivery Follow-up
+
+- Luis (Oliva Landscaping) and customer `+18013010076` are still waiting on the shirt-proof photos that originally failed to deliver on 2026-10-12 (HEIC/oversized-image delivery failures). Those messages remain `delivery_status = 'failed'` in Supabase with no automatic retry; resend them now that the pipeline is fixed. See `docs/mms-delivery-and-mobile-composer-fixes.md`.
 
 ### Demo Day Checklist
 
