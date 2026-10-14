@@ -28,7 +28,7 @@ from app.dependencies import (
 )
 from app.models import Conversation
 from app.operator_auth import OperatorAuthService
-from app.reply_helpers import image_attachment_urls, read_uploads, reply_body_with_attachments
+from app.reply_helpers import normalize_image_uploads, prepare_mms_media, read_uploads, reply_body_with_attachments
 from app.services.contact_import import ContactImportValidationError, import_contacts_csv
 from app.services.customer_actions import (
     CustomerActionNotFound,
@@ -1200,19 +1200,30 @@ def api_send_conversation_reply(
             return {"status": "duplicate", "message": _serialize_message(existing)}
 
     reply_body = body.strip()
-    uploads = _validated_message_uploads(read_uploads(reply_files))
+    uploads = normalize_image_uploads(_validated_message_uploads(read_uploads(reply_files)))
     if not reply_body and not uploads:
         raise HTTPException(status_code=400, detail="Reply body or file is required.")
 
     stored_attachments = ()
+    outbound_media_urls = ()
+    compressed_attachments = ()
+    full_quality_links = ()
+    object_prefix = f"api-replies/{conversation.id}"
     if uploads:
         stored_attachments = attachment_store.store_uploaded_attachments(
-            object_prefix=f"api-replies/{conversation.id}",
+            object_prefix=object_prefix,
             files=uploads,
         )
+        outbound_media_urls, compressed_attachments, full_quality_links = prepare_mms_media(
+            attachment_store=attachment_store,
+            object_prefix=object_prefix,
+            uploads=uploads,
+            stored_attachments=stored_attachments,
+            target_bytes=settings.mms_target_bytes,
+            max_dimension=settings.mms_max_dimension_px,
+        )
 
-    outbound_body = reply_body_with_attachments(reply_body, stored_attachments)
-    outbound_media_urls = image_attachment_urls(stored_attachments)
+    outbound_body = reply_body_with_attachments(reply_body, stored_attachments, full_quality_links=full_quality_links)
 
     channel = _effective_customer_channel(conversation.customer_channel, conversation.customer_phone)
     whatsapp_window_open = channel != "whatsapp" or _has_active_whatsapp_window(repository, conversation.id)
@@ -1247,7 +1258,7 @@ def api_send_conversation_reply(
         media_content_types=tuple(attachment.content_type for attachment in stored_attachments),
         client_request_id=normalized_client_request_id,
     )
-    for attachment in stored_attachments:
+    for attachment in stored_attachments + compressed_attachments:
         repository.create_message_attachment(
             message_id=created_message["id"],
             bucket=attachment.bucket,
