@@ -10,6 +10,7 @@ from app.auth import SESSION_COOKIE, admin_enabled, is_authenticated, require_ad
 from app.config import Settings, get_settings
 from app.db import RelayRepository
 from app.dependencies import get_attachment_store, get_repository, get_sender
+from app.public_base_url import public_base_url
 from app.reply_helpers import (
     is_image_content_type,
     normalize_image_uploads,
@@ -170,7 +171,7 @@ def send_conversation_reply(
         outbound_media_urls, compressed_attachments, full_quality_links = prepare_mms_media(
             attachment_store=attachment_store,
             repository=repository,
-            app_base_url=settings.app_base_url,
+            app_base_url=public_base_url(request, settings),
             object_prefix=object_prefix,
             uploads=uploads,
             stored_attachments=stored_attachments,
