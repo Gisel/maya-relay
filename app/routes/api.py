@@ -29,7 +29,13 @@ from app.dependencies import (
 from app.models import Conversation
 from app.operator_auth import OperatorAuthService
 from app.public_base_url import is_local_base_url, public_base_url, required_public_base_url
-from app.reply_helpers import normalize_image_uploads, prepare_mms_media, read_uploads, reply_body_with_attachments
+from app.reply_helpers import (
+    normalize_image_uploads,
+    prepare_mms_media,
+    read_uploads,
+    reply_body_with_attachments,
+    send_reply_messages,
+)
 from app.services.contact_import import ContactImportValidationError, import_contacts_csv
 from app.services.customer_actions import (
     CustomerActionNotFound,
@@ -1232,11 +1238,17 @@ def api_send_conversation_reply(
     whatsapp_window_open = channel != "whatsapp" or _has_active_whatsapp_window(repository, conversation.id)
 
     if whatsapp_window_open:
-        outbound_sid = sender.send_message(
+        created_messages = send_reply_messages(
+            sender=sender,
+            repository=repository,
+            conversation_id=conversation.id,
+            from_phone=settings.maya_business_number,
             to_phone=conversation.customer_phone,
-            body=outbound_body,
             channel=channel,
+            text_body=outbound_body,
             media_urls=outbound_media_urls,
+            media_attachments=stored_attachments,
+            client_request_id=normalized_client_request_id,
         )
         send_mode = "free_form"
     else:
@@ -1248,22 +1260,25 @@ def api_send_conversation_reply(
             has_attachments=bool(stored_attachments),
         )
         send_mode = "owner_message_template"
+        created_messages = (
+            repository.create_message(
+                conversation_id=conversation.id,
+                direction="employee_to_customer",
+                from_phone=settings.maya_business_number,
+                to_phone=conversation.customer_phone,
+                body=outbound_body,
+                twilio_message_sid=outbound_sid,
+                num_media=len(stored_attachments),
+                media_urls=tuple(attachment.public_url for attachment in stored_attachments),
+                media_content_types=tuple(attachment.content_type for attachment in stored_attachments),
+                client_request_id=normalized_client_request_id,
+            ),
+        )
 
-    created_message = repository.create_message(
-        conversation_id=conversation.id,
-        direction="employee_to_customer",
-        from_phone=settings.maya_business_number,
-        to_phone=conversation.customer_phone,
-        body=outbound_body,
-        twilio_message_sid=outbound_sid,
-        num_media=len(stored_attachments),
-        media_urls=tuple(attachment.public_url for attachment in stored_attachments),
-        media_content_types=tuple(attachment.content_type for attachment in stored_attachments),
-        client_request_id=normalized_client_request_id,
-    )
+    media_message_id = created_messages[-1]["id"]
     for attachment in stored_attachments + compressed_attachments:
         repository.create_message_attachment(
-            message_id=created_message["id"],
+            message_id=media_message_id,
             bucket=attachment.bucket,
             object_path=attachment.object_path,
             public_url=attachment.public_url,
@@ -1272,7 +1287,14 @@ def api_send_conversation_reply(
             size_bytes=None,
         )
 
-    return {"status": "sent", "sendMode": send_mode, "message": _serialize_message(created_message)}
+    response: dict[str, Any] = {
+        "status": "sent",
+        "sendMode": send_mode,
+        "message": _serialize_message(created_messages[0]),
+    }
+    if len(created_messages) > 1:
+        response["additionalMessages"] = [_serialize_message(message) for message in created_messages[1:]]
+    return response
 
 
 @router.post("/conversations/{conversation_id}/quick-responses/{quick_response_id}/send")

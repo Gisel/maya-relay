@@ -1593,9 +1593,11 @@ export function App() {
     setAppError("");
     try {
       const response = await sendReply(selectedId, body, selectedFiles, newClientRequestId());
+      const newMessages = [response.message, ...(response.additionalMessages ?? [])];
       setMessages((current) => {
-        const withoutDuplicate = current.filter((message) => message.id !== response.message.id);
-        return [...withoutDuplicate, response.message];
+        const newIds = new Set(newMessages.map((message) => message.id));
+        const withoutDuplicates = current.filter((message) => !newIds.has(message.id));
+        return [...withoutDuplicates, ...newMessages];
       });
       await loadConversations(selectedId);
       setSuggestedReply("");

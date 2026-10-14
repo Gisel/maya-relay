@@ -17,6 +17,7 @@ from app.reply_helpers import (
     prepare_mms_media,
     read_uploads,
     reply_body_with_attachments,
+    send_reply_messages,
 )
 from app.twilio_client import MessageSender
 
@@ -179,26 +180,21 @@ def send_conversation_reply(
             max_dimension=settings.mms_max_dimension_px,
         )
     outbound_body = reply_body_with_attachments(body, stored_attachments, full_quality_links=full_quality_links)
-    outbound_sid = sender.send_message(
-        to_phone=conversation.customer_phone,
-        body=outbound_body,
-        channel=conversation.customer_channel,
-        media_urls=outbound_media_urls,
-    )
-    created_message = repository.create_message(
+    created_messages = send_reply_messages(
+        sender=sender,
+        repository=repository,
         conversation_id=conversation.id,
-        direction="employee_to_customer",
         from_phone=settings.maya_business_number,
         to_phone=conversation.customer_phone,
-        body=outbound_body,
-        twilio_message_sid=outbound_sid,
-        num_media=len(stored_attachments),
-        media_urls=tuple(attachment.public_url for attachment in stored_attachments),
-        media_content_types=tuple(attachment.content_type for attachment in stored_attachments),
+        channel=conversation.customer_channel,
+        text_body=outbound_body,
+        media_urls=outbound_media_urls,
+        media_attachments=stored_attachments,
     )
+    media_message_id = created_messages[-1]["id"]
     for attachment in stored_attachments + compressed_attachments:
         repository.create_message_attachment(
-            message_id=created_message["id"],
+            message_id=media_message_id,
             bucket=attachment.bucket,
             object_path=attachment.object_path,
             public_url=attachment.public_url,

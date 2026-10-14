@@ -312,6 +312,7 @@ export type OperationalStatusResponse = {
 export type ReplyResponse = {
   status: "sent" | "duplicate";
   message: Message;
+  additionalMessages?: Message[];
 };
 
 export type ProofRequestResponse = {

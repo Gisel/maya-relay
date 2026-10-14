@@ -1,9 +1,12 @@
+from typing import Any
+
 from fastapi import UploadFile
 
 from app.attachments import AttachmentStore, StoredAttachment, UploadedAttachment
 from app.db import RelayRepository
 from app.image_processing import compress_for_mms, is_heic, normalize_image
 from app.short_links import generate_short_token
+from app.twilio_client import MessageSender
 
 
 def read_uploads(files: list[UploadFile]) -> tuple[UploadedAttachment, ...]:
@@ -137,3 +140,69 @@ def image_attachment_urls(attachments: tuple[StoredAttachment, ...]) -> tuple[st
 
 def is_image_content_type(content_type: str) -> bool:
     return content_type.lower().startswith("image/")
+
+
+def send_reply_messages(
+    *,
+    sender: MessageSender,
+    repository: RelayRepository,
+    conversation_id: str,
+    from_phone: str,
+    to_phone: str,
+    channel: str,
+    text_body: str,
+    media_urls: tuple[str, ...],
+    media_attachments: tuple[StoredAttachment, ...],
+    client_request_id: str | None = None,
+) -> tuple[dict[str, Any], ...]:
+    """
+    Send a reply as one or two Twilio messages.
+
+    SMS/MMS clients size a message bubble to its widest text line, then
+    center any (narrower) photo inside it — so a caption next to an image
+    pads the image with blank space. When both text and media are present,
+    this sends them as two separate messages (text first, bare image
+    second) so the photo always renders at its own width. Otherwise it
+    sends a single message exactly as before. Returns the created
+    `messages` row(s), text message first when split.
+    """
+    if text_body and media_urls:
+        text_sid = sender.send_message(to_phone=to_phone, body=text_body, channel=channel, media_urls=())
+        text_message = repository.create_message(
+            conversation_id=conversation_id,
+            direction="employee_to_customer",
+            from_phone=from_phone,
+            to_phone=to_phone,
+            body=text_body,
+            twilio_message_sid=text_sid,
+            client_request_id=client_request_id,
+        )
+
+        media_sid = sender.send_message(to_phone=to_phone, body="", channel=channel, media_urls=media_urls)
+        media_message = repository.create_message(
+            conversation_id=conversation_id,
+            direction="employee_to_customer",
+            from_phone=from_phone,
+            to_phone=to_phone,
+            body="",
+            twilio_message_sid=media_sid,
+            num_media=len(media_attachments),
+            media_urls=tuple(attachment.public_url for attachment in media_attachments),
+            media_content_types=tuple(attachment.content_type for attachment in media_attachments),
+        )
+        return (text_message, media_message)
+
+    sid = sender.send_message(to_phone=to_phone, body=text_body, channel=channel, media_urls=media_urls)
+    message = repository.create_message(
+        conversation_id=conversation_id,
+        direction="employee_to_customer",
+        from_phone=from_phone,
+        to_phone=to_phone,
+        body=text_body,
+        twilio_message_sid=sid,
+        num_media=len(media_attachments),
+        media_urls=tuple(attachment.public_url for attachment in media_attachments),
+        media_content_types=tuple(attachment.content_type for attachment in media_attachments),
+        client_request_id=client_request_id,
+    )
+    return (message,)
