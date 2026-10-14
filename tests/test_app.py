@@ -308,10 +308,17 @@ def test_admin_login_and_conversations_page():
         follow_redirects=False,
     )
     assert send_image_reply.status_code == 303
-    assert sender.sent_messages[-1] == {
+    # A caption + an image send as two separate texts (caption, then bare image) so the
+    # photo never gets padded with blank space to match a wider caption bubble.
+    assert sender.sent_messages[-2] == {
         "sid": "SMfake3",
         "to_phone": "+15550000001",
         "body": "Please review this image.",
+    }
+    assert sender.sent_messages[-1] == {
+        "sid": "SMfake4",
+        "to_phone": "+15550000001",
+        "body": "",
         "media_urls": ("https://files.example/admin-replies/conversation-1/proof.jpg",),
     }
     assert repository.messages[-1]["media_urls"] == (
@@ -347,9 +354,13 @@ def test_admin_reply_compresses_oversized_image_for_mms():
     assert send_reply.status_code == 303
     original_url = "https://files.example/admin-replies/conversation-1/shirt.jpg"
     compressed_url = "https://files.example/admin-replies/conversation-1/mms/mms-shirt.jpg"
-    sent = sender.sent_messages[-1]
-    assert sent["media_urls"] == (compressed_url,)
-    match = re.search(r"See original photo: (https://maya-relay\.example/i/\S+)", sent["body"])
+    # Caption + "See original photo" link go out as their own text; the image follows bare.
+    text_sent = sender.sent_messages[-2]
+    media_sent = sender.sent_messages[-1]
+    assert "media_urls" not in text_sent
+    assert media_sent["body"] == ""
+    assert media_sent["media_urls"] == (compressed_url,)
+    match = re.search(r"See original photo: (https://maya-relay\.example/i/\S+)", text_sent["body"])
     assert match is not None
     short_url = match.group(1)
     redirect = client.get(short_url.removeprefix("https://maya-relay.example"), headers={"cookie": cookie}, follow_redirects=False)
@@ -1495,13 +1506,23 @@ def test_api_reply_uploads_image_as_media():
     )
 
     assert response.status_code == 200
-    assert sender.sent_messages[-1] == {
+    # Caption + image go out as two texts (caption, then bare image) so the photo
+    # never gets padded with blank space to match a wider caption bubble.
+    assert sender.sent_messages[-2] == {
         "sid": "SMfake1",
         "to_phone": "+15550000001",
         "body": "Please review.",
+    }
+    assert sender.sent_messages[-1] == {
+        "sid": "SMfake2",
+        "to_phone": "+15550000001",
+        "body": "",
         "media_urls": ("https://files.example/api-replies/conversation-1/proof.jpg",),
     }
-    assert response.json()["message"]["attachments"] == [
+    body = response.json()
+    assert body["message"]["body"] == "Please review."
+    assert body["message"]["attachments"] == []
+    assert body["additionalMessages"][0]["attachments"] == [
         {
             "url": "https://files.example/api-replies/conversation-1/proof.jpg",
             "contentType": "image/jpeg",
@@ -1527,10 +1548,12 @@ def test_api_reply_converts_heic_upload_to_jpeg_before_sending():
     )
 
     assert response.status_code == 200
+    # Caption + image split into two texts; the image send is last and carries no body.
     media_urls = sender.sent_messages[-1]["media_urls"]
+    assert sender.sent_messages[-1]["body"] == ""
     assert len(media_urls) == 1
     assert media_urls[0].endswith("IMG_3531.jpg")
-    attachment = response.json()["message"]["attachments"][0]
+    attachment = response.json()["additionalMessages"][0]["attachments"][0]
     assert attachment["contentType"] == "image/jpeg"
     assert attachment["url"].endswith("IMG_3531.jpg")
 
@@ -1554,13 +1577,17 @@ def test_api_reply_compresses_oversized_image_and_links_full_quality():
     )
 
     assert response.status_code == 200
-    sent = sender.sent_messages[-1]
+    # Caption + "See original photo" link go out as their own text; the image follows bare.
+    text_sent = sender.sent_messages[-2]
+    media_sent = sender.sent_messages[-1]
     original_url = "https://files.example/api-replies/conversation-1/shirt.jpg"
     compressed_url = "https://files.example/api-replies/conversation-1/mms/mms-shirt.jpg"
 
     # Twilio gets the compressed copy, not the original oversized file.
-    assert sent["media_urls"] == (compressed_url,)
-    match = re.search(r"See original photo: (https://maya-relay\.example/i/\S+)", sent["body"])
+    assert "media_urls" not in text_sent
+    assert media_sent["body"] == ""
+    assert media_sent["media_urls"] == (compressed_url,)
+    match = re.search(r"See original photo: (https://maya-relay\.example/i/\S+)", text_sent["body"])
     assert match is not None
     short_url = match.group(1)
 
@@ -1570,13 +1597,66 @@ def test_api_reply_compresses_oversized_image_and_links_full_quality():
     assert redirect.headers["location"] == original_url
 
     # The message's canonical attachment record still points at the full-res original.
-    attachment = response.json()["message"]["attachments"][0]
+    attachment = response.json()["additionalMessages"][0]["attachments"][0]
     assert attachment["url"] == original_url
 
     # Both the original and the compressed copy are persisted for traceability.
     stored_object_paths = {a["object_path"] for a in repository.attachments}
     assert "api-replies/conversation-1/shirt.jpg" in stored_object_paths
     assert "api-replies/conversation-1/mms/mms-shirt.jpg" in stored_object_paths
+
+
+def test_api_reply_image_only_does_not_split():
+    client, repository, sender = make_client(admin_password="secret")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    response = client.post(
+        "/api/conversations/conversation-1/reply",
+        data={"body": "", "client_request_id": "image-only-request-1"},
+        files=[("reply_files", ("proof.jpg", b"fake jpg", "image/jpeg"))],
+        headers={"cookie": cookie},
+    )
+
+    assert response.status_code == 200
+    assert len(sender.sent_messages) == 1
+    assert sender.sent_messages[0]["media_urls"] == (
+        "https://files.example/api-replies/conversation-1/proof.jpg",
+    )
+    body = response.json()
+    assert "additionalMessages" not in body
+    assert body["message"]["attachments"] == [
+        {
+            "url": "https://files.example/api-replies/conversation-1/proof.jpg",
+            "contentType": "image/jpeg",
+            "kind": "image",
+        }
+    ]
+
+
+def test_api_reply_text_only_does_not_split():
+    client, repository, sender = make_client(admin_password="secret")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    response = client.post(
+        "/api/conversations/conversation-1/reply",
+        data={"body": "Just a text reply.", "client_request_id": "text-only-request-1"},
+        headers={"cookie": cookie},
+    )
+
+    assert response.status_code == 200
+    assert len(sender.sent_messages) == 1
+    assert sender.sent_messages[0]["body"] == "Just a text reply."
+    assert "additionalMessages" not in response.json()
 
 
 def test_api_conversation_list_hides_call_only_activity_from_text_inbox():
