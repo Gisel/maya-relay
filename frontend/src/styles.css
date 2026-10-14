@@ -1470,7 +1470,7 @@ button {
   padding: 0 3px;
   position: absolute;
   right: -4px;
-  top: -4px;
+  top: 0;
 }
 
 .attach-control.is-disabled {
