@@ -81,6 +81,7 @@ import { UnifiedSearchResults } from "./search/UnifiedSearchResults";
 import { ContactCsvImport } from "./settings/ContactCsvImport";
 import { OperationalStatusView } from "./settings/OperationalStatusView";
 import { SettingsModal } from "./settings/SettingsModal";
+import { useVisualViewportHeight } from "./useVisualViewportHeight";
 
 const INBOX_REFRESH_INTERVAL_MS = 15000;
 const CLOSE_AUDIT_LOG_PREFIX = "[Maya Relay Close Audit]";
@@ -674,6 +675,17 @@ function Composer({
     textarea.style.height = `${Math.min(textarea.scrollHeight, 132)}px`;
   }, [draft]);
 
+  useEffect(() => {
+    // Attaching a file (often before the keyboard is open) grows the composer;
+    // nudge the field back into view once that reflow — and any keyboard
+    // animation it triggers — has settled.
+    if (files.length === 0) return;
+    const timeoutId = window.setTimeout(() => {
+      textareaRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
+    }, 300);
+    return () => window.clearTimeout(timeoutId);
+  }, [files]);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSend || isSending || disabled) return;
@@ -784,6 +796,7 @@ function Composer({
 }
 
 export function App() {
+  useVisualViewportHeight();
   const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authError, setAuthError] = useState("");
