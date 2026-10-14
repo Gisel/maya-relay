@@ -748,11 +748,12 @@ function Composer({
     >
       <div className="composer-actions">
         <label
-          aria-label="Attach files or imagery"
+          aria-label={files.length > 0 ? `Attach files or imagery (${files.length} attached)` : "Attach files or imagery"}
           className={`attach-control ${disabled || isSending ? "is-disabled" : ""}`}
-          title="Attach files or imagery"
+          title={files.length > 0 ? `${files.length} file(s) attached` : "Attach files or imagery"}
         >
           <Paperclip size={22} />
+          {files.length > 0 && <span className="attach-badge">{files.length}</span>}
           <input
             disabled={disabled || isSending}
             multiple
