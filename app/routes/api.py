@@ -28,6 +28,7 @@ from app.dependencies import (
 )
 from app.models import Conversation
 from app.operator_auth import OperatorAuthService
+from app.public_base_url import is_local_base_url, public_base_url, required_public_base_url
 from app.reply_helpers import normalize_image_uploads, prepare_mms_media, read_uploads, reply_body_with_attachments
 from app.services.contact_import import ContactImportValidationError, import_contacts_csv
 from app.services.customer_actions import (
@@ -201,7 +202,7 @@ def api_password_reset(
     settings: Settings = Depends(get_settings),
     operator_auth: OperatorAuthService = Depends(get_operator_auth_service),
 ) -> dict[str, bool]:
-    redirect_to = f"{_required_public_base_url(request, settings)}/reset-password"
+    redirect_to = f"{required_public_base_url(request, settings)}/reset-password"
     operator_auth.request_password_reset(email=payload.email, redirect_to=redirect_to)
     return {"sent": True}
 
@@ -213,7 +214,7 @@ def api_password_update(
     settings: Settings = Depends(get_settings),
     operator_auth: OperatorAuthService = Depends(get_operator_auth_service),
 ) -> dict[str, bool]:
-    redirect_to = f"{_required_public_base_url(request, settings)}/reset-password"
+    redirect_to = f"{required_public_base_url(request, settings)}/reset-password"
     operator_auth.update_password(
         password=payload.password,
         access_token=payload.access_token,
@@ -806,8 +807,8 @@ def api_create_proof_request(
     conversation = repository.get_conversation(conversation_id)
     if conversation is None:
         raise HTTPException(status_code=404)
-    public_base_url = _public_base_url(request, settings)
-    if _is_local_base_url(public_base_url):
+    resolved_base_url = public_base_url(request, settings)
+    if is_local_base_url(resolved_base_url):
         raise HTTPException(
             status_code=503,
             detail="APP_BASE_URL must be set to the public Maya Relay URL before sending proof links.",
@@ -843,7 +844,7 @@ def api_create_proof_request(
             title=title,
             operator_note=operator_note,
             proof_file=proof_file_input,
-            public_base_url=public_base_url,
+            public_base_url=resolved_base_url,
         )
     except CustomerActionValidationError as exc:
         attachment_store.delete_uploaded_attachments(stored_files)
@@ -931,8 +932,8 @@ def api_create_asset_request(
     conversation = repository.get_conversation(conversation_id)
     if conversation is None:
         raise HTTPException(status_code=404)
-    public_base_url = _public_base_url(request, settings)
-    if _is_local_base_url(public_base_url):
+    resolved_base_url = public_base_url(request, settings)
+    if is_local_base_url(resolved_base_url):
         raise HTTPException(
             status_code=503,
             detail="APP_BASE_URL must be set to the public Maya Relay URL before sending asset links.",
@@ -942,7 +943,7 @@ def api_create_asset_request(
             conversation_id=conversation_id,
             title=title,
             operator_note=operator_note,
-            public_base_url=public_base_url,
+            public_base_url=resolved_base_url,
         )
     except CustomerActionValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -1217,7 +1218,7 @@ def api_send_conversation_reply(
         outbound_media_urls, compressed_attachments, full_quality_links = prepare_mms_media(
             attachment_store=attachment_store,
             repository=repository,
-            app_base_url=settings.app_base_url,
+            app_base_url=public_base_url(request, settings),
             object_prefix=object_prefix,
             uploads=uploads,
             stored_attachments=stored_attachments,
@@ -1592,7 +1593,7 @@ def _start_click_to_call(
     if recent_call is not None:
         raise HTTPException(status_code=409, detail="A call is already in progress for this conversation.")
 
-    base_url = _public_base_url(request, settings)
+    base_url = public_base_url(request, settings)
     call_sid = voice_caller.start_click_to_call(
         employee_phone=employee_phone,
         bridge_url=f"{base_url}/webhooks/twilio/voice/bridge/{conversation.id}",
@@ -2658,40 +2659,6 @@ def _strip_conversation_code(reply: str, conversation_code: str) -> str:
     if clean.upper().startswith(prefix):
         return clean[len(prefix):].strip()
     return clean
-
-
-def _public_base_url(request: Request, settings: Settings) -> str:
-    forwarded_proto = request.headers.get("x-forwarded-proto")
-    forwarded_host = request.headers.get("x-forwarded-host") or request.headers.get("host")
-    if forwarded_proto and forwarded_host:
-        request_base_url = f"{forwarded_proto}://{forwarded_host}"
-    else:
-        request_base_url = str(request.base_url).rstrip("/")
-
-    configured_base_url = settings.app_base_url.strip().rstrip("/")
-    if configured_base_url and not _is_local_base_url(configured_base_url):
-        return configured_base_url
-    if request_base_url:
-        return request_base_url
-
-    return configured_base_url or "http://localhost:8000"
-
-
-def _required_public_base_url(request: Request, settings: Settings) -> str:
-    base_url = _public_base_url(request, settings)
-    parsed = urlparse(base_url)
-    if parsed.scheme != "https" or _is_local_base_url(base_url):
-        raise HTTPException(
-            status_code=503,
-            detail="APP_BASE_URL must be set to the public HTTPS Maya Relay URL before sending password reset links.",
-        )
-    return base_url
-
-
-def _is_local_base_url(base_url: str) -> bool:
-    parsed = urlparse(base_url)
-    host = (parsed.hostname or "").lower()
-    return host in {"localhost", "127.0.0.1", "0.0.0.0"}
 
 
 def _voice_phone_number(phone_number: str) -> str:
