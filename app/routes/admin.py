@@ -10,7 +10,13 @@ from app.auth import SESSION_COOKIE, admin_enabled, is_authenticated, require_ad
 from app.config import Settings, get_settings
 from app.db import RelayRepository
 from app.dependencies import get_attachment_store, get_repository, get_sender
-from app.reply_helpers import image_attachment_urls, is_image_content_type, read_uploads, reply_body_with_attachments
+from app.reply_helpers import (
+    is_image_content_type,
+    normalize_image_uploads,
+    prepare_mms_media,
+    read_uploads,
+    reply_body_with_attachments,
+)
 from app.twilio_client import MessageSender
 
 
@@ -147,18 +153,29 @@ def send_conversation_reply(
         raise HTTPException(status_code=404)
 
     body = reply_body.strip()
-    uploads = _validated_message_uploads(read_uploads(reply_files))
+    uploads = normalize_image_uploads(_validated_message_uploads(read_uploads(reply_files)))
     if not body and not uploads:
         raise HTTPException(status_code=400, detail="Reply body or file is required.")
 
     stored_attachments = ()
+    outbound_media_urls = ()
+    compressed_attachments = ()
+    full_quality_links = ()
+    object_prefix = f"admin-replies/{conversation.id}"
     if uploads:
         stored_attachments = attachment_store.store_uploaded_attachments(
-            object_prefix=f"admin-replies/{conversation.id}",
+            object_prefix=object_prefix,
             files=uploads,
         )
-    outbound_body = reply_body_with_attachments(body, stored_attachments)
-    outbound_media_urls = image_attachment_urls(stored_attachments)
+        outbound_media_urls, compressed_attachments, full_quality_links = prepare_mms_media(
+            attachment_store=attachment_store,
+            object_prefix=object_prefix,
+            uploads=uploads,
+            stored_attachments=stored_attachments,
+            target_bytes=settings.mms_target_bytes,
+            max_dimension=settings.mms_max_dimension_px,
+        )
+    outbound_body = reply_body_with_attachments(body, stored_attachments, full_quality_links=full_quality_links)
     outbound_sid = sender.send_message(
         to_phone=conversation.customer_phone,
         body=outbound_body,
@@ -176,7 +193,7 @@ def send_conversation_reply(
         media_urls=tuple(attachment.public_url for attachment in stored_attachments),
         media_content_types=tuple(attachment.content_type for attachment in stored_attachments),
     )
-    for attachment in stored_attachments:
+    for attachment in stored_attachments + compressed_attachments:
         repository.create_message_attachment(
             message_id=created_message["id"],
             bucket=attachment.bucket,

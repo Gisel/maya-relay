@@ -1,8 +1,12 @@
+import io
+import os
 from datetime import UTC, datetime, timedelta
 
+import pillow_heif
 from fastapi.testclient import TestClient
 from fastapi import HTTPException
 from gotrue.errors import AuthApiError
+from PIL import Image
 from twilio.request_validator import RequestValidator
 
 import app.routes.api as api_routes
@@ -23,6 +27,22 @@ from tests.fakes import FakeAttachmentStore, FakeOperatorAuthService, FakeReposi
 
 
 PROOF_PDF_BYTES = b"%PDF-1.4\nfake proof"
+
+
+def _oversized_jpeg_bytes(width: int = 1200, height: int = 900) -> bytes:
+    # Random noise defeats JPEG compression, giving a realistic "big photo" size.
+    image = Image.frombytes("RGB", (width, height), os.urandom(width * height * 3))
+    buffer = io.BytesIO()
+    image.save(buffer, format="JPEG", quality=95)
+    return buffer.getvalue()
+
+
+def _heic_bytes(width: int = 64, height: int = 64) -> bytes:
+    image = Image.new("RGB", (width, height), color=(255, 0, 0))
+    heif_file = pillow_heif.from_pillow(image)
+    buffer = io.BytesIO()
+    heif_file.save(buffer, quality=80)
+    return buffer.getvalue()
 
 
 def make_client(
@@ -303,6 +323,36 @@ def test_admin_login_and_conversations_page():
     logout = client.get("/admin/logout", follow_redirects=False)
     assert logout.status_code == 303
     assert "maya_admin" in logout.headers["set-cookie"]
+
+
+def test_admin_reply_compresses_oversized_image_for_mms():
+    client, repository, sender = make_client(admin_password="secret")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+    oversized = _oversized_jpeg_bytes()
+
+    send_reply = client.post(
+        "/admin/conversations/conversation-1/reply",
+        data={"reply_body": "Asi quedaria."},
+        files=[("reply_files", ("shirt.jpg", oversized, "image/jpeg"))],
+        headers={"cookie": cookie},
+        follow_redirects=False,
+    )
+
+    assert send_reply.status_code == 303
+    original_url = "https://files.example/admin-replies/conversation-1/shirt.jpg"
+    compressed_url = "https://files.example/admin-replies/conversation-1/mms/mms-shirt.jpg"
+    sent = sender.sent_messages[-1]
+    assert sent["media_urls"] == (compressed_url,)
+    assert f"Full quality: {original_url}" in sent["body"]
+    assert repository.messages[-1]["media_urls"] == (original_url,)
+    stored_object_paths = {a["object_path"] for a in repository.attachments}
+    assert "admin-replies/conversation-1/shirt.jpg" in stored_object_paths
+    assert "admin-replies/conversation-1/mms/mms-shirt.jpg" in stored_object_paths
 
 
 def test_admin_reply_uses_conversation_customer_channel():
@@ -1452,6 +1502,68 @@ def test_api_reply_uploads_image_as_media():
             "kind": "image",
         }
     ]
+
+
+def test_api_reply_converts_heic_upload_to_jpeg_before_sending():
+    client, repository, sender = make_client(admin_password="secret")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+
+    response = client.post(
+        "/api/conversations/conversation-1/reply",
+        data={"body": "Asi quedaria.", "client_request_id": "heic-request-1"},
+        files=[("reply_files", ("IMG_3531.HEIC", _heic_bytes(), "image/heic"))],
+        headers={"cookie": cookie},
+    )
+
+    assert response.status_code == 200
+    media_urls = sender.sent_messages[-1]["media_urls"]
+    assert len(media_urls) == 1
+    assert media_urls[0].endswith("IMG_3531.jpg")
+    attachment = response.json()["message"]["attachments"][0]
+    assert attachment["contentType"] == "image/jpeg"
+    assert attachment["url"].endswith("IMG_3531.jpg")
+
+
+def test_api_reply_compresses_oversized_image_and_links_full_quality():
+    client, repository, sender = make_client(admin_password="secret")
+    repository.get_or_create_customer_conversation(
+        customer_phone="+15550000001",
+        assigned_employee="+15551234567",
+    )
+    login = client.post("/admin/login", data={"password": "secret"}, follow_redirects=False)
+    cookie = login.headers["set-cookie"]
+    oversized = _oversized_jpeg_bytes()
+    assert len(oversized) > 500_000
+
+    response = client.post(
+        "/api/conversations/conversation-1/reply",
+        data={"body": "Asi quedaria.", "client_request_id": "oversized-request-1"},
+        files=[("reply_files", ("shirt.jpg", oversized, "image/jpeg"))],
+        headers={"cookie": cookie},
+    )
+
+    assert response.status_code == 200
+    sent = sender.sent_messages[-1]
+    original_url = "https://files.example/api-replies/conversation-1/shirt.jpg"
+    compressed_url = "https://files.example/api-replies/conversation-1/mms/mms-shirt.jpg"
+
+    # Twilio gets the compressed copy, not the original oversized file.
+    assert sent["media_urls"] == (compressed_url,)
+    assert f"Full quality: {original_url}" in sent["body"]
+
+    # The message's canonical attachment record still points at the full-res original.
+    attachment = response.json()["message"]["attachments"][0]
+    assert attachment["url"] == original_url
+
+    # Both the original and the compressed copy are persisted for traceability.
+    stored_object_paths = {a["object_path"] for a in repository.attachments}
+    assert "api-replies/conversation-1/shirt.jpg" in stored_object_paths
+    assert "api-replies/conversation-1/mms/mms-shirt.jpg" in stored_object_paths
 
 
 def test_api_conversation_list_hides_call_only_activity_from_text_inbox():

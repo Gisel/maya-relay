@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     supabase_anon_key: str = Field(default="", alias="SUPABASE_ANON_KEY")
     supabase_attachments_bucket: str = Field(default="attachments", alias="SUPABASE_ATTACHMENTS_BUCKET")
 
+    mms_target_bytes: int = Field(default=500_000, alias="MMS_TARGET_BYTES")
+    mms_max_dimension_px: int = Field(default=1600, alias="MMS_MAX_DIMENSION_PX")
+
     operator_1_email: str = Field(default="", alias="OPERATOR_1_EMAIL")
     operator_1_password: str = Field(default="", alias="OPERATOR_1_PASSWORD")
     operator_1_name: str = Field(default="", alias="OPERATOR_1_NAME")
